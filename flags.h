@@ -1392,12 +1392,10 @@ int numSubgraphs(const Graph &Hflag1, const Graph &Gflag1) {
 		}
 	}
 	
-	//Hflag.printOrbits();
-	
 	for(int i = 0; i < Hflag.getNumOrbits(); ++i) {
 		if(!Hflag.isFlag(Hflag.getOrbit(i,0))) {
 			bool val = true;
-			vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
+			vector< vector < vector < int > > > possible; //Subsets of vertices in each color which could create a copy of H
 			int Hvertex = Hflag.getOrbit(i,0)-HFlagSize;
 
 			for(int c = 0; c < H.getNumColors(); ++c) {
