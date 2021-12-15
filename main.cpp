@@ -33,7 +33,35 @@ extern "C" {
 int main() {
 	auto start=high_resolution_clock::now();
 	
-	ifstream myFile;
+	
+	for(int j = 2; j < 5; ++j) {
+		for(int k = j; k < 10; ++k) {
+			for(int i = 0; i < 1000; ++i) {
+				cout << i << " " << j << " " << k << endl;
+				Graph H = randomGraph(j, 2, {0.5,0.5}, 0);
+				Graph G = randomGraph(k, 2, {0.5,0.5}, 0);
+				
+				vector< vector<int> > temp;
+				returnSubgraphsNoFlags(H,G,temp);
+				
+				if(numSubgraphs(H,G) != (int)temp.size()) {
+					cout << numSubgraphs(H,G) << " " << (int)temp.size() << endl;
+					for(int l = 0; l < (int)temp.size(); ++l) {
+						for(int n = 0; n < (int)temp[l].size(); ++n) {
+							cout << temp[l][n] << " ";
+						}
+						cout << endl;
+					}
+					cout << endl;
+					H.printEdges();
+					G.printEdges();
+					return 0;
+				}
+			}
+		}
+	}
+	
+	/*ifstream myFile;
 	myFile.open("r44_14.g6");
 	string line;
 	char* canonLabel;
@@ -97,7 +125,7 @@ int main() {
   			outputFile << "Minimum number: " << minNum << endl;
   			outputFile << "Maximum number: " << maxNum << endl << endl;
   		}
-  	}
+  	}*/
 	
 	
 	auto end=high_resolution_clock::now();
