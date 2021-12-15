@@ -34,31 +34,44 @@ int main() {
 	auto start=high_resolution_clock::now();
 	
 	
-	for(int j = 2; j < 5; ++j) {
-		for(int k = j; k < 10; ++k) {
+	/*for(int j = 2; j <= 5; ++j) {
+		for(int k = j; k <= 10; ++k) {
 			for(int l = 0; l <=  j; ++l) {
-			cout << j << " " << k << " " << l << endl;
+			//cout << j << " " << k << " " << l << endl;
 				for(int i = 0; i < 1000; ++i) {
-					//Graph H = randomGraph(j, 2, {1./2.,1./2.},0);
-					//Graph G = randomGraph(k, 2, {1./2.,1./2.},0);
+					Graph H = randomGraph(j, 2, {1./2.,1./2.},l);
+					Graph G = randomGraph(k, 2, {1./2.,1./2.},l);
 					
-					Graph H = randomGraph(j, 3, {1./3.,1./3.,1./3.},l);
-					Graph G = randomGraph(k, 3, {1./3.,1./3.,1./3.},l);
-					
-					
-					
-					if(numSubgraphs(H,G) != numSubgraphsNoFlags(H,G)) {
-						cout << numSubgraphs(H,G) << " " << numSubgraphsNoFlags(H,G) << endl;
-						H.printEdges();
-						G.printEdges();
-						return 0;
-					}
+					numSubgraphs(H,G);
 				}
 			}
 		}
 	}
 	
-	/*ifstream myFile;
+	auto start2=high_resolution_clock::now();
+	
+	for(int j = 2; j <= 5; ++j) {
+		for(int k = j; k <= 10; ++k) {
+			for(int l = 0; l <=  j; ++l) {
+			//cout << j << " " << k << " " << l << endl;
+				for(int i = 0; i < 1000; ++i) {
+					Graph H = randomGraph(j, 2, {1./2.,1./2.},l);
+					Graph G = randomGraph(k, 2, {1./2.,1./2.},l);
+					
+					numSubgraphsOLD(H,G);
+				}
+			}
+		}
+	}
+	
+	auto start3=high_resolution_clock::now();
+	
+	auto duration1 = duration_cast<seconds>(start2 - start);
+	auto duration2 = duration_cast<seconds>(start3 - start2);
+	cout << "New numSubGraphs time: " << duration1.count() << endl;
+	cout << "Old numSubGraphs time: " << duration2.count() << endl;*/
+	
+	ifstream myFile;
 	myFile.open("r44_14.g6");
 	string line;
 	char* canonLabel;
@@ -122,7 +135,7 @@ int main() {
   			outputFile << "Minimum number: " << minNum << endl;
   			outputFile << "Maximum number: " << maxNum << endl << endl;
   		}
-  	}*/
+  	}
 	
 	
 	auto end=high_resolution_clock::now();
