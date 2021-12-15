@@ -36,8 +36,8 @@ int main() {
 	
 	for(int j = 2; j < 5; ++j) {
 		for(int k = j; k < 10; ++k) {
-			for(int i = 0; i < 1000; ++i) {
-				cout << i << " " << j << " " << k << endl;
+			cout << j << " " << k << endl;
+			for(int i = 0; i < 1000; ++i) {	
 				Graph H = randomGraph(j, 2, {0.5,0.5}, 0);
 				Graph G = randomGraph(k, 2, {0.5,0.5}, 0);
 				

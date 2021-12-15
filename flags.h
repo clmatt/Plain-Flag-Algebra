@@ -1379,6 +1379,8 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 			
 			output.push_back(Y);
 		}
+		
+		return;
 	}
 	
 	for(int i = 0; i < H.getNumOrbits(); ++i) {
@@ -1419,8 +1421,9 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 						}
 					}
 				}
+				
 				vector< vector< int > > possibleTemp; 
-					returnSubgraphsNoFlags(G.restriction(Grestriction),H.restriction(Hrestriction),possibleTemp);
+					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
 				//Make possibleTemp actually correspond to indices in G		
 				for(int j = 0; j < (int)possibleTemp.size(); ++j) {
 					int index = 0;
@@ -1429,7 +1432,7 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 					for(int k = 0; k < G.getN(); ++k) {
 						if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
 							tempVec[k] = possibleTemp[j][index];
-							++temp;
+							++index;
 						}
 					}
 					
@@ -1442,6 +1445,18 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 				c = H.getNumColors();
 			}
 		}
+		
+		/*if(val) {
+		for(int c = 0; c < H.getNumColors(); ++c) {
+			cout << i << " " << c << " " << endl;
+			for(int j = 0; j < (int)possible[c].size(); ++j) {
+				for(int k = 0; k < (int)possible[c][j].size(); ++k) {
+					cout << possible[c][j][k] << " ";
+				}
+				cout << endl;
+			}
+		}
+		}*/
 		
 		//Go through all possibilities and see if any of them combine to give a subgraph
 		if(val) {	
@@ -1460,16 +1475,17 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 			}
 				
 			do {
-				
 				vector<int> Grestriction;
 				Grestriction.resize(G.getN(),-1);
 				int index = 0;
 					
 				for(int c = 0; c < H.getNumColors(); ++c) {
 					if(possible[c].size() > 0) {
-						for(int j = 0; j < (int)possible[c][list[c]].size(); ++j) {
-							Grestriction[possible[c][list[c]][j]] = index;
-							++index;
+						for(int j = 0; j < G.getN(); ++j) {
+							if(possible[c][list[c]][j] != -1) {
+								Grestriction[j] = index;
+								++index;
+							}
 						}
 					}
 				}
@@ -2377,6 +2393,7 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 	}
 	
 	vector<Edge> Edges;
+	//srand (time(NULL));
 	
 	for(int i = 0; i < n-1; ++i) {
 		for(int j = i+1; j < n; ++j) {
