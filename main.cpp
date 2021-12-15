@@ -33,6 +33,7 @@ extern "C" {
 int main() {
 	auto start=high_resolution_clock::now();
 	
+	
 	ifstream myFile;
 	myFile.open("r44_14.g6");
 	string line;
