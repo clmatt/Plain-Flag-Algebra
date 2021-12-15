@@ -34,30 +34,7 @@ int main() {
 	auto start=high_resolution_clock::now();
 	
 	
-	for(int j = 3; j <= 5; ++j) {
-		for(int k = j; k <= 10; ++k) {
-			for(int l = 0; l <=  j; ++l) {
-			cout << j << " " << k << " " << l << endl;
-				for(int i = 0; i < 1000; ++i) {
-					Graph H = randomGraph(j, 2, {1./2.,1./2.},l);
-					Graph G = randomGraph(k, 2, {1./2.,1./2.},l);
-					
-					if(((numSubgraphs(H,G) == 0) && subgraph(H,G)) || ((numSubgraphs(H,G) != 0) && !subgraph(H,G))) {
-						H.printEdges();
-						H.printFlag();
-						G.printEdges();
-						G.printFlag();
-						//cout << numSubgraphs(H,G) << endl;
-						//cout << subgraph(H,G) << endl;
-						return 0;
-					}
-				}
-			}
-		}
-	}
-	
-	
-	/*ifstream myFile;
+	ifstream myFile;
 	myFile.open("r44_14.g6");
 	string line;
 	char* canonLabel;
@@ -126,7 +103,7 @@ int main() {
 	
 	auto end=high_resolution_clock::now();
 	auto duration = duration_cast<seconds>(end - start);
-	cout << "Running time in seconds: " << duration.count() << endl << endl;*/
+	cout << "Running time in seconds: " << duration.count() << endl << endl;
 	
 	return 0;
 }

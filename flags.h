@@ -1591,9 +1591,9 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 	return (output + numSubgraphsNoFlags(H,Gcopy));
 }
 
-//---------------------------
-//-----Returns Subgraphs-----
-//---------------------------
+//-----------------------------
+//-----Number of Subgraphs-----
+//-----------------------------
 
 //Return of vectors that could be used in restriction
 int numSubgraphs(const Graph &H, const Graph &G) {
