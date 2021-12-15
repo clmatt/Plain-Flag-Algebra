@@ -1636,6 +1636,197 @@ void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &outpu
 	return;
 }
 
+//--------------------------------------
+//-----Number of Subgraphs No Flags-----
+//--------------------------------------
+
+//Copied almost directly from returnSubgraphsNoFlags
+int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
+	//No flags
+	if((H.getSizeOfFlag() != 0) || (G.getSizeOfFlag() != 0)) {
+		cout << "In returnSubgraphsNoFlags H and G can't have flags." << endl << endl;
+		throw exception();
+	}
+	
+	if(H.getNumColors() != G.getNumColors()) {
+		return 0;
+	}
+
+	if((G.getN() < H.getN())) {
+		return 0;
+	}
+
+	if(G.getN() == H.getN()) {
+		if(isomorphic(H,G)) {
+			return 1;
+		}
+		
+		else {
+			return 0;
+		}
+	}
+	
+	//Single Vertex
+	if(H.getN() == 1) {
+		return G.getN();
+	}
+	
+	//Fastest way to do edges
+	if(H.getN() == 2) {
+		int output = 0;
+			
+		for(int i = 0; i < G.getN(); ++i) {
+			for(int j = i+1; j < G.getN(); ++j) {
+				if(G.getEdgeColor(i,j) == H.getEdgeColor(0,1)) {
+					++output;
+				}
+			}
+		}
+		
+		return output;
+	}
+	
+	//Guarantees the least number of calls to the function (helps prune quickly)
+	int vertex = -1;
+	long long int minVal = (1 << G.getN());
+	
+	for(int i = 0; i < G.getNumOrbits(); ++i) {
+		long long int temp1 = 0;
+	
+		for(int j = 0; j < H.getNumOrbits(); ++j) {
+			int temp2 = 1;
+			for(int c = 0; c < H.getNumColors(); ++c) {
+				temp2 = temp2*choose(G.getDegree(G.getOrbit(i,0),c),H.getDegree(H.getOrbit(j,0),c));
+			}
+			temp1 = temp1 + temp2;
+		}
+		
+		if (temp1 < minVal) {
+			minVal = temp1;
+			vertex = G.getOrbit(i,0);
+		}
+	}
+	
+	if(minVal == 0) {
+		Graph Gcopy = G;
+		Gcopy.removeVertex(vertex);
+		
+		return numSubgraphsNoFlags(H,Gcopy);
+	}
+	
+	int output = 0;
+	
+	for(int i = 0; i < H.getNumOrbits(); ++i) {
+		bool val = true;
+		vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
+		int Hvertex = H.getOrbit(i,0);
+
+		for(int c = 0; c < H.getNumColors(); ++c) {
+			possible.push_back({});
+			possible[c].clear();
+				
+			int Gdegree = G.getDegree(vertex,c);					
+			int Hdegree = H.getDegree(Hvertex,c);
+				
+			//Can we actually find H in the nbrhd of vertex?
+			if((Gdegree >= Hdegree) && (Hdegree > 0)) {
+				//Recursively call returnSubgraphsNoFlags for each nbrhd
+				
+				vector<int> Grestriction(G.getN(),-1);
+				vector<int> Hrestriction(H.getN(),-1);
+				
+				int temp = 0;
+				for(int j = 0; j < G.getN(); ++j) {
+					if(j != vertex) {
+						if(G.getEdgeColor(vertex,j) == c) {
+							Grestriction[j] = temp;
+							++temp;
+						}
+					}
+				}
+				
+				temp = 0;
+				for(int j = 0; j < H.getN(); ++j) {
+					if(j != Hvertex) {
+						if(H.getEdgeColor(Hvertex,j) == c) {
+							Hrestriction[j] = temp;
+							++temp;
+						}
+					}
+				}
+				
+				vector< vector< int > > possibleTemp; 
+					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
+				//Make possibleTemp actually correspond to indices in G		
+				for(int j = 0; j < (int)possibleTemp.size(); ++j) {
+					int index = 0;
+					vector<int> tempVec(G.getN(),-1);
+					
+					for(int k = 0; k < G.getN(); ++k) {
+						if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
+							tempVec[k] = possibleTemp[j][index];
+							++index;
+						}
+					}
+					
+					possible[c].push_back(tempVec);
+				}
+			}
+			
+			if((possible[c].size() == 0) && (Hdegree > 0)) {
+				val = false;
+				c = H.getNumColors();
+			}
+		}
+		
+		//Go through all possibilities and see if any of them combine to give a subgraph
+		if(val) {	
+			vector<int> maxVals; //Use in next_list
+			vector<int> list;
+			list.resize(H.getNumColors(),0);
+				
+			for(int c = 0; c < H.getNumColors(); ++c) {
+				if(possible[c].size() == 0) {
+					maxVals.push_back(0);
+				}
+					
+				else {
+					maxVals.push_back(possible[c].size()-1);
+				}
+			}
+				
+			do {
+				vector<int> Grestriction;
+				Grestriction.resize(G.getN(),-1);
+				int index = 0;
+					
+				for(int c = 0; c < H.getNumColors(); ++c) {
+					if(possible[c].size() > 0) {
+						for(int j = 0; j < G.getN(); ++j) {
+							if(possible[c][list[c]][j] != -1) {
+								Grestriction[j] = index;
+								++index;
+							}
+						}
+					}
+				}
+					
+				Grestriction[vertex] = index;
+					
+				if(isomorphic(G.restriction(Grestriction),H)) {
+					++output;
+				}
+			} while(nextList(list, maxVals));
+		}
+	}
+	
+	Graph Gcopy = G;
+	Gcopy.removeVertex(vertex);
+	vector<vector<int> > output2;
+	
+	return (output + numSubgraphsNoFlags(H,Gcopy));
+}
+
 //-----------------------------
 //-----Number of Subgraphs-----
 //-----------------------------

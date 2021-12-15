@@ -39,24 +39,16 @@ int main() {
 			for(int l = 0; l <=  j; ++l) {
 			cout << j << " " << k << " " << l << endl;
 				for(int i = 0; i < 1000; ++i) {
-					Graph H = randomGraph(j, 2, {1./2.,1./2.},l);
-					Graph G = randomGraph(k, 2, {1./2.,1./2.},l);
+					//Graph H = randomGraph(j, 2, {1./2.,1./2.},0);
+					//Graph G = randomGraph(k, 2, {1./2.,1./2.},0);
 					
-					//Graph H = randomGraph(j, 3, {1./3.,1./3.,1./3.},l);
-					//Graph G = randomGraph(k, 3, {1./3.,1./3.,1./3.},l);
+					Graph H = randomGraph(j, 3, {1./3.,1./3.,1./3.},l);
+					Graph G = randomGraph(k, 3, {1./3.,1./3.,1./3.},l);
 					
-					vector< vector<int> > temp;
-					returnSubgraphs(H,G,temp);
 					
-					if(numSubgraphs(H,G) != (int)temp.size()) {
-						cout << numSubgraphs(H,G) << " " << (int)temp.size() << endl;
-						for(int l = 0; l < (int)temp.size(); ++l) {
-							for(int n = 0; n < (int)temp[l].size(); ++n) {
-								cout << temp[l][n] << " ";
-							}
-							cout << endl;
-						}
-						cout << endl;
+					
+					if(numSubgraphs(H,G) != numSubgraphsNoFlags(H,G)) {
+						cout << numSubgraphs(H,G) << " " << numSubgraphsNoFlags(H,G) << endl;
 						H.printEdges();
 						G.printEdges();
 						return 0;
