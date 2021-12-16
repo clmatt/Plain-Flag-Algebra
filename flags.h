@@ -1974,49 +1974,21 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 //-------------------------
 
 //Generates all graphs of size n 
-//totalZeros are zeros that are zero in the underlying structure of the graph without colors
-//If numColors = 2 don't use total Zeros
-//TODO Can assume colors are ordered and then just consider all permutations (don't know if faster though)
-vector<Graph> generate(const int n, const int numColors, const vector<Graph> &zeros, const vector<Graph> &totalZeros) {
-	ifstream myFile;
-	myFile.open("graphs"+to_string(n)+".txt");
-	
-	if(!myFile.is_open()) {
-		cout << "Error in generate while opening file, may have to use ./geng to create the file you need." << endl << endl;
-		throw exception();
-	}
-	
-	if(numColors < 2) {
-		cout << "You need at least two colors in generate." << endl << endl;
-		throw exception();
-	}
-	
-	int numZeros = zeros.size();
-	int numTotalZeros = totalZeros.size();
-	
-	//Check all zeros have the correct number of colors
-	for(int i = 0; i < numZeros; ++i) {
-		if(zeros[i].getNumColors() != numColors) {
-			cout << "In generate all zeros must have the correct number of colors." << endl << endl;
+vector<Graph> generate(const int n, const int numColors, const vector<Graph> &zeros) {
+	if((numColors == 2) && (zeros.size() == 0)) {
+		ifstream myFile;
+		myFile.open("graphs"+to_string(n)+".txt");
+		
+		if(!myFile.is_open()) {
+			cout << "Error in generate while opening file, may have to use ./geng to create the file you need." << endl << endl;
 			throw exception();
 		}
-	}
-	
-	//Check if all totalZeros have 2 colors
-	for(int i = 0; i < numTotalZeros; ++i) {
-		if(totalZeros[i].getNumColors() != 2) {
-			cout << "In general all graphs in totalZeros must have 2 colors." << endl << endl;
-			throw exception();
-		}
-	}
-	
-	string tempGraph;
-	vector<Graph> output;
-	
-	bool zero;
+		
 		int counter = 0;
-	
-	if(numColors == 2) {
+		string tempGraph;
+		vector<Graph> output;
+		int numZeros = zeros.size();
+		
 		while(getline(myFile, tempGraph)) {
 			if(counter % 100 == 0) {
 				cout << "In generate " << counter << " iterations out of " << numberOfGraphs[n] << endl;
@@ -2029,7 +2001,7 @@ vector<Graph> generate(const int n, const int numColors, const vector<Graph> &ze
     		Graph G = convertFromNauty(sg);
     		SG_FREE(sg);
     		
-    		zero = false;
+    		bool zero = false;
     		for(int i = 0; i < numZeros; ++i) {
     			if(subgraph(zeros[i],G)) {
     				zero = true;
@@ -2041,84 +2013,109 @@ vector<Graph> generate(const int n, const int numColors, const vector<Graph> &ze
     			output.push_back(G);
     		}
 		}
+		
+		return output;
 	}
 	
-	if(numColors > 2) { 
-		vector<Graph> edgeColored;
-		//edgeColored.reserve(myPow(numColors,n*(n-1)/2));
-		vector<Edge> edges;
-		edges.reserve(n*(n-1)/2);
-		unordered_set<string> outputSet;
+	if(numColors < 2) {
+		cout << "You need at least two colors in generate." << endl << endl;
+		throw exception();
+	}
 	
-		while(getline(myFile, tempGraph)) {
-			if(counter % 1 == 0) {
-				cout << "In generate " << counter+1 << " iterations out of " << numberOfGraphs[n] << endl;
+	int numZeros = zeros.size();
+	
+	//Check all zeros have the correct number of colors
+	for(int i = 0; i < numZeros; ++i) {
+		if(zeros[i].getNumColors() != numColors) {
+			cout << "In generate all zeros must have the correct number of colors." << endl << endl;
+			throw exception();
+		}
+	}
+	
+	if(n == 1) {
+		Graph G({{}},1,numColors);
+		return {G};
+	}
+	
+	vector<Graph> output;
+	int counter = 0;
+	
+	unordered_set<string> outputSet;
+	
+	
+	vector<Graph> smallerGraphs = generate(n-1, numColors, zeros);
+	
+	for (auto G: smallerGraphs) {
+		if(counter % 100 == 0) {
+			cout << "In generate n = " << n << " and " << counter+1 << " iterations out of " << smallerGraphs.size() << endl;
+		}
+		
+		++counter;
+		vector<Edge> permanentEdges;
+		vector<int> permanentZeroDegree(n,0);
+		
+		for(int i = 0; i < n-2; ++i) {
+			for(int j = i+1; j < n-1; ++j) {
+				if(G.getEdgeColor(i,j) != 0) {
+					permanentEdges.push_back({i,j,G.getEdgeColor(i,j)});
+				}
+				
+				else {
+					++permanentZeroDegree[i];
+				}
 			}
-			++counter;
-   		sparsegraph sg;
-    		SG_INIT(sg);
-    		int num_loops;
-    		stringtosparsegraph(&tempGraph[0], &sg, &num_loops);
-    		Graph G = convertFromNauty(sg); 	
-    		SG_FREE(sg);
-    		
-    		bool totalZerosTest = true;
-    		
-    		for(int i = 0; i < numTotalZeros; ++i)	 {
-    			if(subgraph(totalZeros[i],G)) {
-    				totalZerosTest = false;
-    				i = numTotalZeros;
-    			}
-    		}
-    		
-    		if(totalZerosTest) {
-		 		for(int i = 0; i < myPow(numColors-1,G.getNumEdges()); ++i) {
-		 			int temp = i;
+		}
+		
+		for(int i = 0; i < myPow(numColors,n-1); ++i) {		
+		 	int temp = i;
+		 	vector<Edge> edges = permanentEdges;
+		 	vector<int> zeroDegree = permanentZeroDegree;
 		 			
-		 			for(int j = 0; j < n-1; ++j) {
-		 				for(int k = j+1; k < n; ++k) {
-		 					if(G.getEdgeColor(j,k) != 0) {
-			 					int digit = temp % (numColors - 1);
-			 					temp = temp / (numColors - 1);
-			 					edges.push_back({j,k,digit+1});
-		 					}
-		 				}
+		 	for(int j = 0; j < n-1; ++j) {
+			 	edges.push_back({j,n-1,temp % numColors});
+			 	
+			 	if((temp % numColors) == 0) {
+			 		++zeroDegree[n-1];
+			 		++zeroDegree[j];
+			 	}
+			 	
+			 	temp = temp / numColors;
+			}
+			
+			//Check if new vertex has highest degee in color 0
+			bool cont = true;
+			for(int j = 0; j < n-1; ++j) {
+				if(zeroDegree[j] > zeroDegree[n-1]) {
+					cont = false;
+					j = n-1;
+				}
+			}
+			
+			if(cont) {
+				Graph Gv(edges,n,numColors);
+				
+				//Removes zeros
+		 		for(int j = 0; j < numZeros; ++j) {
+		 			if(subgraph(zeros[j],Gv)) {
+		 				cont = false;
+		 				j = numZeros;
 		 			}
-		 			
-		 			Graph H = Graph(edges,n,numColors);
-		 			
-		 			bool test = true;
-		 			
-		 			//Removes zeros
-		 			for(int i = 0; i < numZeros; ++i) {
-		 				if(subgraph(zeros[i],H)) {
-		 					test = false;
-		 					i = numZeros;
-		 				}
-		 			}
-		 			
-		 			//Removes repeats
-		 			if(test) {
-		 				test = false;
-		 				
-		 				if(outputSet.count(H.getCanonLabel()) == 0) {
-		 					test = true;
-		 					outputSet.insert(H.getCanonLabel());
-		 				}
-		 			}
-		 			
-		 			if(test) {
-		 				edgeColored.push_back(Graph(edges,n,numColors));
-		 			}	
-		 			edges.clear();
 		 		}
-    		}
-    		
-    		for(int i = 0; i < int(edgeColored.size()); ++i) {
-    			output.push_back(edgeColored[i]);
-    		}
-    		
-    		edgeColored.clear();
+			 			
+			 	//Removes repeats
+			 	if(cont) {
+			 		cont = false;
+			 				
+			 		if(outputSet.count(Gv.getCanonLabel()) == 0) {
+			 			cont = true;
+			 			outputSet.insert(Gv.getCanonLabel());
+			 		}
+			 	}
+			 			
+			 	if(cont) {
+			 		output.push_back(Gv);
+			 	}
+		 	}
 		}
 	}
 
@@ -2194,8 +2191,8 @@ vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 //----------------------------
 
 //Used in generateV
-vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph> &zeros, const vector<Graph> &totalZeros) {
-	vector<Graph> allGraphs = generate(n,numColors,zeros,totalZeros);
+vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph> &zeros) {
+	vector<Graph> allGraphs = generate(n,numColors,zeros);
 	vector<Graph> output;
 	
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
@@ -2227,7 +2224,7 @@ vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph
 
 //For fixed n generate all flags of size k such that 2k-sizeOfFlag = n (used in plainFlagAlgebra)
 //First index means all flags are same type
-vector< vector<Graph> > generateV(const int n, const int numColors, const vector<Graph> &zeros, const vector<Graph> &totalZeros) {
+vector< vector<Graph> > generateV(const int n, const int numColors, const vector<Graph> &zeros) {
 	vector< vector<Graph> > output;
 	int index = 0;
 	
@@ -2235,8 +2232,8 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 		int sizeOfFlag = 2*k-n;
 		
 		if(sizeOfFlag > 0) {
-			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros,totalZeros);
-			vector<Graph> graphs = generate(k, numColors, zeros, totalZeros);
+			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
+			vector<Graph> graphs = generate(k, numColors, zeros);
 			
 			for(int i = 0; i < (int)flags.size(); ++i) {
 				cout << "When generating v (" << k << " " << i << ") out of (" << n-1 << " " <<(int)flags.size()-1 << ")" << endl; 
@@ -3547,7 +3544,7 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 //Prints to plainFlagAlgerba1.txt & plainFlagAlgebra2.txt necessary files for python SDP code 
 //f can be thought of as a linear combo of all graphs that we want to max/min
 //v is vector multiplied by matrix in SDP
-void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, vector<Equation> &known, const vector<Graph> &totalZeros) {
+void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, vector<Equation> &known) {
 	cout << "Starting plainFlagAlgebra." << endl;
 	int vSize = v.size();
 	int fSize = f.size();
@@ -3670,7 +3667,7 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 	Equation eq2({H},zeros,Frac(1,1),0);
 	
 	cout << "Generating graphs to be used in resize." << endl;
-	vector<Graph> allGraphs = generate(n,numColors,zeros,totalZeros);
+	vector<Graph> allGraphs = generate(n,numColors,zeros);
 	
 	cout << endl << "Resizing f." << endl;
 	Equation fEqResized = resize(fEq,allGraphs);
@@ -3828,7 +3825,7 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 //Prints to plainFlagAlgerba1.txt & plainFlagAlgebra2.txt necessary files for python SDP code 
 //f can be thought of as a linear combo of all graphs that we want to max/min
 //Rather than taking a v this function takes the number of vertices to compute on (n)
-void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equation> &known, const vector<Graph> &totalZeros = {}) {
+void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equation> &known) {
 	cout << "Starting plainFlagAlgebra." << endl;
 	
 	//The way the python script is setup we need at least one known
@@ -3941,7 +3938,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	Equation eq2({H},zeros,Frac(1,1),0);
 	
 	cout << "Generating graphs to be used in resize." << endl;
-	vector<Graph> allGraphs = generate(n,numColors,zeros,totalZeros);
+	vector<Graph> allGraphs = generate(n,numColors,zeros);
 	
 	cout << endl << "Resizing f." << endl;
 	Equation fEqResized = resize(fEq,allGraphs);
@@ -3980,7 +3977,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 
 	
 	cout << "Generating v." << endl;
-	vector< vector< Graph> > v = generateV(n,numColors,zeros,totalZeros);
+	vector< vector< Graph> > v = generateV(n,numColors,zeros);
 	cout << endl;
 
 	queue<tuple<int,int,int,int,Frac> > A;
