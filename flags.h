@@ -2963,6 +2963,43 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	
 	vector<Graph> variables;
 	unordered_set<string> variablesSet;
+	
+	vector<Edge> permanentEdges;
+	//First vertices G
+	for(int j = 0; j < nG-1; ++j) {
+		for(int k = j+1; k < nG; ++k) {
+			if(G.getEdgeColor(j,k) != 0) {
+				permanentEdges.push_back({j,k,G.getEdgeColor(j,k)});
+			}
+		}
+	}
+
+	//Flag Plus Last Vertices = H
+	for(int j = 0; j < nH-1; ++j) {
+		for(int k = j+1; k < nH; ++k) {
+			if(H.getEdgeColor(j,k) != 0) {
+				if((j < sizeOfFlag) && (k < sizeOfFlag)) {
+					permanentEdges.push_back({j,k,H.getEdgeColor(j,k)});
+				}
+					
+				else if((j < sizeOfFlag) && (k >= sizeOfFlag)) {
+					permanentEdges.push_back({j,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
+				}
+					
+				else {
+					permanentEdges.push_back({j+nG-sizeOfFlag,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
+				}
+			}
+		}
+	}
+	
+	//Create Flag
+	vector<int> flag;
+		
+	//Can do this because they are in canonical form
+	for(int j = 0; j < sizeOfFlag; ++j) {
+		flag.push_back(G.getFlagVertex(j));
+	}
 
 	//Create all possible variables
 	for(int i = 0; i < myPow(c,(nG - sizeOfFlag)*(nH-sizeOfFlag)); ++i) { //c-ary mask
@@ -2974,43 +3011,9 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 			int temp2 = temp/myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1); //Need to be careful with rounding? 
 		   ary.push_back(temp2);
 		   temp = temp-temp2*myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1);
-		   
-		   if((temp2 < 0) || (temp2 >= c)) { //This really shouldn't happen I've checked, but better safe than sorry
-		   	cout << "Something went wrong in graph multiplication." << endl << endl;
-		   	throw exception();
-		   }
 		}
 		
-		//Create edge list for new Graph
-		vector<Edge> edges;
-		
-		//First vertices G
-		for(int j = 0; j < nG-1; ++j) {
-			for(int k = j+1; k < nG; ++k) {
-				if(G.getEdgeColor(j,k) != 0) {
-					edges.push_back({j,k,G.getEdgeColor(j,k)});
-				}
-			}
-		}
-
-		//Flag Plus Last Vertices = H
-		for(int j = 0; j < nH-1; ++j) {
-			for(int k = j+1; k < nH; ++k) {
-				if(H.getEdgeColor(j,k) != 0) {
-					if((j < sizeOfFlag) && (k < sizeOfFlag)) {
-						edges.push_back({j,k,H.getEdgeColor(j,k)});
-					}
-					
-					else if((j < sizeOfFlag) && (k >= sizeOfFlag)) {
-						edges.push_back({j,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
-					}
-					
-					else {
-						edges.push_back({j+nG-sizeOfFlag,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
-					}
-				}
-			}
-		}
+		vector<Edge> edges = permanentEdges;
 		
 		//Add edges from i
 		//Easier to just iterate through than to make a function
@@ -3024,14 +3027,6 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 			}
 		}
 		
-		//Create Flag
-		vector<int> flag;
-		
-		//Can do this because they are in canonical form
-		for(int j = 0; j < sizeOfFlag; ++j) {
-			flag.push_back(G.getFlagVertex(j));
-		}
-		
 		Graph GH(edges, nG+nH-sizeOfFlag, c);
 		GH.setFlag(flag);
 		
@@ -3042,8 +3037,8 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	}
 
 	Equation eq(variables,zeros, Frac(0,1), 0, false); //When converting to equation, removes isomorphisms
+	
 	//Makes coefficients correct
-
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
 		int num = 0;
 		
