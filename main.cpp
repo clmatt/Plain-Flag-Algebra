@@ -37,10 +37,9 @@ int main() {
 	
 	
 	//R(4,6) <= 39
-	/*vector<Graph> f;
+	vector<Graph> f;
 	vector<Graph> zeros;
 	vector<Equation> known;
-	vector<Graph> totalZeros;
 	vector<Edge> edges;
 	const int numColors = 3;
 	
@@ -71,10 +70,6 @@ int main() {
 		}
 	}
 	zeros.push_back(Graph(edges,6,numColors));
-	
-	//Total Zeros
-	edges = {{0,1,1}}; 
-	totalZeros.push_back(Graph(edges,3,2));
 	
 	//f-Maximize number of edges
 	f.push_back(Graph({{0,1,2}},2,numColors));
@@ -111,7 +106,7 @@ int main() {
 	
 	Equation known3 = eq1*eq1*eq2*eq3*eq4;
 	known3.averageAll();
-	known.push_back(known3);*/
+	known.push_back(known3);
 	
 	
 	/*Equation known4 = eq1*eq2*eq2*eq3*eq4;
@@ -124,7 +119,7 @@ int main() {
 	known6.averageAll();
 	known.push_back(known6);*/
 	
-	//plainFlagAlgebra(f,7,zeros,known,totalZeros);
+	plainFlagAlgebra(f,7,zeros,known);
 	
 	
 	auto end=high_resolution_clock::now();
