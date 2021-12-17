@@ -34,8 +34,10 @@ extern "C" {
 int main() {
 	auto start=high_resolution_clock::now();
 	
+	
+	
 	//R(4,6) <= 39
-	vector<Graph> f;
+	/*vector<Graph> f;
 	vector<Graph> zeros;
 	vector<Equation> known;
 	vector<Graph> totalZeros;
@@ -109,7 +111,9 @@ int main() {
 	
 	Equation known3 = eq1*eq1*eq2*eq3*eq4;
 	known3.averageAll();
-	known.push_back(known3);
+	known.push_back(known3);*/
+	
+	
 	/*Equation known4 = eq1*eq2*eq2*eq3*eq4;
 	known4.averageAll();
 	known.push_back(known4);
@@ -120,7 +124,7 @@ int main() {
 	known6.averageAll();
 	known.push_back(known6);*/
 	
-	plainFlagAlgebra(f,7,zeros,known,totalZeros);
+	//plainFlagAlgebra(f,7,zeros,known,totalZeros);
 	
 	
 	auto end=high_resolution_clock::now();

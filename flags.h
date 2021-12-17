@@ -2567,6 +2567,15 @@ class Equation {
 		}
 		
 		
+		//-----------------------
+		//-----Get numColors-----
+		//-----------------------
+		
+		int getNumColors() const {
+			return numColors;
+		}
+		
+		
 		//----------------------
 		//-----Get numZeros-----
 		//----------------------
@@ -2798,6 +2807,68 @@ class Equation {
 //-----Functions Involving Equations----- 
 //---------------------------------------
 //---------------------------------------
+
+
+//-------------------
+//-----Equaltiy------
+//-------------------
+
+//Mostly used in debugging
+bool operator==(const Equation &eq1, const Equation &eq2) {
+	vector<Graph> variables;
+	vector<Graph> zeros; //No Flag on zeros (remove flag from Graph to check subgraph)
+	
+	if(eq1.getType() != eq2.getType()) {
+		return false;
+	}	
+	
+	if(eq1.getAns() != eq2.getAns()) {
+		return false;
+	}
+	
+	if(eq1.getNumColors() != eq2.getNumColors()) {
+		return false;
+	}
+	
+	if(eq1.getNumZeros() != eq2.getNumZeros()) {
+		return false;
+	}
+	
+	if(eq1.getNumVariables() != eq2.getNumVariables()) {
+		return false;
+	}
+	
+	for(int i = 0; i < eq1.getNumZeros(); ++i) {
+		bool check = false;
+	
+		for(int j = 0; j < eq2.getNumZeros(); ++j) {
+			if(isomorphic(eq1.getZero(i),eq2.getZero(j))) {
+				check = true;
+				j = eq2.getNumZeros();
+			}
+		}
+		
+		if(!check) {
+			return false;
+		}
+	}
+	
+	for(int i = 0; i < eq1.getNumVariables(); ++i) {
+		bool check = false;
+	
+		for(int j = 0; j < eq2.getNumVariables(); ++j) {
+			if(isomorphic(eq1.getVariable(i),eq2.getVariable(j))) {
+				check = true;
+				j = eq2.getNumVariables();
+			}
+		}
+		
+		if(!check) {
+			return false;
+		}
+	}
+	
+}
 
 
 //------------------
