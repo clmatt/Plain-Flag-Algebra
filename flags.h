@@ -6,7 +6,7 @@ extern "C" {
 	#include "gtools.h"
 }
 
-const vector<long long int> numberOfGraphs = {1,1,2,4,11, 34, 156, 1044, 12346, 274668, 12005168, 1018997864, 165091172592};
+const vector<long long int> numberOfGraphs = {1,1,2,4,11, 34, 156, 1044, 12346, 274668, 12005168, 1018997864, 165091172592}; //Up to 12 vertices
 
 //---------------------
 //-----Edge Struct-----
@@ -2358,6 +2358,17 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 	return G;
 }
 
+
+//------------------------------
+//-----Uniform Random Graph-----
+//------------------------------
+
+Graph uniformRandomGraph(const int n, const int numColors, const int flagSize) {
+	vector<double> p(numColors,1./numColors);
+	return randomGraph(n, numColors, p, flagSize);
+}
+
+
 //------------------------
 //------------------------
 //-----Equation Class-----
@@ -2865,6 +2876,7 @@ bool operator==(const Equation &eq1, const Equation &eq2) {
 		}
 	}
 	
+	return true;
 }
 
 
@@ -3081,7 +3093,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		   temp = temp-temp2*myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1);
 		}
 		
-		vector<Edge> edges = permanentEdges;
+		vector<Edge> newEdges;
 		
 		//Add edges from i
 		//Easier to just iterate through than to make a function
@@ -3089,18 +3101,66 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		for(int j = nG; j < nG+nH-sizeOfFlag; ++j) {
 			for(int k = sizeOfFlag; k < nG; ++k) {
 				if(ary[index] != 0) {
-					edges.push_back({j,k,ary[index]});
+					newEdges.push_back({k,j,ary[index]});
 				}
 				++index;
 			}
 		}
 		
-		Graph GH(edges, nG+nH-sizeOfFlag, c);
-		GH.setFlag(flag);
+		//May assume that within each orbit the degrees are decreasing
+		bool cont = true;
 		
-		if(variablesSet.count(GH.getCanonLabel()) == 0) {
-			variablesSet.insert(GH.getCanonLabel());
-			variables.push_back(GH);
+		vector<int> degreeG(nG-sizeOfFlag,0); //This makes both 0 index rather hthan sizeOfFlag indexed
+		vector<int> degreeH(nH-sizeOfFlag,0);
+		for(int j = 0; j < (int)newEdges.size(); ++j) {
+			if(newEdges[j].color == 1) {
+				++degreeG[newEdges[j].a-sizeOfFlag];
+				++degreeH[newEdges[j].b-nG];
+			}
+		}
+		
+		for(int j = 0; j < G.getNumOrbits(); ++j) {	
+			for(int k = 1; k < G.getOrbitSize(j); ++k) {
+				if(degreeG[G.getOrbit(j,k-1)-sizeOfFlag] < degreeG[G.getOrbit(j,k)-sizeOfFlag]) {
+					cont = false;
+					k = G.getOrbitSize(j);
+				}
+			}	
+			
+			if(!cont) {
+				j = G.getNumOrbits();
+			}
+		}
+		
+		/*if(cont) {
+			for(int j = 0; j < H.getNumOrbits(); ++j) {	
+				for(int k = 1; k < H.getOrbitSize(j); ++k) {
+					if(degreeH[H.getOrbit(j,k-1)-sizeOfFlag] < degreeH[H.getOrbit(j,k)-sizeOfFlag]) {
+						cont = false;
+						k = H.getOrbitSize(j);
+					}
+				}	
+				
+				if(!cont) {
+					j = H.getNumOrbits();
+				}
+			}
+		}*/
+		
+		if(cont) {
+			vector<Edge> edges = permanentEdges;
+			for(int j = 0; j < (int)newEdges.size(); ++j) {
+				edges.push_back(newEdges[j]);
+			}
+
+			
+			Graph GH(edges, nG+nH-sizeOfFlag, c);
+			GH.setFlag(flag);
+			
+			if(variablesSet.count(GH.getCanonLabel()) == 0) {
+				variablesSet.insert(GH.getCanonLabel());
+				variables.push_back(GH);
+			}
 		}
 	}
 

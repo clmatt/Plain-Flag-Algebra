@@ -31,11 +31,7 @@ extern "C" {
 //This is going to be extremely confusing, but graph is from Nauty and Graph is from me
 
 
-int main() {
-	auto start=high_resolution_clock::now();
-	
-	
-	
+int main() {		
 	//R(4,6) <= 39
 	vector<Graph> f;
 	vector<Graph> zeros;
