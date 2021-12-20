@@ -1150,7 +1150,8 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 	for(int i = 0; i < H.getNumOrbits(); ++i) {
 		bool val = true;
 		vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
-		int Hvertex = H.getOrbit(i,0);
+		int Hvertex = H.getOrbit(i,0);	
+		bool dominating = true; //If our vertex is dominating we don't have to make final isomorphism call
 
 		for(int c = 0; c < H.getNumColors(); ++c) {
 			possible.push_back({});
@@ -1158,6 +1159,10 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 				
 			int Gdegree = G.getDegree(vertex,c);					
 			int Hdegree = H.getDegree(Hvertex,c);
+			
+			if((Hdegree != 0) && (Hdegree != H.getN()-1)) {
+				dominating = false;
+			}
 				
 			//Can we actually find H in the nbrhd of vertex?
 			if((Gdegree >= Hdegree) && (Hdegree > 0)) {
@@ -1243,8 +1248,15 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 				}
 					
 				Grestriction[vertex] = index;
-					
-				if(isomorphic(G.restriction(Grestriction),H)) {
+				
+				if(!dominating) {
+					if(isomorphic(G.restriction(Grestriction),H)) { //Not a cheap call, try to avoid it
+						output.push_back(Grestriction);
+					}
+				}
+				
+				//If we have a dominating vertex don't need to do a second isomorphism check
+				else {
 					output.push_back(Grestriction);
 				}
 			} while(nextList(list, maxVals));
@@ -1484,6 +1496,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 		bool val = true;
 		vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
 		int Hvertex = H.getOrbit(i,0);
+		bool dominating = true;
 
 		for(int c = 0; c < H.getNumColors(); ++c) {
 			possible.push_back({});
@@ -1491,7 +1504,11 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 				
 			int Gdegree = G.getDegree(vertex,c);					
 			int Hdegree = H.getDegree(Hvertex,c);
-				
+			
+			if((Hdegree != 0) && (Hdegree != H.getN()-1)) {
+				dominating = false;
+			}
+			
 			//Can we actually find H in the nbrhd of vertex?
 			if((Gdegree >= Hdegree) && (Hdegree > 0)) {
 				//Recursively call returnSubgraphsNoFlags for each nbrhd
@@ -1520,21 +1537,30 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 				}
 				
 				vector< vector< int > > possibleTemp; 
-					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
+					
+				
 				//Make possibleTemp actually correspond to indices in G		
-				for(int j = 0; j < (int)possibleTemp.size(); ++j) {
-					int index = 0;
-					vector<int> tempVec(G.getN(),-1);
-					
-					for(int k = 0; k < G.getN(); ++k) {
-						if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
-							tempVec[k] = possibleTemp[j][index];
-							++index;
+				if(!dominating) {						
+					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
+					for(int j = 0; j < (int)possibleTemp.size(); ++j) {
+						int index = 0;
+						vector<int> tempVec(G.getN(),-1);
+						
+						for(int k = 0; k < G.getN(); ++k) {
+							if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
+								tempVec[k] = possibleTemp[j][index];
+								++index;
+							}
 						}
+						
+						possible[c].push_back(tempVec);
 					}
-					
-					possible[c].push_back(tempVec);
 				}
+				
+				else {
+					output = output+numSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction));
+					c = H.getNumColors();
+				}	
 			}
 			
 			if((possible[c].size() == 0) && (Hdegree > 0)) {
@@ -1544,7 +1570,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 		}
 		
 		//Go through all possibilities and see if any of them combine to give a subgraph
-		if(val) {	
+		if(val & !dominating) {	
 			vector<int> maxVals; //Use in next_list
 			vector<int> list;
 			list.resize(H.getNumColors(),0);
@@ -1576,10 +1602,11 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 				}
 					
 				Grestriction[vertex] = index;
-					
-				if(isomorphic(G.restriction(Grestriction),H)) {
+				
+				if(isomorphic(G.restriction(Grestriction),H)) { //Not a cheap call, try to avoid it
 					++output;
 				}
+				
 			} while(nextList(list, maxVals));
 		}
 	}
@@ -1821,6 +1848,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 		bool val = true;
 		vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
 		int Hvertex = H.getOrbit(i,0);
+		bool dominating = true; 
 
 		for(int c = 0; c < H.getNumColors(); ++c) {
 			possible.push_back({});
@@ -1828,6 +1856,10 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 				
 			int Gdegree = G.getDegree(vertex,c);					
 			int Hdegree = H.getDegree(Hvertex,c);
+			
+			if((Hdegree != 0) && (Hdegree != H.getN()-1)) {
+				dominating = false;
+			}
 				
 			//Can we actually find H in the nbrhd of vertex?
 			if((Gdegree >= Hdegree) && (Hdegree > 0)) {
@@ -1858,6 +1890,11 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 				
 				vector< vector< int > > possibleTemp; 
 					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
+					
+				if((possibleTemp.size() != 0) && dominating) {
+					return true;
+				}
+				
 				//Make possibleTemp actually correspond to indices in G		
 				for(int j = 0; j < (int)possibleTemp.size(); ++j) {
 					int index = 0;
@@ -2365,6 +2402,7 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 
 Graph uniformRandomGraph(const int n, const int numColors, const int flagSize) {
 	vector<double> p(numColors,1./numColors);
+
 	return randomGraph(n, numColors, p, flagSize);
 }
 
@@ -3177,8 +3215,6 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 				++num;
 			}
 		}
-		
-	
 		
 		int den = choose(nG+nH-2*sizeOfFlag,nG-sizeOfFlag);
 		eq.setCoefficient(i,Frac(num,den)*GCoefficient*HCoefficient);
