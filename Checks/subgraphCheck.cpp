@@ -31,9 +31,42 @@ extern "C" {
 
 
 int main() {
-	auto start=high_resolution_clock::now();	
+	auto start=high_resolution_clock::now();
 	
-	ifstream myFile;
+	for(int i = 1; i <= 5; ++i) {
+		for(int j = i; j <= 10; ++j) {
+			//cout << i << " " << j << endl;
+			for(int k = 0; k < 10000; ++k) {
+				Graph H = uniformRandomGraph(i,2,0);
+				Graph G = uniformRandomGraph(j,2,0);
+				vector < vector <int> >  temp;
+				
+				NEWreturnSubgraphsNoFlags(H,G,temp);
+			}
+		}
+	}
+	
+	auto start2=high_resolution_clock::now();
+	auto duration1 = duration_cast<seconds>(start2 - start);
+	cout << "Running time of new subgraphs: " << duration1.count() << endl << endl;
+	
+	auto start3=high_resolution_clock::now();
+	
+	for(int i = 1; i <= 5; ++i) {
+		for(int j = i; j <= 10; ++j) {
+			//cout << i << " " << j << endl;
+			for(int k = 0; k < 1000; ++k) {
+				Graph H = uniformRandomGraph(i,2,0);
+				Graph G = uniformRandomGraph(j,2,0);
+				vector < vector <int> >  temp;
+				
+				returnSubgraphsNoFlags(H,G,temp);
+			}
+		}
+	}
+	
+	
+	/*ifstream myFile;
 	myFile.open("r44_14.g6");
 	string line;
 	char* canonLabel;
@@ -97,7 +130,7 @@ int main() {
   			outputFile << "Minimum number: " << minNum << endl;
   			outputFile << "Maximum number: " << maxNum << endl << endl;
   		}
-  	}
+  	}*/
 	
 	
 	auto end=high_resolution_clock::now();
