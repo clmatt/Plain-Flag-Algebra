@@ -10,6 +10,7 @@ using namespace std;
 #include <limits> 
 #include <queue>
 #include <tuple>
+#include <string>
 
 using namespace std::chrono;
 
@@ -18,8 +19,6 @@ using namespace std::chrono;
 #include "general.h"
 #include "fractions.h"
 #include "flags.h"
-
-//#define MAXN 100    /* Define this before including nauty.h */
 
 //Nauty
 extern "C" {
@@ -33,6 +32,7 @@ extern "C" {
 
 int main() {
 	auto start=high_resolution_clock::now();
+<<<<<<< Updated upstream
 	
 	
 	
@@ -46,80 +46,75 @@ int main() {
 	//zeros
 	edges = {{0,1,1}};
 	zeros.push_back(Graph(edges,3,numColors));
+=======
+>>>>>>> Stashed changes
 	
-	edges = {{0,1,2}};
-	zeros.push_back(Graph(edges,3,numColors));
+	ifstream myFile;
+	myFile.open("r36_15.g6");
+	string line;
+	char* canonLabel;
+	const int subgraphSize = 4;
 	
-	edges = {{0,1,1},{1,2,2}};
-	zeros.push_back(Graph(edges,3,numColors));
+	vector< vector< Graph> > allGraphs;
 	
-	//K4
-	edges.clear();
-	for(int i = 0; i < 3; ++i) {
-		for(int j = i+1; j < 4; ++j) {
-			edges.push_back({i,j,1});
+	allGraphs.push_back({});
+	allGraphs.push_back({});
+	for(int i = 2; i <= subgraphSize; ++i) {
+		allGraphs.push_back(generate(i, 2, {}));
+	}
+	
+	vector<Graph> fromFile;
+	
+	cout << endl << "Reading in file." << endl << endl;
+	int counter = 0;
+	
+	if (myFile.is_open()) {
+		while (getline(myFile,line)) {
+			if(counter %10000 == 0) {
+				cout << "Iteration number " << counter << endl;
+			}
+			
+			++counter;
+			canonLabel = &line[0];
+			sparsegraph sg;
+    		SG_INIT(sg);
+    		int num_loops;
+			
+			stringtosparsegraph(&canonLabel[0], &sg, &num_loops);
+    		Graph G = convertFromNauty(sg);
+    		fromFile.push_back(G);
 		}
-	}
-	zeros.push_back(Graph(edges,4,numColors));
-	
-	//K6
-	edges.clear();
-	for(int i = 0; i < 5; ++i) {
-		for(int j = i+1; j < 6; ++j) {
-			edges.push_back({i,j,2});
-		}
-	}
-	zeros.push_back(Graph(edges,6,numColors));
-	
-	//f-Maximize number of edges
-	f.push_back(Graph({{0,1,2}},2,numColors));
-	
-	//Make known
-	//CHANGE if running on more vertices
-	for(int i = 2; i <= 6; ++i) {
-		Graph Kempty({{}},i,numColors);
-		Equation knownEmpty({Kempty},zeros,Frac(1,myPow(39,i-1)),0);
-		known.push_back(knownEmpty);
-	}
-	
-	//Edge density bounds based on R(3,6)
-	Graph K21({{0,1,1}},2,numColors);
-	Equation known1({K21},zeros,Frac(17,39),1);
-	known.push_back(known1);
-	
-	K21.setCoefficient({-1});
-	Equation known2({K21},zeros,Frac(-14,39),1);
-	known.push_back(known2);
-	
-	Graph K21f({{0,1,1}},2,numColors);
-	K21f.setFlag({0});
-	Graph K11f({{}},1,numColors);
-	K11f.setFlag({0});
-	K11f.setCoefficient(Frac(-14,39));
-	Equation eq1({K21f,K11f},zeros,Frac(0,1),0);
-	K11f.setCoefficient(Frac(-15,39));
-	Equation eq2({K21f,K11f},zeros,Frac(0,1),0);
-	K11f.setCoefficient(Frac(-16,39));
-	Equation eq3({K21f,K11f},zeros,Frac(0,1),0);
-	K11f.setCoefficient(Frac(-17,39));
-	Equation eq4({K21f,K11f},zeros,Frac(0,1),0);
-	
-	Equation known3 = eq1*eq1*eq2*eq3*eq4;
-	known3.averageAll();
-	known.push_back(known3);
-	
-	
-	/*Equation known4 = eq1*eq2*eq2*eq3*eq4;
-	known4.averageAll();
-	known.push_back(known4);
-	Equation known5 = eq1*eq2*eq3*eq3*eq4;
-	known5.averageAll();
-	known.push_back(known5);
-	Equation known6 = eq1*eq2*eq3*eq4*eq4;
-	known6.averageAll();
-	known.push_back(known6);*/
-	
-	plainFlagAlgebra(f,7,zeros,known);
+   	myFile.close();
+  	}
+  	cout << endl;
+  	
+  	ofstream outputFile;
+  	outputFile.open("r36_15_subgraphBounds.txt");
+  	
+  	for(int i = 2; i <= subgraphSize; ++i) {
+  		for(int j = 0; j < (int)allGraphs[i].size(); ++j) {
+  			cout << "(" << i << ", " << j << ") out of (" << subgraphSize << ", " << (int)allGraphs[i].size() << ")" << endl;
+  			int temp = numSubgraphs(allGraphs[i][j],fromFile[0]);
+  			int minNum = temp;
+  			int maxNum = temp;
+  			int counter = 1;
+  			
+  			for(int k = 1; k < (int)fromFile.size(); ++k) {
+  				if(counter %10000 == 0) {
+					cout << "Iteration number " << counter << endl;
+				}
+				++counter;
+				temp = numSubgraphs(allGraphs[i][j],fromFile[k]);
+  				minNum = min(minNum,temp);
+  				maxNum = max(maxNum,temp);
+  			}
+  			cout << endl;
+  			outputFile << "Adjacency Matrix:" << endl;
+  			allGraphs[i][j].printAdjMatToFile(outputFile);
+  			outputFile << "Minimum number: " << minNum << endl;
+  			outputFile << "Maximum number: " << maxNum << endl << endl;
+  		}
+  	}
 	
 	
 	auto end=high_resolution_clock::now();
