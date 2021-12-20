@@ -30,24 +30,8 @@ extern "C" {
 //This is going to be extremely confusing, but graph is from Nauty and Graph is from me
 
 
-int main() {
-	auto start=high_resolution_clock::now();
-<<<<<<< Updated upstream
-	
-	
-	
-	//R(4,6) <= 39
-	vector<Graph> f;
-	vector<Graph> zeros;
-	vector<Equation> known;
-	vector<Edge> edges;
-	const int numColors = 3;
-	
-	//zeros
-	edges = {{0,1,1}};
-	zeros.push_back(Graph(edges,3,numColors));
-=======
->>>>>>> Stashed changes
+int main() {		
+
 	
 	ifstream myFile;
 	myFile.open("r36_15.g6");
