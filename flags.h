@@ -3119,8 +3119,6 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 			}
 		}
 		
-	
-		
 		int den = choose(nG+nH-2*sizeOfFlag,nG-sizeOfFlag);
 		eq.setCoefficient(i,Frac(num,den)*GCoefficient*HCoefficient);
 	}
