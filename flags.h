@@ -1037,7 +1037,7 @@ bool isomorphic(const Graph &G, const Graph &H) {
 //Return of vectors that could be used in restriction
 //Almost the same as numSubgraphs, just with different output
 //Needs no flags (used in the version with flags)
-void NEWreturnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> > &output) {
+void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> > &output) {
 	//No flags
 	if((H.getSizeOfFlag() != 0) || (G.getSizeOfFlag() != 0)) {
 		cout << "In returnSubgraphsNoFlags H and G can't have flags." << endl << endl;
@@ -1537,21 +1537,30 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 				}
 				
 				vector< vector< int > > possibleTemp; 
-					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
+					
+				
 				//Make possibleTemp actually correspond to indices in G		
-				for(int j = 0; j < (int)possibleTemp.size(); ++j) {
-					int index = 0;
-					vector<int> tempVec(G.getN(),-1);
-					
-					for(int k = 0; k < G.getN(); ++k) {
-						if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
-							tempVec[k] = possibleTemp[j][index];
-							++index;
+				if(!dominating) {						
+					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
+					for(int j = 0; j < (int)possibleTemp.size(); ++j) {
+						int index = 0;
+						vector<int> tempVec(G.getN(),-1);
+						
+						for(int k = 0; k < G.getN(); ++k) {
+							if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
+								tempVec[k] = possibleTemp[j][index];
+								++index;
+							}
 						}
+						
+						possible[c].push_back(tempVec);
 					}
-					
-					possible[c].push_back(tempVec);
 				}
+				
+				else {
+					output = output+numSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction));
+					c = H.getNumColors();
+				}	
 			}
 			
 			if((possible[c].size() == 0) && (Hdegree > 0)) {
@@ -1561,7 +1570,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 		}
 		
 		//Go through all possibilities and see if any of them combine to give a subgraph
-		if(val) {	
+		if(val & !dominating) {	
 			vector<int> maxVals; //Use in next_list
 			vector<int> list;
 			list.resize(H.getNumColors(),0);
@@ -1594,16 +1603,10 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 					
 				Grestriction[vertex] = index;
 				
-				if(!dominating) {
-					if(isomorphic(G.restriction(Grestriction),H)) { //Not a cheap call, try to avoid it
-						output.push_back(Grestriction);
-					}
+				if(isomorphic(G.restriction(Grestriction),H)) { //Not a cheap call, try to avoid it
+					++output;
 				}
 				
-				//If we have a dominating vertex don't need to do a second isomorphism check
-				else {
-					output.push_back(Grestriction);
-				}
 			} while(nextList(list, maxVals));
 		}
 	}
