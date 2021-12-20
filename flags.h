@@ -3111,11 +3111,9 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		bool cont = true;
 		
 		vector<int> degreeG(nG-sizeOfFlag,0); //This makes both 0 index rather hthan sizeOfFlag indexed
-		vector<int> degreeH(nH-sizeOfFlag,0);
 		for(int j = 0; j < (int)newEdges.size(); ++j) {
 			if(newEdges[j].color == 1) {
 				++degreeG[newEdges[j].a-sizeOfFlag];
-				++degreeH[newEdges[j].b-nG];
 			}
 		}
 		
@@ -3131,21 +3129,6 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 				j = G.getNumOrbits();
 			}
 		}
-		
-		/*if(cont) {
-			for(int j = 0; j < H.getNumOrbits(); ++j) {	
-				for(int k = 1; k < H.getOrbitSize(j); ++k) {
-					if(degreeH[H.getOrbit(j,k-1)-sizeOfFlag] < degreeH[H.getOrbit(j,k)-sizeOfFlag]) {
-						cont = false;
-						k = H.getOrbitSize(j);
-					}
-				}	
-				
-				if(!cont) {
-					j = H.getNumOrbits();
-				}
-			}
-		}*/
 		
 		if(cont) {
 			vector<Edge> edges = permanentEdges;
