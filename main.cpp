@@ -31,10 +31,11 @@ extern "C" {
 
 
 
-int main() {		
+int main() {
+	auto start=high_resolution_clock::now();		
 	
 	ifstream myFile;
-	myFile.open("r36_15.g6");
+	myFile.open("r36_13.g6");
 	string line;
 	char* canonLabel;
 	const int subgraphSize = 4;
@@ -73,7 +74,7 @@ int main() {
   	cout << endl;
   	
   	ofstream outputFile;
-  	outputFile.open("r36_15_subgraphBounds.txt");
+  	outputFile.open("r36_13_subgraphBounds.txt");
   	
   	for(int i = 2; i <= subgraphSize; ++i) {
   		for(int j = 0; j < (int)allGraphs[i].size(); ++j) {
@@ -98,7 +99,7 @@ int main() {
   			outputFile << "Minimum number: " << minNum << endl;
   			outputFile << "Maximum number: " << maxNum << endl << endl;
   		}
-  	}*/
+  	}
 	
 	
 	auto end=high_resolution_clock::now();

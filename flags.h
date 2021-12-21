@@ -1570,7 +1570,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 		}
 		
 		//Go through all possibilities and see if any of them combine to give a subgraph
-		if(val & !dominating) {	
+		if(val && !dominating) {	
 			vector<int> maxVals; //Use in next_list
 			vector<int> list;
 			list.resize(H.getNumColors(),0);
@@ -3148,7 +3148,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		//May assume that within each orbit the degrees are decreasing
 		bool cont = true;
 		
-		vector<int> degreeG(nG-sizeOfFlag,0); //This makes both 0 index rather hthan sizeOfFlag indexed
+		vector<int> degreeG(nG-sizeOfFlag,0); //This makes both 0 index rather than sizeOfFlag indexed
 		for(int j = 0; j < (int)newEdges.size(); ++j) {
 			if(newEdges[j].color == 1) {
 				++degreeG[newEdges[j].a-sizeOfFlag];
