@@ -7,10 +7,11 @@ import time
 
 startTime = time.time()
 
-eps = 1E-15
+eps = 1E-10
 
 with Model("Plain Flag Algebra") as M:
-        
+   # THIS HAS A BUG!!! I'm not sure where but there's at least an issue when n is the same size as the objective function graphs
+   # not sure if I actually need to fix if I figure out how to port Mosek into C++
 	# Setting up the variables
 	x = M.variable("x", Domain.greaterThan(0.))
 	
@@ -19,12 +20,40 @@ with Model("Plain Flag Algebra") as M:
 		line = file1.readline()
 		dimension = [int(i) for i in line.split(" ") if i.strip()]
 		
-		Matrices = [[[[0]*dimension[i+2] for k in range(dimension[i+2])] for j in range(dimension[1])] for i in range(dimension[0])]
+		firstIndex = 0
+		Matrices = [[[0]*dimension[2] for k in range(dimension[2])] for j in range(dimension[1])]
+		
+		A = []
+		for i in range(dimension[0]):
+			A.append(M.variable("A"+str(i), Domain.inPSDCone(dimension[i+2]))) 
+			
+		constr = []
 		
 		for line in file1.readlines():
 			temp = [float(i) for i in line.split(" ") if i.strip()]
-			Matrices[int(temp[0])][int(temp[1])][int(temp[2])][int(temp[3])] = temp[4]-eps
-			Matrices[int(temp[0])][int(temp[1])][int(temp[3])][int(temp[2])] = temp[4]-eps
+			
+			if firstIndex != temp[0]:
+				print("Index is ", int(temp[0]), " out of ", dimension[0])
+				if firstIndex == 0:
+					for i in range(dimension[1]):
+						tempMat = Matrix.dense(Matrices[i])
+						constr.append(Expr.add(Expr.dot(tempMat, A[0]), x))
+						
+				else:
+					for i in range(dimension[1]):
+						tempMat = Matrix.dense(Matrices[i])
+						constr[i] = Expr.add(constr[i],Expr.dot(tempMat, A[firstIndex]))
+			
+				Matrices = [[[0]*dimension[int(temp[0])+2] for k in range(dimension[int(temp[0])+2])] for j in range(dimension[1])]
+				firstIndex = int(temp[0])
+			
+			Matrices[int(temp[1])][int(temp[2])][int(temp[3])] = temp[4]-eps
+			Matrices[int(temp[1])][int(temp[3])][int(temp[2])] = temp[4]-eps
+			
+	#Add final constraints
+	for i in range(dimension[1]):
+		temp = Matrix.dense(Matrices[i])
+		constr[i] = Expr.add(constr[i],Expr.dot(temp, A[firstIndex]))
 	
 	print("Reading in B.")		
 	with open("plainFlagAlgebra2.txt", "r") as file1:
@@ -39,10 +68,6 @@ with Model("Plain Flag Algebra") as M:
 			test = [float(i) for i in line.split(" ") if i.strip()]
 			C.append(test)
 			numKnown = numKnown + 1
-	
-	A = []
-	for i in range(dimension[0]):
-		A.append(M.variable("A"+str(i), Domain.inPSDCone(dimension[i+2]))) 
 
 	if dimension[1] != len(B) :
 		print("Something wrong with .txt files.")
@@ -54,16 +79,6 @@ with Model("Plain Flag Algebra") as M:
 	
 	for i in range(numKnown):
 		y.append(M.variable("y"+str(i), Domain.greaterThan(0.)))
-	
-	constr = []
-	
-	for i in range(dimension[1]):
-		temp = Matrix.dense(Matrices[0][i])
-		constr.append(Expr.add(Expr.dot(temp, A[0]), x))
-		
-		for j in range(1,dimension[0]) :
-			temp = Matrix.dense(Matrices[j][i])
-			constr[i] = Expr.add(constr[i],Expr.dot(temp, A[j]))
 	
 	#Add constraint on duals to bound subgraph densities
 	forObj = Expr.mul(-C[0][0]-eps,y[0])
@@ -85,13 +100,13 @@ with Model("Plain Flag Algebra") as M:
 	X = []
 
 	for i in range(dimension[1]) :
-		c = M.constraint("c"+str(i),constr[i], Domain.lessThan(B[i])) #Minimize
-		#c = M.constraint("c"+str(i),constr[i], Domain.lessThan(1.-B[i])) #Maximize
+		#c = M.constraint("c"+str(i),constr[i], Domain.lessThan(B[i])) #Minimize
+		c = M.constraint("c"+str(i),constr[i], Domain.lessThan(1.-B[i])) #Maximize
 		X.append(c)	
 			
 	# Objective
+	# Bounding duals creates new variables, which are in the objective function
 	M.objective(ObjectiveSense.Maximize, Expr.add(x,forObj))
-	#M.objective(ObjectiveSense.Maximize,x)
 	
 	M.setLogHandler(sys.stdout)
 	M.writeTask("sdo3.ptf")
@@ -107,9 +122,9 @@ with Model("Plain Flag Algebra") as M:
 			print("For graph ", index, " we have a dual value of: ", c.dual())
 		index = index + 1
 	#Minimize
-	print("Solution is: ", M.dualObjValue())
+	#print("Solution is: ", M.dualObjValue())
 	
 	#Maximize
-	#print("Solution is: ", 1-M.dualObjValue())
+	print("Solution is: ", 1-M.dualObjValue())
 
 print("Total running time: ", time.time()-startTime, " seconds. ")

@@ -30,12 +30,12 @@ extern "C" {
 //This is going to be extremely confusing, but graph is from Nauty and Graph is from me
 
 
+
 int main() {
-	auto start=high_resolution_clock::now();
-	
+	auto start=high_resolution_clock::now();	
 	
 	ifstream myFile;
-	myFile.open("r44_14.g6");
+	myFile.open("r36_11.g6");
 	string line;
 	char* canonLabel;
 	const int subgraphSize = 4;
@@ -45,7 +45,7 @@ int main() {
 	allGraphs.push_back({});
 	allGraphs.push_back({});
 	for(int i = 2; i <= subgraphSize; ++i) {
-		allGraphs.push_back(generate(i, 2, {}, {}));
+		allGraphs.push_back(generate(i, 2, {}));
 	}
 	
 	vector<Graph> fromFile;
@@ -74,7 +74,7 @@ int main() {
   	cout << endl;
   	
   	ofstream outputFile;
-  	outputFile.open("r44_14_subgraphBounds.txt");
+  	outputFile.open("r36_11_subgraphBounds.txt");
   	
   	for(int i = 2; i <= subgraphSize; ++i) {
   		for(int j = 0; j < (int)allGraphs[i].size(); ++j) {

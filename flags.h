@@ -2155,6 +2155,8 @@ vector<Graph> generate(const int n, const int numColors, const vector<Graph> &ze
 		 	}
 		}
 	}
+	
+	cout << endl;
 
 	return output;
 }
@@ -3216,13 +3218,12 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 			}
 		}
 		
-		for(int j = 0; j < partialEdges.size(); ++j) {
+		for(int j = 0; j < (int)partialEdges.size(); ++j) {
 			newEdges.push_back(partialEdges[j]);
 		}
 		
 		//May assume that within each orbit the degrees are decreasing
 		bool cont = true;
-		
 
 		vector<int> degreeG(nG-sizeOfFlag,0); //0 indexed rather than sizeOfFlag indexed
 		for(int j = 0; j < (int)newEdges.size(); ++j) {
@@ -4220,13 +4221,12 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	}
 	
 	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
+		cout << "In A, iteration " << i+1 << " out of " << v.size() << endl;
 		for(int j = 0; j < (int)v[i].size(); ++j) {
 			for(int k = j; k < (int)v[i].size(); ++k) {
-				cout << "When calculating A: (" << i << ", " << j << ", " << k  <<  ") out of (" << v.size() << ", " << v[i].size() << ", " << v[i].size() << ")" << endl;
+				
 				Equation temp = multiply(v[i][j],v[i][k],zeros);
-				cout << "Multiplied." << endl;
 				temp.averageAll();
-				cout << "Averaged." << endl;
 				
 				for(int l = 0; l < temp.getNumVariables(); ++l) {
 					if(temp.getVariable(l).getCoefficient() != 0) {
@@ -4242,9 +4242,9 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 					}
 				}
 			}
-			cout << endl;
 		}
 	}
+	cout << endl;
 	
 	Frac zeroFrac(0,1);
 	//Calculating B
@@ -4321,6 +4321,457 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	for(int i = 0; i < knownSize; ++i) {
 		for(int j = 0; j < everything.getNumVariables()+1; ++j) {
+			myFile3 << (long double)C[i][j].getNum() / (long double)C[i][j].getDen() << " ";
+		}
+		myFile3 << endl;
+	}
+	
+	
+	//Integer Version
+	/*long long int mult = 1;
+	
+	queue<tuple<int,int,int,int,Frac> > Acopy = A;
+	
+	while(!Acopy.empty()) {
+		auto tempTup = Acopy.front();
+		Acopy.pop();
+
+		mult = lcm(mult,get<4>(tempTup).getDen());
+	}
+	
+	for(int i = 0; i < everything.getNumVariables(); ++i) {
+		mult = lcm(mult,B[i].getDen());
+	}
+	
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < everything.getNumVariables()+1; ++j) {
+			mult = lcm(mult,C[i][j].getDen());
+		}
+	}
+	
+	ofstream myFile1;
+	myFile1.open("plainFlagAlgebra1.txt");
+	
+	//Tells python the size of the matrix
+	myFile1 << v.size() << " " << everything.getNumVariables() << " ";
+	for(int i = 0; i < (int)v.size(); ++i) {
+		myFile1 << v[i].size() << " ";
+	}
+	myFile1 << endl;
+	
+	while(!A.empty()) {	
+		auto tempTup = A.front();
+		A.pop();
+		
+		myFile1 << get<0>(tempTup) << " " << get<1>(tempTup)  << " " << get<2>(tempTup)  << " " << get<3>(tempTup)  << " " << get<4>(tempTup).getNum()*mult/get<4>(tempTup).getDen() << endl;
+	}
+	
+	ofstream myFile2;
+	myFile2.open("plainFlagAlgebra2.txt");
+	
+	for(int i = 0; i < everything.getNumVariables(); ++i) {
+		myFile2 << B[i].getNum()*mult/B[i].getDen() << " ";
+	}
+
+	ofstream myFile3;
+	myFile3.open("plainFlagAlgebra3.txt");
+	
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < everything.getNumVariables()+1; ++j) {
+			myFile3 << C[i][j].getNum()*mult/C[i][j].getDen() << " ";
+		}
+		myFile3 << endl;
+	}
+	
+	ofstream myFile4;
+	myFile4.open("plainFlagAlgebra4.txt");
+	myFile4 << mult;
+	
+	cout << "Finished plainFlagAlgebra." << endl << endl;*/
+}
+
+
+
+
+
+void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equation> &known) {
+	cout << "Starting plainFlagAlgebra." << endl;
+	
+	//The way the python script is setup we need at least one known, this just says that edge density is <= 1
+	if(known.size() == 0) {
+		Graph K2({{}},2,f[0].getNumColors());
+		Equation knownTemp({K2},zeros,Frac(1,1),1);
+		known.push_back(knownTemp);
+	}
+	
+	int fSize = f.size();
+	int zerosSize = zeros.size();
+	int knownSize = known.size();
+		
+	if(n <= 1) {
+		cout << "Plain flag algebra method not set up for graphs with fewer than two vertices." << endl << endl;
+		throw exception();
+	}
+
+	if(fSize == 0) {
+		cout << "Need at least one graph in f in plainFlagAlgebra." << endl << endl;
+		throw exception();
+	}
+	
+	//Check if every equation in known has at least one variable
+	for(int i = 0; i < knownSize; ++i) {
+		if(known[i].getNumVariables() == 0) {
+			cout << "Equations in known must have at least one graph in plainFlagAlgebra." << endl << endl;
+			throw exception();
+		}
+	}
+	
+	//Make every equation in known type 1 (<=)
+	for(int i = 0; i < knownSize; ++i) {
+		if(known[i].getType() != 1) {
+			vector<Graph> variablesTemp;
+			
+			for(int j = 0; j < known[i].getNumVariables(); ++j) {
+				Graph graphTemp = known[i].getVariable(j);
+				graphTemp.setCoefficient(-graphTemp.getCoefficient());
+				variablesTemp.push_back(graphTemp);
+			}
+			
+			Equation knownTemp(variablesTemp,zeros,-known[i].getAns(),1);
+			
+			known[i].setType(1);
+			known.insert(known.begin()+i, knownTemp);
+			++knownSize;
+		}
+	}
+
+	int fN = f[0].getN();
+	
+	//Graphs in f can't have flags
+	for(int i = 0; i < fSize; ++i) {
+		if(f[i].getFlag().getN() != 0) {
+			cout << "All graphs in f in plainFlagAlgebra must not have any flags." << endl << endl;
+			throw exception();
+		}
+	}
+
+	//Graphs in known can't have flags
+	//Maybe fix?
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			if(known[i].getVariable(j).getFlag().getN() != 0) {
+				cout << "All graphs in known in plainFlagAlgebra must not have any flags." << endl << endl;
+				throw exception();
+			}
+		}
+	}
+	
+	//Make sure everything has correct number of colors
+	int numColors = f[0].getNumColors();
+	
+	for(int i = 1; i < fSize; ++i) {
+		if(f[i].getNumColors() != numColors) {
+			cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << endl << endl;
+			throw exception();
+		}
+	}
+	
+	for(int i = 0; i < zerosSize; ++i) {
+		if(zeros[i].getNumColors() != numColors) {
+			cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << endl << endl;
+			throw exception();
+		}
+	}
+	
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			if(known[i].getVariable(j).getNumColors() != numColors) {
+				cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << endl << endl;
+				throw exception();
+			}
+		}
+	}
+	
+	//Not sure if strictly necessary, but it would probably give trash bounds otherwise
+	if(fN > n) {
+		cout << "Make n large enough so it has vertices at least as many vertices when multiplied by itself as n." << endl << endl;
+		throw exception();
+	}
+	
+	cout << endl;
+	
+	Equation fEq(f,zeros,Frac(1,1),0); //Type doesn't matter
+	vector<Edge> edges {};
+	Graph H(edges,1,numColors);
+	Equation eq1({H},zeros,Frac(1,1),0);
+	Equation eq2({H},zeros,Frac(1,1),0);
+	
+	cout << "Generating graphs to be used in resize." << endl;
+	vector<Graph> allGraphs = generate(n,numColors,zeros);
+	
+	cout << endl << "Resizing f." << endl;
+	Equation fEqResized = resize(fEq,allGraphs);
+	f.clear();
+	for(int i = 0; i < fEqResized.getNumVariables(); ++i) {
+		f.push_back(fEqResized.getVariable(i));
+	}
+	cout << endl;
+	
+	fSize = f.size();
+	
+	//Resize known
+	cout << "Resizing known." << endl;
+	for(int i = 0; i < knownSize; ++i) {
+		cout << i+1 << " out of " << knownSize << endl;
+		known[i] = resize(known[i],allGraphs);
+	}
+	cout << endl;
+
+	
+	ofstream myFile;
+	myFile.open("Duals.txt");
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		myFile << "Label: " << i+1 << endl;
+		allGraphs[i].printAdjMatToFile(myFile);
+		myFile << endl;
+	}
+
+	
+	cout << "Generating v." << endl << endl;
+	vector< vector< Graph> > v = generateV(n,numColors,zeros);
+	cout << endl;
+
+	queue<tuple<int,int,int,int,Frac> > A;
+
+	vector<Frac> B; //Gives numbers to be printed
+	vector< vector<Frac> > C; //From Known
+	
+	//Used to give indices of A
+	//Rather than multiplying we look at all graphs and work backwards to get coefficients
+	//This works well as we have already generated all graphs of size n and multiplication basically just has us partially doing that every time so it saves time on generation
+	//The only slow down could come from looking up indices but unordered_maps are SO fast it doesn't matter
+	unordered_map<string, int> allGraphsMap;
+			
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		allGraphsMap.insert(pair<string, int>(allGraphs[i].getCanonLabel(),i));
+	}
+	
+	//not really all flags as we need to consider parity issues
+	vector<Graph> allFlags = generateFlags(n-2, numColors, zeros);
+	for(int i = 2; i < (int)ceil(n/2.); ++i) {
+		vector<Graph> temp = generateFlags(n-2*i, numColors, zeros);
+		allFlags.insert(allFlags.end(), temp.begin(), temp.end());
+	}
+	
+	
+	//Hash map for flags which we need to determine first index of everythingWithFlag
+	unordered_map<string, int> flagMap;
+	for(int i = 0; i < (int)allFlags.size(); ++i) {
+		flagMap.insert(pair<string, int>(allFlags[i].getCanonLabel(),i));
+	}	
+	
+	//All graphs of size n with flags such that parity issues work out
+	/*cout << "Generating allGraphsWithFlags." << endl << endl;
+	vector< vector < Graph > > allGraphsWithFlags;
+	
+	for(int i = 0; i < (int)allFlags.size(); ++i) {
+		cout << "In allGraphsWithFlags, iteration " << i+1 << " out of " << allFlags.size() << endl;  
+		allGraphsWithFlags.push_back(vector<Graph>());
+	
+		for(int j = 0; j < (int)allGraphs.size(); ++j) {
+			vector<Graph> temp = addAllFlags(allGraphs[j],allFlags[i]);
+			
+			allGraphsWithFlags[i].insert(allGraphsWithFlags[i].end(), temp.begin(), temp.end());
+		}
+	}
+	cout << endl;*/
+	
+	cout << "Calculating A." << endl << endl;
+	
+	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
+		cout << "In A, iteration " << i+1 << " out of " << v.size() << endl;  
+		//Create hash map for third and fourth indices of A
+		unordered_map<string, int> f;
+		for(int j = 0; j < (int)v[i].size(); ++j) {
+			f.insert(pair<string, int>(v[i][j].getCanonLabel(),j));
+		}
+		
+		vector< vector < vector <Frac> > > partialA( (int)allGraphs.size(), vector< vector<Frac> > ((int)v[i].size(), vector<Frac>((int)v[i].size(), Frac(0,1))));
+		
+		int index1 = flagMap[v[i][0].getFlag().getCanonLabel()];
+		int sizeOfFlag = v[i][0].getSizeOfFlag();
+		
+		for(int index2 = 0; index2 < (int)allGraphsWithFlags[index1].size(); ++index2) {
+			Graph G = allGraphsWithFlags[index1][index2];
+			Graph Gcopy = G;
+			Gcopy.removeFlag();
+		
+			int b = allGraphsMap[Gcopy.getCanonLabel()];
+			
+			Gcopy = G;
+			Gcopy.averageAll();
+			
+			Frac e = Gcopy.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
+			
+			vector<int> X((n-sizeOfFlag)/2 - 1); //X is zero indexed but it should actually be sizeOfFlag+1 indexed
+			//Wlog first non-flag vertex in X
+			for(int j = 0; j < (n-sizeOfFlag)/2 - 1; ++j) {
+				X[j] = j;
+			}
+			
+			do {
+				vector<int> restriction1(n,-1);
+				vector<int> restriction2(n,-1);
+				
+				for(int j = 0; j < sizeOfFlag; ++j) {
+					restriction1[G.getFlagVertex(j)] = j;
+					restriction2[G.getFlagVertex(j)] = j;
+				}
+				
+				int counter1 = sizeOfFlag;
+				int counter2 = sizeOfFlag;
+				int Xcounter = 0;
+				int totalCounter = 0;
+				bool first = true;
+				
+				//A bit weird b/c we don't know the flag vertices in G are first
+				for(int j = 0; j < n; ++j) {
+					if(!G.flagVertex(j)) {
+						if(first) {
+							restriction1[j] = counter1;
+							++counter1;
+							first = false;
+						}
+						
+						else {
+							if((X.size() != 0) && (X[Xcounter] == totalCounter)) {
+								restriction1[j] = counter1;
+								++counter1;
+								++Xcounter;
+								++totalCounter;
+							}
+							
+							else {
+								restriction2[j] = counter2;
+								++counter2;
+								++totalCounter;
+							}
+						}
+					}
+				}
+				
+				Graph G1 = G.restriction(restriction1);
+				Graph G2 = G.restriction(restriction2);
+				
+				int G1Index = f[G1.getCanonLabel()];
+				int G2Index = f[G2.getCanonLabel()];
+				
+				int c = min(G1Index,G2Index);
+				int d = max(G1Index,G2Index);
+				
+				partialA[b][c][d] = partialA[b][c][d] +  e;
+			
+			} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
+		}
+		
+		//Combine partialA into A
+		for(int index1 = 0; index1 < (int)partialA.size(); ++index1) {
+			for(int index2 = 0; index2 < (int)partialA[index1].size(); ++index2) {
+				for(int index3 = 0; index3 < (int)partialA[index1][index2].size(); ++index3) {
+					if(partialA[index1][index2][index3] != 0) {
+						if(index2 != index3) {
+							auto tempTup = make_tuple(i,index1,index2,index3,partialA[index1][index2][index3]/2);
+							A.push(tempTup);
+						}
+						
+						else {
+							auto tempTup = make_tuple(i,index1,index2,index3,partialA[index1][index2][index3]);
+							A.push(tempTup);
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	cout << endl;
+	
+	Frac zeroFrac(0,1);
+	//Calculating B
+	cout << "Calculating B." << endl << endl;
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		B.push_back(zeroFrac);
+	}
+	
+	for(int i = 0; i < fSize; ++i) {
+		for(int j = 0; j < (int)allGraphs.size(); ++j) {
+			if(isomorphic(f[i],allGraphs[j])) {
+				B[j] = f[i].getCoefficient();
+				j = (int)allGraphs.size();
+			}
+		}
+	}
+	
+	//First has 0 for ==, 1 for <=
+	//Next entry is bound
+	//Finally, it's the vector of coefficients in known (after it's been resized)
+	
+	//Calculating C
+	cout << "Calculating C." << endl << endl;
+	C.resize(knownSize);
+	for(int i = 0; i < knownSize; ++i) {
+		C[i].resize(allGraphs.size()+1,zeroFrac);
+	}
+	
+	for(int i = 0; i < knownSize; ++i) {
+		C[i][0] = known[i].getAns();
+		
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			for(int k = 0; k < (int)allGraphs.size(); ++k) {
+				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
+					C[i][k+1] = known[i].getVariable(j).getCoefficient();
+					k = (int)allGraphs.size();
+				}
+			}
+		}
+	}
+	
+	//Non-integer version
+	typedef std::numeric_limits<long double> ldbl;
+	
+	ofstream myFile1;
+	myFile1.open("plainFlagAlgebra1.txt");
+	myFile1.precision(ldbl::max_digits10);
+	
+	//Tells python the size of the matrix
+	myFile1 << v.size() << " " << allGraphs.size() << " ";
+	for(int i = 0; i < (int)v.size(); ++i) {
+		myFile1 << v[i].size() << " ";
+	}
+	myFile1 << endl;
+	
+	while(!A.empty()) {	
+		auto tempTup = A.front();
+		A.pop();
+		
+		myFile1 << get<0>(tempTup) << " " << get<1>(tempTup)  << " " << get<2>(tempTup)  << " " << get<3>(tempTup)  << " " << (long double)get<4>(tempTup).getNum() / (long double)get<4>(tempTup).getDen() << endl;
+	}
+	
+	ofstream myFile2;
+	myFile2.open("plainFlagAlgebra2.txt");
+	myFile2.precision(ldbl::max_digits10);
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		myFile2 << (long double)B[i].getNum() / (long double)B[i].getDen() << " ";
+	}
+
+	ofstream myFile3;
+	myFile3.open("plainFlagAlgebra3.txt");
+	myFile3.precision(ldbl::max_digits10);
+	
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < (int)allGraphs.size()+1; ++j) {
 			myFile3 << (long double)C[i][j].getNum() / (long double)C[i][j].getDen() << " ";
 		}
 		myFile3 << endl;
