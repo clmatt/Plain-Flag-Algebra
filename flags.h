@@ -3010,6 +3010,10 @@ Equation operator+(Equation eq, Graph G) {
 //Really more of a vector of graphs, but in this form it allows us to use overridden +
 //TODO add edge between parts in a smarter way?
 Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) {
+	if(G1.getN() > H1.getN()) {
+		return multiply(H1,G1,zeros);
+	} 
+
 	vector<int> HReorder;
 	vector<int> GReorder;
 	
@@ -3118,17 +3122,84 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	for(int j = 0; j < sizeOfFlag; ++j) {
 		flag.push_back(G.getFlagVertex(j));
 	}
+	
+	if(nG == sizeOfFlag) {
+		Equation eq({H},zeros, Frac(0,1), 0, false);
+		return eq;
+	}
 
 	//Create all possible variables
-	for(int i = 0; i < myPow(c,(nG - sizeOfFlag)*(nH-sizeOfFlag)); ++i) { //c-ary mask
+	//In first vertex (index=sizeOfFlag) order of edges in each orbit doesn't matter
+	vector< vector< vector<Edge> > > edgesTemp;
+	
+	int index1 = 0;
+	
+	for(int i = 0; i < H.getNumOrbits(); ++i) {
+		if(H.getOrbit(i,0) >= sizeOfFlag) {
+			edgesTemp.push_back(vector< vector<Edge> >());
+		
+			vector<int> colors(c,0);		
+			colors[0] = H.getOrbitSize(i);
+			
+			int index2 = 0;
+			do {
+				edgesTemp[index1].push_back(vector<Edge>());
+					
+				int index3 = 0;
+				for(int j = 0; j < c; ++j) {
+					for(int k = 0; k < colors[j]; ++k) {
+						edgesTemp[index1][index2].push_back({sizeOfFlag,H.getOrbit(i,index3)+nG-sizeOfFlag,j});
+						++index3;
+					}	
+				}
+				++index2;
+			} while(nextOrderedSum(colors));
+			
+			++index1;
+		}
+	}
+	
+	//Combine info from each orbit from edgesTemp
+	vector< vector<Edge> > firstVertexEdge;
+	vector<int> maxVals;
+	vector<int> list(H.getNumOrbits()-sizeOfFlag,0);
+	
+	for(int i = 0; i < H.getNumOrbits(); ++i) {
+		if(H.getOrbit(i,0) >= sizeOfFlag) {
+			maxVals.push_back(H.getOrbitSize(i));
+		}
+	}
+	
+	index1 = 0;
+	do {
+		firstVertexEdge.push_back(vector<Edge>());
+		
+		int index2 = 0;
+		
+		for(int i = 0; i < H.getNumOrbits(); ++i) {
+			if(H.getOrbit(i,0) >= sizeOfFlag) {
+				for(int j = 0; j < H.getOrbitSize(i); ++j) {
+					firstVertexEdge[index1].push_back(edgesTemp[index2][list[index2]][j]);
+				}
+				
+				++index2;
+			}
+		}
+		
+		++index1;
+	
+	} while(nextList(list,maxVals));
+	
+	for(auto partialEdges : firstVertexEdge) {
+	for(int i = 0; i < myPow(c,(nG - sizeOfFlag-1)*(nH-sizeOfFlag)); ++i) { //c-ary mask
 		//Convert i to c-ary number
 		vector<int> ary;
 		int temp = i;
 		
-		for(int j = 0; j < (nG-sizeOfFlag)*(nH-sizeOfFlag); ++ j) {
-			int temp2 = temp/myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1); //Need to be careful with rounding? 
+		for(int j = 0; j < (nG-sizeOfFlag-1)*(nH-sizeOfFlag); ++ j) {
+			int temp2 = temp/myPow(c,(nG-sizeOfFlag-1)*(nH-sizeOfFlag)-j-1); //Need to be careful with rounding? 
 		   ary.push_back(temp2);
-		   temp = temp-temp2*myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1);
+		   temp = temp-temp2*myPow(c,(nG-sizeOfFlag-1)*(nH-sizeOfFlag)-j-1);
 		}
 		
 		vector<Edge> newEdges;
@@ -3137,7 +3208,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		//Easier to just iterate through than to make a function
 		int index = 0;
 		for(int j = nG; j < nG+nH-sizeOfFlag; ++j) {
-			for(int k = sizeOfFlag; k < nG; ++k) {
+			for(int k = sizeOfFlag+1; k < nG; ++k) {
 				if(ary[index] != 0) {
 					newEdges.push_back({k,j,ary[index]});
 				}
@@ -3145,24 +3216,29 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 			}
 		}
 		
+		for(int j = 0; j < partialEdges.size(); ++j) {
+			newEdges.push_back(partialEdges[j]);
+		}
+		
 		//May assume that within each orbit the degrees are decreasing
 		bool cont = true;
 		
-		vector<int> degreeG(nG-sizeOfFlag,0); //This makes both 0 index rather than sizeOfFlag indexed
+
+		vector<int> degreeG(nG-sizeOfFlag,0); //0 indexed rather than sizeOfFlag indexed
 		for(int j = 0; j < (int)newEdges.size(); ++j) {
 			if(newEdges[j].color == 1) {
 				++degreeG[newEdges[j].a-sizeOfFlag];
 			}
 		}
-		
+			
 		for(int j = 0; j < G.getNumOrbits(); ++j) {	
-			for(int k = 1; k < G.getOrbitSize(j); ++k) {
+			for(int k = 1; k < G.getOrbitSize(j); ++k) { //Makes it so we don't look at flag vertices
 				if(degreeG[G.getOrbit(j,k-1)-sizeOfFlag] < degreeG[G.getOrbit(j,k)-sizeOfFlag]) {
 					cont = false;
 					k = G.getOrbitSize(j);
 				}
 			}	
-			
+				
 			if(!cont) {
 				j = G.getNumOrbits();
 			}
@@ -3183,6 +3259,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 				variables.push_back(GH);
 			}
 		}
+	}
 	}
 
 	Equation eq(variables,zeros, Frac(0,1), 0, false); //When converting to equation, removes isomorphisms

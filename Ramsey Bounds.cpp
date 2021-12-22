@@ -32,9 +32,8 @@ extern "C" {
 
 
 int main() {
-	auto start=high_resolution_clock::now();		
+	auto start=high_resolution_clock::now();	
 	
-	ifstream myFile;
 	myFile.open("r36_13.g6");
 	string line;
 	char* canonLabel;

@@ -109,6 +109,65 @@ bool nextList(vector<int> &list, const vector<int> &maxVals) {
 	return output;
 }
 
+
+//--------------------------
+//-----Next Ordered Sum-----
+//--------------------------
+
+//Outputs all ordered sets of size k such that they sum to equal n
+//Intialize with n,0,0,...,0 goes until 0,0,...,0,n
+bool nextOrderedSum(vector<int> &sum) {
+	int k = sum.size();
+	
+	int n = 0;
+	for(int i = 0; i < k; ++i) {
+		n += sum[i];
+	}
+	
+	bool output = false;
+	for(int i = 0; i < k-1; ++i) {
+		if(sum[i] != 0) {
+			output = true;
+			i = k-1;
+		}
+	}
+	
+	if(!output) {
+		return output;
+	}
+	
+	if(k == 2) {
+		--sum[0];
+		++sum[1];
+	}
+	
+	else {
+		vector<int> partialSum(k-1);
+		for(int i = 0; i < k-1; ++i) {
+			partialSum[i] = sum[i+1];
+		}
+		
+		bool test = nextOrderedSum(partialSum);
+		
+		if(test) {
+			for(int i = 0; i < k-1; ++i) {
+				sum[i+1] = partialSum[i];
+			}
+		} 
+		
+		else {
+			--sum[0];
+			sum[1] = n - sum[0];
+			for(int i = 2; i < k; ++i) {
+				sum[i] = 0;
+			}	
+		}
+	}
+	
+	return true;
+}
+
+
 //----------------------------
 //-----Euclid's Algorithm-----
 //----------------------------
