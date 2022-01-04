@@ -2294,6 +2294,116 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 }
 
 
+//-------------------------------------------
+//-----Generate v and allGraphsWithFlags-----
+//-------------------------------------------
+
+//Helper function in plainFlagAlgebra use
+void generateHelper(const int n, const int numColors, const vector<Graph> &zeros, vector<vector<Graph> > &v, vector<vector<Graph> > &allGraphsWithFlags) {
+	for(int k = n/2; k <= n-1; ++k) {
+		int sizeOfFlag = 2*k-n;
+		
+		if(sizeOfFlag > 0) {
+			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
+			for(int i = 0; i < (int)flags.size(); ++i) {
+			cout << "In generate helper iteration (" << k << ", " << i <<  ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
+				vector<Graph> X;
+				X.push_back(flags[i]);
+				
+				//Recrusively build up based on a flag
+				while(X[0].getN() != n) {
+					
+					//Add X to v
+					if((2*X[0].getN() - sizeOfFlag) == n) {
+						v.push_back(X);
+					}
+				
+					vector<Graph> Xcopy = X;
+					X.clear();
+					unordered_set<string> canonLabels;
+					
+					for(int j = 0; j < (int)Xcopy.size(); ++j) {
+						//All possible edges to the flag
+						for(int l = 0; l < myPow(numColors,Xcopy[j].getN()); ++l) {
+							vector<int> ary;
+							int temp = l;
+							
+							//Could also do something with orbits
+							for(int m = 0; m < Xcopy[j].getN(); ++m) {
+								int temp2 = temp/myPow(numColors,Xcopy[j].getN()-m-1);
+								ary.push_back(temp2);
+								temp = temp-temp2*myPow(numColors,Xcopy[j].getN()-m-1);
+							}
+							
+							vector<Edge> edges;
+							
+							//Uggh so many indices
+							for(int m1 = 0; m1 < Xcopy[j].getN(); ++m1) {
+								for(int m2 = m1+1; m2 < Xcopy[j].getN(); ++m2) {
+									if(Xcopy[j].getEdgeColor(m1,m2) != 0) {
+										edges.push_back({m1,m2,Xcopy[j].getEdgeColor(m1,m2)});
+									}
+								}
+							}
+							
+							for(int m = 0; m < Xcopy[j].getN(); ++m) {
+								if(ary[m] != 0) {
+									edges.push_back({m,Xcopy[j].getN(),ary[m]});
+								}
+							}
+							
+							//May assume that new vertex has highest degree (color 1) in non-flag vertices
+							vector<int> degree(Xcopy[j].getN()+1,0); //Not zero indexed
+							for(int m = 0; m < (int)edges.size(); ++m) {
+								if((edges[m].a >= sizeOfFlag) && (edges[m].color == 1)) { //Only need one check as vertices are ordered
+									++degree[edges[m].a];
+									++degree[edges[m].b];
+								}
+							}
+							
+							bool cont = true;
+							for(int m = sizeOfFlag; m < Xcopy[j].getN(); ++m) {
+								if(degree[Xcopy[j].getN()] < degree[m]) {
+									cont = false; 
+									m = Xcopy[j].getN();
+								}
+							}
+							
+							if(cont) {
+								Graph Gv(edges,Xcopy[j].getN()+1,numColors);
+								
+								vector<int> flag;
+								for(int m = 0; m < sizeOfFlag; ++m) {
+									flag.push_back(m);
+								}
+								Gv.setFlag(flag);
+								
+								for(int m = 0; m < (int)zeros.size(); ++m) {
+									if(subgraph(zeros[i], Gv)) {
+										cont = false;
+										m = zeros.size();
+									}
+								}
+								
+								if(cont && (canonLabels.count(Gv.getCanonLabel()) == 0)) {
+									X.push_back(Gv);
+									canonLabels.insert(Gv.getCanonLabel());
+								}
+							}
+						}
+					}
+				}
+				
+				//Add X to allGraphsWithFlags
+				allGraphsWithFlags.push_back(X);
+			}
+		}
+	}
+	cout << endl;
+	return;
+}
+
+
 //----------------------
 //-----Random Graph-----
 //----------------------
@@ -4537,13 +4647,7 @@ void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<E
 		myFile << endl;
 	}
 
-	
-	cout << "Generating v." << endl << endl;
-	vector< vector< Graph> > v = generateV(n,numColors,zeros);
-	cout << endl;
-
 	queue<tuple<int,int,int,int,Frac> > A;
-
 	vector<Frac> B; //Gives numbers to be printed
 	vector< vector<Frac> > C; //From Known
 	
@@ -4557,35 +4661,11 @@ void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<E
 		allGraphsMap.insert(pair<string, int>(allGraphs[i].getCanonLabel(),i));
 	}
 	
-	//not really all flags as we need to consider parity issues
-	vector<Graph> allFlags = generateFlags(n-2, numColors, zeros);
-	for(int i = 2; i < (int)ceil(n/2.); ++i) {
-		vector<Graph> temp = generateFlags(n-2*i, numColors, zeros);
-		allFlags.insert(allFlags.end(), temp.begin(), temp.end());
-	}
-	
-	
-	//Hash map for flags which we need to determine first index of everythingWithFlag
-	unordered_map<string, int> flagMap;
-	for(int i = 0; i < (int)allFlags.size(); ++i) {
-		flagMap.insert(pair<string, int>(allFlags[i].getCanonLabel(),i));
-	}	
-	
 	//All graphs of size n with flags such that parity issues work out
-	/*cout << "Generating allGraphsWithFlags." << endl << endl;
-	vector< vector < Graph > > allGraphsWithFlags;
-	
-	for(int i = 0; i < (int)allFlags.size(); ++i) {
-		cout << "In allGraphsWithFlags, iteration " << i+1 << " out of " << allFlags.size() << endl;  
-		allGraphsWithFlags.push_back(vector<Graph>());
-	
-		for(int j = 0; j < (int)allGraphs.size(); ++j) {
-			vector<Graph> temp = addAllFlags(allGraphs[j],allFlags[i]);
-			
-			allGraphsWithFlags[i].insert(allGraphsWithFlags[i].end(), temp.begin(), temp.end());
-		}
-	}
-	cout << endl;*/
+	cout << "Generating allGraphsWithFlags and v." << endl << endl;
+	vector < vector < Graph > > allGraphsWithFlags;
+	vector < vector < Graph > > v;
+	generateHelper(n,numColors,zeros,v,allGraphsWithFlags);
 	
 	cout << "Calculating A." << endl << endl;
 	
@@ -4599,11 +4679,10 @@ void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<E
 		
 		vector< vector < vector <Frac> > > partialA( (int)allGraphs.size(), vector< vector<Frac> > ((int)v[i].size(), vector<Frac>((int)v[i].size(), Frac(0,1))));
 		
-		int index1 = flagMap[v[i][0].getFlag().getCanonLabel()];
 		int sizeOfFlag = v[i][0].getSizeOfFlag();
 		
-		for(int index2 = 0; index2 < (int)allGraphsWithFlags[index1].size(); ++index2) {
-			Graph G = allGraphsWithFlags[index1][index2];
+		for(int index2 = 0; index2 < (int)allGraphsWithFlags[i].size(); ++index2) {
+			Graph G = allGraphsWithFlags[i][index2];
 			Graph Gcopy = G;
 			Gcopy.removeFlag();
 		
@@ -4625,39 +4704,26 @@ void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<E
 				vector<int> restriction2(n,-1);
 				
 				for(int j = 0; j < sizeOfFlag; ++j) {
-					restriction1[G.getFlagVertex(j)] = j;
-					restriction2[G.getFlagVertex(j)] = j;
+					restriction1[j] = j;
+					restriction2[j] = j;
 				}
 				
-				int counter1 = sizeOfFlag;
+				int counter1 = sizeOfFlag+1;
 				int counter2 = sizeOfFlag;
 				int Xcounter = 0;
-				int totalCounter = 0;
-				bool first = true;
 				
-				//A bit weird b/c we don't know the flag vertices in G are first
-				for(int j = 0; j < n; ++j) {
-					if(!G.flagVertex(j)) {
-						if(first) {
-							restriction1[j] = counter1;
-							++counter1;
-							first = false;
-						}
-						
-						else {
-							if((X.size() != 0) && (X[Xcounter] == totalCounter)) {
-								restriction1[j] = counter1;
-								++counter1;
-								++Xcounter;
-								++totalCounter;
-							}
-							
-							else {
-								restriction2[j] = counter2;
-								++counter2;
-								++totalCounter;
-							}
-						}
+				//Know flag vertices of G are first
+				restriction1[sizeOfFlag] = sizeOfFlag;
+				for(int j = sizeOfFlag + 1; j < n; ++j) {
+					if((X.size() != 0) && (X[Xcounter] == (j - sizeOfFlag - 1))) {
+						++Xcounter;
+						restriction1[j] = counter1;
+						++counter1; 
+					}
+					
+					else {
+						restriction2[j] = counter2;
+						++counter2;
 					}
 				}
 				
