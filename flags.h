@@ -907,8 +907,6 @@ class Graph {
 			long long int den = 0;
 			long long int num = 0;
 			
-			
-			
 			if(k == 1) {
 				for(int i = 0; i < H.getNumOrbits(); ++i) {
 					for(int j = 0; j < H.getOrbitSize(i); ++j) {
@@ -2006,6 +2004,183 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 	return subgraph(HWithFlag,GWithFlagCopy);
 }
 
+
+//-----------------------
+//-----Expand Graphs-----
+//-----------------------
+
+//Expands a set of graphs of the same size by one vertex
+//If input has flags, zeros applies to the graphs with the flags removed
+//Need all flag vertices to be first and in order
+//Doesn't check for duplicates in input (does in output) so if needed check that ahead of time
+//TODO add version which preserves coefficients (shouldn't be too bad)
+vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zeros) {
+	int size = input.size();
+	
+	if(size == 0) {
+		return {};
+	}
+	
+	int n = input[0].getN();
+	int numColors = input[0].getNumColors();
+	Graph flag = input[0].getFlag();
+	int sizeOfFlag = flag.getN();
+	
+	for(int i = 1; i < size; ++i) {
+		if(input[i].getN() != n) {
+			cout << "In expandGraphs, everything in input must be the same size." << endl << endl;
+			throw exception();
+		}
+		
+		if(input[i].getNumColors() != numColors) {
+			cout << "In expandGraphs, everything in input must have the same number of colors." << endl << endl;
+			throw exception();
+		}
+		
+		if(input[i].getFlag().getCanonLabel() != flag.getCanonLabel()) {
+			cout << "In expandGraphs, everything in input must have the same flag." << endl << endl;
+			throw exception();
+		}
+		
+		for(int j = 0; j < sizeOfFlag; ++j) {
+			if(input[i].getFlagVertex(j) != j) {
+				cout << "In expandGraphs, in input, flag vertices must be first in the correct order." << endl << endl;
+				throw exception();
+			}
+		}
+	}
+	
+	for(int i = 0; i < (int)zeros.size(); ++i) {
+		if(zeros[i].getNumColors() != numColors) {
+			cout << "In expandGraphs, at least one zero doesn't have the correct number of colors." << endl << endl;
+			throw exception();
+		}
+		
+		if(zeros[i].getFlag().getN() != 0) {
+			cout << "In expandGraphs, everything in zeros must not have a flag." << endl << endl;
+			throw exception();
+		}
+	}
+	
+	//Actual generation
+	unordered_set<string> canonLabels;
+	vector<Graph> output;
+	
+	//Needed everytime since they are always the same
+	vector<Edge> flagEdges;
+	
+	for(int i = 0; i < sizeOfFlag-1; ++i) {
+		for(int j = i+1; j < sizeOfFlag; ++j) {
+			if(flag.getEdgeColor(i,j) != 0) {
+				flagEdges.push_back({i,j,flag.getEdgeColor(i,j)});
+			}
+		}
+	}
+	
+	for(auto G: input) {
+		vector<Edge> GEdges = flagEdges;
+		for(int i = sizeOfFlag; i < n-1; ++i) {
+			for(int j = i+1; j < n; ++j) {
+				if(G.getEdgeColor(i,j) != 0) {
+					GEdges.push_back({i,j,G.getEdgeColor(i,j)});
+				}
+			}
+		}		
+		
+		//All possible edge configuration for the new vertex
+		//To be used by next list
+		vector< vector< vector <Edge> > > newEdges; 
+		vector<int> maxVals;
+		vector<int> list;
+		
+		newEdges.resize(G.getNumOrbits());
+		list.resize(G.getNumOrbits(),0);
+		
+		for(int i = 0; i < G.getNumOrbits(); ++i) {
+			newEdges[i].resize(choose(G.getOrbitSize(i)+numColors-1,numColors-1));
+			for(int j = 0; j < choose(G.getOrbitSize(i)+numColors-1,numColors-1); ++j) {
+				newEdges[i][j].resize(G.getOrbitSize(i));
+			}
+			maxVals.push_back(choose(G.getOrbitSize(i)+numColors-1,numColors-1)-1);
+		}
+		
+		//Order within each orbit doesn't matter
+		for(int i = 0; i < G.getNumOrbits(); ++i) {
+			//Use ordered sum to tell number of colors of each part
+			vector<int> colors(numColors);
+			colors[0] = G.getOrbitSize(i);
+			int index2 = 0;
+			
+			do {
+				int index3 = 0;
+				for(int j = 0; j < numColors; ++j) {
+					for(int k = 0; k < colors[j]; ++k) {
+						newEdges[i][index2][index3] = {G.getOrbit(i,index3),n,j};				
+						++index3;
+					}
+				}
+				++index2;
+			} while(nextOrderedSum(colors));
+		}
+		
+		do {
+			vector<Edge> edges = GEdges;
+		
+			for(int i = 0; i < G.getNumOrbits(); ++i) {
+				for(int j = 0; j < G.getOrbitSize(i); ++j) {
+					edges.push_back(newEdges[i][list[i]][j]);
+				}
+			}
+			
+			//May assume added vertex has highest degree (in color 1)
+			vector<int> degree(n+1,0);
+			for(int i = 0; i < (int)edges.size(); ++i) {
+				if((edges[i].a >= sizeOfFlag) && (edges[i].b >= sizeOfFlag) && (edges[i].color == 1)) {
+					++degree[edges[i].a];
+					++degree[edges[i].b];
+				}
+			}
+			
+			bool cont = true;
+			
+			for(int i = sizeOfFlag; i < n; ++i) {
+				if(degree[i] > degree[n]) {
+					cont = false;
+					i = n;
+				}
+			}
+			
+			if(cont) {
+				Graph Gv(edges,n+1,numColors);
+				
+				for(int i = 0; i < (int)zeros.size(); ++i) {
+					if(subgraph(zeros[i],Gv)) {
+						cont = false;
+						i = zeros.size();
+					}
+				}
+				
+				if(cont) {
+					vector<int> GvFlag(sizeOfFlag);
+					for(int i = 0; i < sizeOfFlag; ++i) {
+						GvFlag[i] = i;
+					}
+					
+					Gv.setFlag(GvFlag);
+					
+					if(canonLabels.count(Gv.getCanonLabel()) == 0) {
+						output.push_back(Gv);
+						canonLabels.insert(Gv.getCanonLabel());
+					}
+				}
+			}	
+		} while(nextList(list,maxVals));
+	}
+	
+	return output;
+}
+
+
 //-------------------------
 //-----Generate Graphs-----
 //-------------------------
@@ -2161,6 +2336,32 @@ vector<Graph> generate(const int n, const int numColors, const vector<Graph> &ze
 	return output;
 }
 
+//Generates all graphs of size n
+vector<Graph> NEWgenerate(const int n, const int numColors, const vector<Graph> &zeros) {\
+	if(numColors < 2) {
+		cout << "You need at least two colors in generate." << endl << endl;
+		throw exception();
+	}
+	
+	//Check all zeros have the correct number of colors
+	for(int i = 0; i < (int)zeros.size(); ++i) {
+		if(zeros[i].getNumColors() != numColors) {
+			cout << "In generate all zeros must have the correct number of colors." << endl << endl;
+			throw exception();
+		}
+	}
+	
+	
+	Graph G({},1,numColors);
+	vector<Graph> output = {G};
+	
+	for(int k = 2; k <= n; ++k) {
+		output = expandGraphs(output,zeros);
+	}
+	
+	return output;
+}
+
 
 //-----------------------
 //-----Add All Flags-----
@@ -2306,7 +2507,7 @@ void generateHelper(const int n, const int numColors, const vector<Graph> &zeros
 		if(sizeOfFlag > 0) {
 			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
 			for(int i = 0; i < (int)flags.size(); ++i) {
-			cout << "In generate helper iteration (" << k << ", " << i <<  ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
+				cout << "In generate helper iteration (" << k << ", " << i <<  ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
 				vector<Graph> X;
 				X.push_back(flags[i]);
 				
@@ -2379,7 +2580,7 @@ void generateHelper(const int n, const int numColors, const vector<Graph> &zeros
 								Gv.setFlag(flag);
 								
 								for(int m = 0; m < (int)zeros.size(); ++m) {
-									if(subgraph(zeros[i], Gv)) {
+									if(subgraph(zeros[m], Gv)) {
 										cont = false;
 										m = zeros.size();
 									}
@@ -3118,7 +3319,7 @@ Equation operator+(Equation eq, Graph G) {
 //-----Multiplication-----
 //------------------------
 
-//First Define for graphs - put into equation with = 0, and no zeros
+//First Define for graphs - put into equation with = 0
 //Really more of a vector of graphs, but in this form it allows us to use overridden +
 //TODO add edge between parts in a smarter way?
 Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) {
@@ -4688,7 +4889,7 @@ void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<E
 		
 			int b = allGraphsMap[Gcopy.getCanonLabel()];
 			
-			Gcopy = G;
+			Gcopy = G; //Not great because it calls Nauty again, make a copy constructor
 			Gcopy.averageAll();
 			
 			Frac e = Gcopy.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));

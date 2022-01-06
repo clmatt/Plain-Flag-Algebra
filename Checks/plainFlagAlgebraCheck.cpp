@@ -36,9 +36,6 @@ int main() {
 	vector<Graph> zeros;
 	vector<Equation> known;
 	
-	//Graph G({{}},2,2);
-	//known.push_back(Equation({G},zeros,Frac(1,1),1));
-	
 	f.push_back(Graph({{0,1,1},{0,2,1},{1,2,1}},3,2));
 	f.push_back(Graph({{}},3,2));
 	

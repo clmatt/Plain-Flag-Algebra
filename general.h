@@ -62,7 +62,7 @@ bool nextSubset(vector<int> &subset, int n, int k) {
 //Intialize list with all zeros
 bool nextList(vector<int> &list, const vector<int> &maxVals) {
 	if(list.size() != maxVals.size()) {
-		cout << "In next_list the list size must be the same as maxVals size." << endl;
+		cout << "In nextList the list size must be the same as maxVals size." << endl;
 		cout << "List size = " << list.size() << endl;
 		cout << "maxVals size = " << maxVals.size() << endl << endl;
 		throw exception();
@@ -70,7 +70,7 @@ bool nextList(vector<int> &list, const vector<int> &maxVals) {
 	
 	for(int i = 0; i < (int)list.size(); ++i) {
 		if(list[i] > maxVals[i]) {
-			cout << "In next_list the list entries must be <= the maxVal entries." << endl;
+			cout << "In nextList the list entries must be <= the maxVal entries." << endl;
 			cout << "Index = " << i << endl;
 			cout << "List entry = " << list[i] << endl;
 			cout << "maxVals entry = " << maxVals[i] << endl << endl;
@@ -78,14 +78,14 @@ bool nextList(vector<int> &list, const vector<int> &maxVals) {
 		}
 		
 		if(maxVals[i] < 0) {
-			cout << "In next_list, maxVals can't have negative entries." << endl;
+			cout << "In nextList, maxVals can't have negative entries." << endl;
 			cout << "Index = " << i << endl;
 			cout << "maxVals entry = " << maxVals[i] << endl << endl;
 			throw exception();
 		}
 		
 		if(list[i] < 0) {
-			cout << "In next_list, list can't have negative entries." << endl;
+			cout << "In nextList, list can't have negative entries." << endl;
 			cout << "Index = " << i << endl;
 			cout << "maxVals entry = " << list[i] << endl << endl;
 			throw exception();
