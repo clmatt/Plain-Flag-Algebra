@@ -2079,102 +2079,92 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 	
 	for(auto G: input) {
 		vector<Edge> GEdges = flagEdges;
+		vector<int> permanentZeroDegree(n+1,0); //Value 0 for 0,...,sizeOfFlag
+		
 		for(int i = sizeOfFlag; i < n-1; ++i) {
 			for(int j = i+1; j < n; ++j) {
 				if(G.getEdgeColor(i,j) != 0) {
 					GEdges.push_back({i,j,G.getEdgeColor(i,j)});
 				}
+				
+				else {
+					++permanentZeroDegree[i];
+					++permanentZeroDegree[j];
+				}
 			}
-		}		
-		
-		//All possible edge configuration for the new vertex
-		//To be used by next list
-		vector< vector< vector <Edge> > > newEdges; 
-		vector<int> maxVals;
-		vector<int> list;
-		
-		newEdges.resize(G.getNumOrbits());
-		list.resize(G.getNumOrbits(),0);
-		
-		for(int i = 0; i < G.getNumOrbits(); ++i) {
-			newEdges[i].resize(choose(G.getOrbitSize(i)+numColors-1,numColors-1));
-			for(int j = 0; j < choose(G.getOrbitSize(i)+numColors-1,numColors-1); ++j) {
-				newEdges[i][j].resize(G.getOrbitSize(i));
-			}
-			maxVals.push_back(choose(G.getOrbitSize(i)+numColors-1,numColors-1)-1);
 		}
 		
-		//Order within each orbit doesn't matter
-		for(int i = 0; i < G.getNumOrbits(); ++i) {
-			//Use ordered sum to tell number of colors of each part
-			vector<int> colors(numColors);
-			colors[0] = G.getOrbitSize(i);
-			int index2 = 0;
-			
-			do {
-				int index3 = 0;
-				for(int j = 0; j < numColors; ++j) {
-					for(int k = 0; k < colors[j]; ++k) {
-						newEdges[i][index2][index3] = {G.getOrbit(i,index3),n,j};				
-						++index3;
+		for(int i = 0; i < myPow(numColors,n); ++i) {		
+		 	int temp = i;
+		 	vector<Edge> edges = GEdges;
+		 	vector<int> zeroDegree = permanentZeroDegree;
+		 	vector<int> check; //Used in an isomorphism check
+		 			
+		 	for(int j = 0; j < n; ++j) {
+			 	edges.push_back({j,n,temp % numColors});
+			 	check.push_back(temp % numColors);
+			 	
+			 	if((temp % numColors) == 0) {
+			 		if(j >= sizeOfFlag) {
+			 			++zeroDegree[n];
+			 			++zeroDegree[j];
 					}
-				}
-				++index2;
-			} while(nextOrderedSum(colors));
-		}
-		
-		do {
-			vector<Edge> edges = GEdges;
-		
-			for(int i = 0; i < G.getNumOrbits(); ++i) {
-				for(int j = 0; j < G.getOrbitSize(i); ++j) {
-					edges.push_back(newEdges[i][list[i]][j]);
-				}
+			 	}
+			 	
+			 	temp = temp / numColors;
 			}
 			
-			//May assume added vertex has highest degree (in color 1)
-			vector<int> degree(n+1,0);
-			for(int i = 0; i < (int)edges.size(); ++i) {
-				if((edges[i].a >= sizeOfFlag) && (edges[i].b >= sizeOfFlag) && (edges[i].color == 1)) {
-					++degree[edges[i].a];
-					++degree[edges[i].b];
-				}
-			}
-			
+			//Check if new vertex has highest degee in color 0
 			bool cont = true;
-			
-			for(int i = sizeOfFlag; i < n; ++i) {
-				if(degree[i] > degree[n]) {
+			for(int j = sizeOfFlag; j < n; ++j) {
+				if(zeroDegree[j] > zeroDegree[n]) {
 					cont = false;
-					i = n;
+					j = n;
 				}
 			}
 			
 			if(cont) {
-				Graph Gv(edges,n+1,numColors);
-				
-				for(int i = 0; i < (int)zeros.size(); ++i) {
-					if(subgraph(zeros[i],Gv)) {
-						cont = false;
-						i = zeros.size();
+				//First non-flag vertex in some orbit has highest color to added vertex
+				//Can only do one orbit b/c they don't play nicely together
+				for(int j = 0; j < G.getNumOrbits(); ++j) {
+					if(G.getOrbitSize(j) > 1) {
+						for(int k = 1; k < G.getOrbitSize(j); ++k) {
+							if(check[G.getOrbit(j,0)] < check[G.getOrbit(j,k)]) {
+								cont = false;
+								k = n;
+							}
+						}
+						
+						j = n;
 					}
 				}
-				
-				if(cont) {
-					vector<int> GvFlag(sizeOfFlag);
-					for(int i = 0; i < sizeOfFlag; ++i) {
-						GvFlag[i] = i;
-					}
+			
+				if(cont) {	
+					Graph Gv(edges,n+1,numColors);
 					
-					Gv.setFlag(GvFlag);
-					
-					if(canonLabels.count(Gv.getCanonLabel()) == 0) {
-						output.push_back(Gv);
-						canonLabels.insert(Gv.getCanonLabel());
-					}
-				}
-			}	
-		} while(nextList(list,maxVals));
+					//Removes zeros
+			 		for(int j = 0; j < (int)zeros.size(); ++j) {
+			 			if(subgraph(zeros[j],Gv)) {
+			 				cont = false;
+			 				j = zeros.size();
+			 			}
+			 		}
+		 		
+			 			
+				 	cont = false;
+				 				
+				 	if(canonLabels.count(Gv.getCanonLabel()) == 0) {
+				 		cont = true;
+				 		canonLabels.insert(Gv.getCanonLabel());
+				 	}
+				 			
+				 	if(cont) {
+				 		output.push_back(Gv);
+				 	}
+			 	}
+		 	}
+		}
+
 	}
 	
 	return output;
@@ -2185,159 +2175,8 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 //-----Generate Graphs-----
 //-------------------------
 
-//Generates all graphs of size n 
-vector<Graph> generate(const int n, const int numColors, const vector<Graph> &zeros) {
-	if((numColors == 2) && (zeros.size() == 0)) {
-		ifstream myFile;
-		myFile.open("graphs"+to_string(n)+".txt");
-		
-		if(!myFile.is_open()) {
-			cout << "Error in generate while opening file, may have to use ./geng to create the file you need." << endl << endl;
-			throw exception();
-		}
-		
-		int counter = 0;
-		string tempGraph;
-		vector<Graph> output;
-		int numZeros = zeros.size();
-		
-		while(getline(myFile, tempGraph)) {
-			if(counter % 100 == 0) {
-				cout << "In generate " << counter << " iterations out of " << numberOfGraphs[n] << endl;
-			}
-			++counter;
-   		sparsegraph sg;
-    		SG_INIT(sg);
-    		int num_loops;
-    		stringtosparsegraph(&tempGraph[0], &sg, &num_loops);
-    		Graph G = convertFromNauty(sg);
-    		SG_FREE(sg);
-    		
-    		bool zero = false;
-    		for(int i = 0; i < numZeros; ++i) {
-    			if(subgraph(zeros[i],G)) {
-    				zero = true;
-    				i = numZeros;
-    			}
-    		}
-    		
-    		if(!zero) {
-    			output.push_back(G);
-    		}
-		}
-		
-		return output;
-	}
-	
-	if(numColors < 2) {
-		cout << "You need at least two colors in generate." << endl << endl;
-		throw exception();
-	}
-	
-	int numZeros = zeros.size();
-	
-	//Check all zeros have the correct number of colors
-	for(int i = 0; i < numZeros; ++i) {
-		if(zeros[i].getNumColors() != numColors) {
-			cout << "In generate all zeros must have the correct number of colors." << endl << endl;
-			throw exception();
-		}
-	}
-	
-	if(n == 1) {
-		Graph G({{}},1,numColors);
-		return {G};
-	}
-	
-	vector<Graph> output;
-	int counter = 0;
-	
-	unordered_set<string> outputSet;
-	
-	
-	vector<Graph> smallerGraphs = generate(n-1, numColors, zeros);
-	
-	for (auto G: smallerGraphs) {
-		if(counter % 100 == 0) {
-			cout << "In generate n = " << n << " and " << counter+1 << " iterations out of " << smallerGraphs.size() << endl;
-		}
-		
-		++counter;
-		vector<Edge> permanentEdges;
-		vector<int> permanentZeroDegree(n,0);
-		
-		for(int i = 0; i < n-2; ++i) {
-			for(int j = i+1; j < n-1; ++j) {
-				if(G.getEdgeColor(i,j) != 0) {
-					permanentEdges.push_back({i,j,G.getEdgeColor(i,j)});
-				}
-				
-				else {
-					++permanentZeroDegree[i];
-				}
-			}
-		}
-		
-		for(int i = 0; i < myPow(numColors,n-1); ++i) {		
-		 	int temp = i;
-		 	vector<Edge> edges = permanentEdges;
-		 	vector<int> zeroDegree = permanentZeroDegree;
-		 			
-		 	for(int j = 0; j < n-1; ++j) {
-			 	edges.push_back({j,n-1,temp % numColors});
-			 	
-			 	if((temp % numColors) == 0) {
-			 		++zeroDegree[n-1];
-			 		++zeroDegree[j];
-			 	}
-			 	
-			 	temp = temp / numColors;
-			}
-			
-			//Check if new vertex has highest degee in color 0
-			bool cont = true;
-			for(int j = 0; j < n-1; ++j) {
-				if(zeroDegree[j] > zeroDegree[n-1]) {
-					cont = false;
-					j = n-1;
-				}
-			}
-			
-			if(cont) {
-				Graph Gv(edges,n,numColors);
-				
-				//Removes zeros
-		 		for(int j = 0; j < numZeros; ++j) {
-		 			if(subgraph(zeros[j],Gv)) {
-		 				cont = false;
-		 				j = numZeros;
-		 			}
-		 		}
-			 			
-			 	//Removes repeats
-			 	if(cont) {
-			 		cont = false;
-			 				
-			 		if(outputSet.count(Gv.getCanonLabel()) == 0) {
-			 			cont = true;
-			 			outputSet.insert(Gv.getCanonLabel());
-			 		}
-			 	}
-			 			
-			 	if(cont) {
-			 		output.push_back(Gv);
-			 	}
-		 	}
-		}
-	}
-	
-	cout << endl;
-
-	return output;
-}
-
 //Generates all graphs of size n
-vector<Graph> NEWgenerate(const int n, const int numColors, const vector<Graph> &zeros) {\
+vector<Graph> generate(const int n, const int numColors, const vector<Graph> &zeros) {
 	if(numColors < 2) {
 		cout << "You need at least two colors in generate." << endl << endl;
 		throw exception();
@@ -2354,7 +2193,6 @@ vector<Graph> NEWgenerate(const int n, const int numColors, const vector<Graph> 
 	
 	Graph G({},1,numColors);
 	vector<Graph> output = {G};
-	
 	for(int k = 2; k <= n; ++k) {
 		output = expandGraphs(output,zeros);
 	}
@@ -2498,6 +2336,31 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 //-------------------------------------------
 //-----Generate v and allGraphsWithFlags-----
 //-------------------------------------------
+
+vector< vector<Graph> > NEWgenerateV(const int n, const int numColors, const vector<Graph> &zeros) {
+	vector< vector< Graph > > output;
+
+	for(int i = n/2; i <= n-1; ++i) {
+		int sizeOfFlag = 2*i-n;
+		
+		if(sizeOfFlag > 0) {
+			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
+			
+			for(int j = 0; j < (int)flags.size(); ++j) {
+				vector<Graph> expanded = {flags[j]};
+			
+				while((expanded[0].getN()*2 - sizeOfFlag) != n) {
+					expanded = expandGraphs(expanded,zeros);
+				}
+				
+				output.push_back(expanded);
+			}
+		}
+	}
+	
+	return output;
+}
+
 
 //Helper function in plainFlagAlgebra use
 void generateHelper(const int n, const int numColors, const vector<Graph> &zeros, vector<vector<Graph> > &v, vector<vector<Graph> > &allGraphsWithFlags) {

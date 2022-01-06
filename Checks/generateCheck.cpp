@@ -33,7 +33,7 @@ extern "C" {
 int main() {
 	auto start1=high_resolution_clock::now();
 	
-	vector < vector <Graph> > test1 = NEWgenerateV(7,2,{});
+	vector<Graph> test1 = NEWgenerate(6,3,{});
 	
 	auto start2=high_resolution_clock::now();
 	auto duration1 = duration_cast<milliseconds>(start2 - start1);
@@ -41,15 +41,15 @@ int main() {
 	
 	auto start3=high_resolution_clock::now();
 	
-	vector < vector <Graph> > test2 = generateV(7,2,{});
+	vector<Graph> test2 = generate(6,3,{});
 
 	
 	
 	
 	auto start4=high_resolution_clock::now();
 	auto duration = duration_cast<milliseconds>(start4 - start3);
-	cout << "Running time of NEWgenerateV: " << duration1.count() << endl << endl;
-	cout << "Running time in generateV: " << duration.count() << endl << endl;
+	cout << "Running time of NEWgenerate: " << duration1.count() << endl << endl;
+	cout << "Running time in generate: " << duration.count() << endl << endl;
 	
 	/*bool test;
 	for(int i = 0; i < test2.size(); ++i) {
