@@ -2273,7 +2273,7 @@ vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 //----------------------------
 
 //Used in generateV
-//TODO make faster? 
+//TODO make faster? Use iterated approach?
 vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph> &zeros) {
 	vector<Graph> allGraphs = generate(n,numColors,zeros);
 	vector<Graph> output;
@@ -2301,10 +2301,11 @@ vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph
 }
 
 
-//-------------------------------------------
-//-----Generate v and allGraphsWithFlags-----
-//-------------------------------------------
+//--------------------
+//-----Generate V-----
+//--------------------
 
+//Use in plain flag algebra
 vector< vector<Graph> > generateV(const int n, const int numColors, const vector<Graph> &zeros) {
 	vector< vector< Graph > > output;
 
@@ -2331,109 +2332,68 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 }
 
 
-//Helper function in plainFlagAlgebra use
-void generateHelper(const int n, const int numColors, const vector<Graph> &zeros, vector<vector<Graph> > &v, vector<vector<Graph> > &allGraphsWithFlags) {
-	for(int k = n/2; k <= n-1; ++k) {
-		int sizeOfFlag = 2*k-n;
+//Use in plain flag algebra
+vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numColors, const vector<Graph> &zeros) {
+	//Need generateV and this to have the same indexing
+	unordered_map<string,int> fFlag; //Takes flag canonLabels and maps to index in v
+	int index = 0;
+	
+	for(int i = n/2; i <= n-1; ++i) {
+		int sizeOfFlag = 2*i-n;
 		
 		if(sizeOfFlag > 0) {
 			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
-			for(int i = 0; i < (int)flags.size(); ++i) {
-				cout << "In generate helper iteration (" << k << ", " << i <<  ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
-				vector<Graph> X;
-				X.push_back(flags[i]);
-				
-				//Recrusively build up based on a flag
-				while(X[0].getN() != n) {
-					
-					//Add X to v
-					if((2*X[0].getN() - sizeOfFlag) == n) {
-						v.push_back(X);
-					}
-				
-					vector<Graph> Xcopy = X;
-					X.clear();
-					unordered_set<string> canonLabels;
-					
-					for(int j = 0; j < (int)Xcopy.size(); ++j) {
-						//All possible edges to the flag
-						for(int l = 0; l < myPow(numColors,Xcopy[j].getN()); ++l) {
-							vector<int> ary;
-							int temp = l;
-							
-							//Could also do something with orbits
-							for(int m = 0; m < Xcopy[j].getN(); ++m) {
-								int temp2 = temp/myPow(numColors,Xcopy[j].getN()-m-1);
-								ary.push_back(temp2);
-								temp = temp-temp2*myPow(numColors,Xcopy[j].getN()-m-1);
-							}
-							
-							vector<Edge> edges;
-							
-							//Uggh so many indices
-							for(int m1 = 0; m1 < Xcopy[j].getN(); ++m1) {
-								for(int m2 = m1+1; m2 < Xcopy[j].getN(); ++m2) {
-									if(Xcopy[j].getEdgeColor(m1,m2) != 0) {
-										edges.push_back({m1,m2,Xcopy[j].getEdgeColor(m1,m2)});
-									}
-								}
-							}
-							
-							for(int m = 0; m < Xcopy[j].getN(); ++m) {
-								if(ary[m] != 0) {
-									edges.push_back({m,Xcopy[j].getN(),ary[m]});
-								}
-							}
-							
-							//May assume that new vertex has highest degree (color 1) in non-flag vertices
-							vector<int> degree(Xcopy[j].getN()+1,0); //Not zero indexed
-							for(int m = 0; m < (int)edges.size(); ++m) {
-								if((edges[m].a >= sizeOfFlag) && (edges[m].color == 1)) { //Only need one check as vertices are ordered
-									++degree[edges[m].a];
-									++degree[edges[m].b];
-								}
-							}
-							
-							bool cont = true;
-							for(int m = sizeOfFlag; m < Xcopy[j].getN(); ++m) {
-								if(degree[Xcopy[j].getN()] < degree[m]) {
-									cont = false; 
-									m = Xcopy[j].getN();
-								}
-							}
-							
-							if(cont) {
-								Graph Gv(edges,Xcopy[j].getN()+1,numColors);
-								
-								vector<int> flag;
-								for(int m = 0; m < sizeOfFlag; ++m) {
-									flag.push_back(m);
-								}
-								Gv.setFlag(flag);
-								
-								for(int m = 0; m < (int)zeros.size(); ++m) {
-									if(subgraph(zeros[m], Gv)) {
-										cont = false;
-										m = zeros.size();
-									}
-								}
-								
-								if(cont && (canonLabels.count(Gv.getCanonLabel()) == 0)) {
-									X.push_back(Gv);
-									canonLabels.insert(Gv.getCanonLabel());
-								}
-							}
-						}
-					}
-				}
-				
-				//Add X to allGraphsWithFlags
-				allGraphsWithFlags.push_back(X);
+			for(int j = 0; j < (int)flags.size(); ++j) {
+				fFlag[flags[j].getCanonLabel()] = index;
+				++index;
 			}
 		}
 	}
-	cout << endl;
-	return;
+	
+	//index is number of flags
+	vector<Graph> allGraphs = generate(n,numColors,zeros);
+	vector < vector < Graph > > output(index);
+	vector<int> index2(index);
+	
+	for(int i = n/2; i <= n-1; ++i) {
+		int sizeOfFlag = 2*i-n;
+		
+		if(sizeOfFlag > 0) {
+			for(int j = 0; j < (int)allGraphs.size(); ++j) {
+				cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << endl;
+				unordered_map<string,int> fGraph;
+				int den = choose(n, sizeOfFlag);
+			
+				vector<int> X(sizeOfFlag);
+				for(int k = 0; k < sizeOfFlag; ++k) {
+					X[k] = k;
+				}
+				
+				do {
+					do {
+						Graph G = allGraphs[j];
+						G.setFlag(X);
+						Graph flag = G.getFlag();
+						
+						
+						if(fGraph.find(G.getCanonLabel()) == fGraph.end()) {
+							fGraph[G.getCanonLabel()] = index2[fFlag[flag.getCanonLabel()]];
+							++index2[fFlag[flag.getCanonLabel()]];
+							G.setCoefficient(Frac(1,den));
+							output[fFlag[flag.getCanonLabel()]].push_back(G);
+						}
+						
+						else {
+							output[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].setCoefficient(output[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].getCoefficient()+Frac(1,den));
+						}
+						
+					} while(next_permutation(X.begin(), X.end()));
+				} while(nextSubset(X,n,sizeOfFlag));
+			}
+		}
+	}
+	
+	return output;
 }
 
 
@@ -4695,10 +4655,12 @@ void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<E
 	}
 	
 	//All graphs of size n with flags such that parity issues work out
-	cout << "Generating allGraphsWithFlags and v." << endl << endl;
-	vector < vector < Graph > > allGraphsWithFlags;
-	vector < vector < Graph > > v;
-	generateHelper(n,numColors,zeros,v,allGraphsWithFlags);
+	cout << "Generating v." << endl;
+	vector < vector < Graph > > v = generateV(n,numColors,zeros);
+	cout << endl;
+	cout << "Generating allGraphsWithFlags." << endl;
+	vector < vector < Graph > > allGraphsWithFlags = generateAllGraphsWithFlags(n,numColors,zeros);
+	cout << endl;
 	
 	cout << "Calculating A." << endl << endl;
 	
@@ -4716,15 +4678,32 @@ void NEWplainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<E
 		
 		for(int index2 = 0; index2 < (int)allGraphsWithFlags[i].size(); ++index2) {
 			Graph G = allGraphsWithFlags[i][index2];
+			
+			//Make sure all flag vertices in G are first
+			//TODO make a function of this
+			vector<int> reordering(n);
+			
+			for(int j = 0; j < sizeOfFlag; ++j) {
+				reordering[G.getFlagVertex(j)] = j;
+			}
+			int index = sizeOfFlag;
+			
+			for(int j = 0; j < n; ++j) {
+				if(!G.isFlag(j)) {
+					reordering[j] = index;
+					++index;
+				}
+			}
+			
+			Frac coeff = G.getCoefficient();
+			G = G.restriction(reordering);
+			G.setCoefficient(coeff);
+			
 			Graph Gcopy = G;
 			Gcopy.removeFlag();
 		
-			int b = allGraphsMap[Gcopy.getCanonLabel()];
-			
-			Gcopy = G; //Not great because it calls Nauty again, make a copy constructor
-			Gcopy.averageAll();
-			
-			Frac e = Gcopy.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
+			int b = allGraphsMap[Gcopy.getCanonLabel()];	
+			Frac e = G.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
 			
 			vector<int> X((n-sizeOfFlag)/2 - 1); //X is zero indexed but it should actually be sizeOfFlag+1 indexed
 			//Wlog first non-flag vertex in X

@@ -10,7 +10,6 @@ using namespace std;
 #include <limits> 
 #include <queue>
 #include <tuple>
-#include <string>
 
 using namespace std::chrono;
 
@@ -19,6 +18,8 @@ using namespace std::chrono;
 #include "general.h"
 #include "fractions.h"
 #include "flags.h"
+
+//#define MAXN 100    /* Define this before including nauty.h */
 
 //Nauty
 extern "C" {
@@ -30,67 +31,27 @@ extern "C" {
 //This is going to be extremely confusing, but graph is from Nauty and Graph is from me
 
 
-int main() {
+int main() {		
+	vector<Graph> f;
 	vector<Graph> zeros;
-	vector<Edge> edges;
-	const int numColors = 3;
+	vector<Equation> known;
 	
-	//zeros
-	edges = {{0,1,1}};
-	zeros.push_back(Graph(edges,3,numColors));
+	f.push_back(Graph({{0,1,1},{0,2,1},{1,2,1}},3,2));
+	f.push_back(Graph({{}},3,2));
 	
-	edges = {{0,1,2}};
-	zeros.push_back(Graph(edges,3,numColors));
+	auto time1=high_resolution_clock::now();
+	NEWplainFlagAlgebra(f,7,zeros,known);
+	auto time2=high_resolution_clock::now();
 	
-	edges = {{0,1,1},{1,2,2}};
-	zeros.push_back(Graph(edges,3,numColors));
+	auto time3=high_resolution_clock::now();
+	plainFlagAlgebra(f,7,zeros,known);
+	auto time4=high_resolution_clock::now();
 	
-	//K4
-	edges.clear();
-	for(int i = 0; i < 3; ++i) {
-		for(int j = i+1; j < 4; ++j) {
-			edges.push_back({i,j,1});
-		}
-	}
-	zeros.push_back(Graph(edges,4,numColors));
+	auto duration1 = duration_cast<milliseconds>(time2 - time1);
+	auto duration2 = duration_cast<milliseconds>(time4 - time3);
 	
-	//K6
-	edges.clear();
-	for(int i = 0; i < 5; ++i) {
-		for(int j = i+1; j < 6; ++j) {
-			edges.push_back({i,j,2});
-		}
-	}
-	zeros.push_back(Graph(edges,6,numColors));
-
-	auto start1=high_resolution_clock::now();
-	
-	vector < vector <Graph> > test1 = NEWgenerateV(7,3,zeros);
-	
-	auto start2=high_resolution_clock::now();
-	auto duration1 = duration_cast<milliseconds>(start2 - start1);
-	
-	
-	auto start3=high_resolution_clock::now();
-	
-	vector < vector <Graph> > test2 = generateV(7,3,zeros);
-
-	
-	
-	
-	auto start4=high_resolution_clock::now();
-	auto duration = duration_cast<milliseconds>(start4 - start3);
-	cout << "Running time of NEWgenerateV: " << duration1.count() << endl << endl;
-	cout << "Running time in generateV: " << duration.count() << endl << endl;
-	
-	for(int i = 0; i < test1.size(); ++i) {
-		cout << test1[i].size() << " ";
-	}
-	cout << endl << endl << endl;
-	for(int i = 0; i < test2.size(); ++i) {
-		cout << test2[i].size() << " ";
-	}
-	cout << endl;
+	cout << "The running time of plainFlagAlgebra is: " << duration1.count() << endl << endl;
+	cout << "The running time of NEWplainFlagAlgebra is: " << duration2.count() << endl << endl;
 	
 	return 0;
 }
