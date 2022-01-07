@@ -2079,17 +2079,19 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 	
 	for(auto G: input) {
 		vector<Edge> GEdges = flagEdges;
-		vector<int> permanentZeroDegree(n+1,0); //Value 0 for 0,...,sizeOfFlag
+		vector<int> permanentZeroDegree(n+1,0); //Value 0 for 0,1,...,sizeOfFlag
 		
-		for(int i = sizeOfFlag; i < n-1; ++i) {
-			for(int j = i+1; j < n; ++j) {
+		for(int i = 0; i < n-1; ++i) {
+			for(int j = max(sizeOfFlag,i+1); j < n; ++j) {
 				if(G.getEdgeColor(i,j) != 0) {
 					GEdges.push_back({i,j,G.getEdgeColor(i,j)});
 				}
 				
 				else {
-					++permanentZeroDegree[i];
-					++permanentZeroDegree[j];
+					if(i >= sizeOfFlag) {
+						++permanentZeroDegree[i];
+						++permanentZeroDegree[j];
+					}
 				}
 			}
 		}
@@ -2101,16 +2103,18 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 		 	vector<int> check; //Used in an isomorphism check
 		 			
 		 	for(int j = 0; j < n; ++j) {
-			 	edges.push_back({j,n,temp % numColors});
-			 	check.push_back(temp % numColors);
+		 		if((temp % numColors) != 0) {
+			 		edges.push_back({j,n,temp % numColors});
+			 	}
 			 	
-			 	if((temp % numColors) == 0) {
+			 	else {
 			 		if(j >= sizeOfFlag) {
 			 			++zeroDegree[n];
 			 			++zeroDegree[j];
 					}
 			 	}
 			 	
+			 	check.push_back(temp % numColors);
 			 	temp = temp / numColors;
 			}
 			
@@ -2141,6 +2145,7 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 			
 				if(cont) {	
 					Graph Gv(edges,n+1,numColors);
+					vector<int> GvFlag;												
 					
 					//Removes zeros
 			 		for(int j = 0; j < (int)zeros.size(); ++j) {
@@ -2149,22 +2154,21 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 			 				j = zeros.size();
 			 			}
 			 		}
-		 		
-			 			
-				 	cont = false;
+			 		
+			 		if(cont) {
+				 		for(int j = 0; j < sizeOfFlag; ++j) {
+							GvFlag.push_back(j);
+						}
+				 		Gv.setFlag(GvFlag);
+			 		}
 				 				
-				 	if(canonLabels.count(Gv.getCanonLabel()) == 0) {
-				 		cont = true;
+				 	if(cont && (canonLabels.count(Gv.getCanonLabel()) == 0)) {
+						output.push_back(Gv);
 				 		canonLabels.insert(Gv.getCanonLabel());
-				 	}
-				 			
-				 	if(cont) {
-				 		output.push_back(Gv);
-				 	}
+				 	}	
 			 	}
 		 	}
 		}
-
 	}
 	
 	return output;
@@ -2269,6 +2273,7 @@ vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 //----------------------------
 
 //Used in generateV
+//TODO make faster? 
 vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph> &zeros) {
 	vector<Graph> allGraphs = generate(n,numColors,zeros);
 	vector<Graph> output;
@@ -2296,48 +2301,11 @@ vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph
 }
 
 
-//--------------------
-//-----Generate v-----
-//--------------------
-
-//For fixed n generate all flags of size k such that 2k-sizeOfFlag = n (used in plainFlagAlgebra)
-//First index means all flags are same type
-vector< vector<Graph> > generateV(const int n, const int numColors, const vector<Graph> &zeros) {
-	vector< vector<Graph> > output;
-	int index = 0;
-	
-	for(int k = n/2; k <= n-1; ++k) {
-		int sizeOfFlag = 2*k-n;
-		
-		if(sizeOfFlag > 0) {
-			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
-			vector<Graph> graphs = generate(k, numColors, zeros);
-			
-			for(int i = 0; i < (int)flags.size(); ++i) {
-				cout << "When generating v (" << k << " " << i << ") out of (" << n-1 << " " <<(int)flags.size()-1 << ")" << endl; 
-				output.push_back({});
-				
-				for(int j = 0; j < (int)graphs.size(); ++j) {
-					vector<Graph> temp = addAllFlags(graphs[j],flags[i]);
-					
-					for(int l = 0; l < (int)temp.size(); ++l) {
-						output[index].push_back(temp[l]);
-					}
-				}
-				++index;
-			}
-		}
-	}
-	
-	return output;
-}
-
-
 //-------------------------------------------
 //-----Generate v and allGraphsWithFlags-----
 //-------------------------------------------
 
-vector< vector<Graph> > NEWgenerateV(const int n, const int numColors, const vector<Graph> &zeros) {
+vector< vector<Graph> > generateV(const int n, const int numColors, const vector<Graph> &zeros) {
 	vector< vector< Graph > > output;
 
 	for(int i = n/2; i <= n-1; ++i) {
@@ -2347,6 +2315,7 @@ vector< vector<Graph> > NEWgenerateV(const int n, const int numColors, const vec
 			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
 			
 			for(int j = 0; j < (int)flags.size(); ++j) {
+				cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
 				vector<Graph> expanded = {flags[j]};
 			
 				while((expanded[0].getN()*2 - sizeOfFlag) != n) {

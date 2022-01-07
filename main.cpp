@@ -31,9 +31,41 @@ extern "C" {
 
 
 int main() {
+	vector<Graph> zeros;
+	vector<Edge> edges;
+	const int numColors = 3;
+	
+	//zeros
+	edges = {{0,1,1}};
+	zeros.push_back(Graph(edges,3,numColors));
+	
+	edges = {{0,1,2}};
+	zeros.push_back(Graph(edges,3,numColors));
+	
+	edges = {{0,1,1},{1,2,2}};
+	zeros.push_back(Graph(edges,3,numColors));
+	
+	//K4
+	edges.clear();
+	for(int i = 0; i < 3; ++i) {
+		for(int j = i+1; j < 4; ++j) {
+			edges.push_back({i,j,1});
+		}
+	}
+	zeros.push_back(Graph(edges,4,numColors));
+	
+	//K6
+	edges.clear();
+	for(int i = 0; i < 5; ++i) {
+		for(int j = i+1; j < 6; ++j) {
+			edges.push_back({i,j,2});
+		}
+	}
+	zeros.push_back(Graph(edges,6,numColors));
+
 	auto start1=high_resolution_clock::now();
 	
-	vector < vector <Graph> > test1 = NEWgenerateV(7,2,{});
+	vector < vector <Graph> > test1 = NEWgenerateV(7,3,zeros);
 	
 	auto start2=high_resolution_clock::now();
 	auto duration1 = duration_cast<milliseconds>(start2 - start1);
@@ -41,7 +73,7 @@ int main() {
 	
 	auto start3=high_resolution_clock::now();
 	
-	vector < vector <Graph> > test2 = generateV(7,2,{});
+	vector < vector <Graph> > test2 = generateV(7,3,zeros);
 
 	
 	
@@ -51,22 +83,14 @@ int main() {
 	cout << "Running time of NEWgenerateV: " << duration1.count() << endl << endl;
 	cout << "Running time in generateV: " << duration.count() << endl << endl;
 	
-	/*bool test;
+	for(int i = 0; i < test1.size(); ++i) {
+		cout << test1[i].size() << " ";
+	}
+	cout << endl << endl << endl;
 	for(int i = 0; i < test2.size(); ++i) {
-		test = false;
-		for(int j = 0; j < test1.size(); ++j) {
-			if(isomorphic(test2[i],test1[j])) {
-				test = true;
-			} 
-		}
-		
-		if(!test) {
-			test2[i].printEdges();
-		}
-	}*/
-	
-	cout << test1.size() << endl;
-	cout << test2.size() << endl;
+		cout << test2[i].size() << " ";
+	}
+	cout << endl;
 	
 	return 0;
 }
