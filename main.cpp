@@ -13,6 +13,8 @@ using namespace std;
 #include <fusion.h>
 
 using namespace std::chrono;
+using namespace mosek::fusion;
+using namespace monty;
 
 
 //My headers
@@ -38,22 +40,16 @@ int main() {
 	vector<Equation> known;
 	
 	f.push_back(Graph({{0,1,1},{0,2,1},{1,2,1}},3,2));
-	f.push_back(Graph({{}},3,2));
+	f.push_back(Graph({{}},7,2));
 	
 	auto time1=high_resolution_clock::now();
-	plainFlagAlgebra(f,7,zeros,known);
+	plainFlagAlgebra(f,6,zeros,known,false);
 	auto time2=high_resolution_clock::now();
 	
-	//auto time3=high_resolution_clock::now();
-	//plainFlagAlgebra(f,7,zeros,known);
-	//auto time4=high_resolution_clock::now();
-	
 	auto duration1 = duration_cast<milliseconds>(time2 - time1);
-	//auto duration2 = duration_cast<milliseconds>(time4 - time3);
 	
-	cout << "The running time of NEWplainFlagAlgebra is: " << duration1.count() << endl << endl;
-	//cout << "The running time of plainFlagAlgebra is: " << duration2.count() << endl << endl;
-	
+	cout << "The running time is: " << duration1.count() << endl << endl;
+
 	return 0;
 }
 

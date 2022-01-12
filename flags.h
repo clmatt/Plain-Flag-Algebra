@@ -3868,6 +3868,13 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 }
 
 
+//-----------------
+//-----Run Spd-----
+//-----------------
+
+
+
+
 //-------------------------------------------
 //-----Plain Flag Algebra (Key Function)-----
 //-------------------------------------------
@@ -4156,7 +4163,7 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 //Prints to plainFlagAlgerba1.txt & plainFlagAlgebra2.txt necessary files for python SDP code 
 //f can be thought of as a linear combo of all graphs that we want to max/min
 //Rather than taking a v this function takes the number of vertices to compute on (n)
-void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equation> &known) {
+void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equation> &known, bool maximize = true, double eps = 1E-10) {
 	cout << "Starting plainFlagAlgebra." << endl;
 	
 	//The way the python script is setup we need at least one known, this just says that edge density is <= 1
@@ -4298,10 +4305,6 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 		allGraphs[i].printAdjMatToFile(myFile);
 		myFile << endl;
 	}
-
-	queue<tuple<int,int,int,int,Frac> > A;
-	vector<Frac> B; //Gives numbers to be printed
-	vector< vector<Frac> > C; //From Known
 	
 	//Used to give indices of A
 	//Rather than multiplying we look at all graphs and work backwards to get coefficients
@@ -4320,8 +4323,62 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	cout << "Generating allGraphsWithFlags." << endl;
 	vector < vector < Graph > > allGraphsWithFlags = generateAllGraphsWithFlags(n,numColors,zeros);
 	cout << endl;
+
+	//queue<tuple<int,int,int,int,Frac> > A;
+	vector<double> B; //Gives numbers to be printed
+	vector< vector<double> > C; //From Known
+	vector<double> C1;
 	
-	cout << "Calculating A." << endl << endl;
+	Frac zeroFrac(0,1);
+	//Calculating B
+	cout << "Calculating B." << endl << endl;
+	B.resize(allGraphs.size(),0.);
+	
+	//TODO use map
+	for(int i = 0; i < fSize; ++i) {
+		for(int j = 0; j < (int)allGraphs.size(); ++j) {
+			if(isomorphic(f[i],allGraphs[j])) {
+				B[j] = toDouble(f[i].getCoefficient());
+				j = (int)allGraphs.size();
+			}
+		}
+	}
+	
+	//First has 0 for ==, 1 for <=
+	//Next entry is bound
+	//Finally, it's the vector of coefficients in known (after it's been resized)
+	
+	//Calculating C
+	cout << "Calculating C." << endl << endl;
+	C.resize(allGraphs.size());
+	C1.resize(knownSize,0.);
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		C[i].resize(knownSize,0.);
+	}
+	
+	//Note I'm changing the order or indices of C from when I had the Python Script
+	for(int i = 0; i < knownSize; ++i) {
+		C1[i] = toDouble(known[i].getAns());
+		
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			for(int k = 0; k < (int)allGraphs.size(); ++k) {
+				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
+					C[k][i] = toDouble(known[i].getVariable(j).getCoefficient());
+					k = (int)allGraphs.size();
+				}
+			}
+		}
+	}
+	
+	auto MosekC1 = monty::new_array_ptr<double>(C1);
+	
+	cout << "Calculating A and setting up Mosek." << endl << endl;
+	
+	Model::t M = new Model("sdp"); auto _M = finally([&]() { M->dispose(); });
+	auto x = M->variable(Domain::greaterThan(0));
+	auto y = M->variable((int)known.size(), Domain::greaterThan(0));
+	vector<Constraint::t> constraints;
+	vector<Expression::t> expressionConstraint;
 	
 	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
 		cout << "In A, iteration " << i+1 << " out of " << v.size() << endl;  
@@ -4412,6 +4469,42 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 			} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
 		}
 		
+		auto MosekM = M->variable("M"+to_string(i),Domain::inPSDCone(v[i].size()));
+		
+		for(int j = 0; j < (int)allGraphs.size(); ++j) {
+			vector< vector< double> > partialADouble;
+			partialADouble.resize(partialA[j].size());
+			
+			for(int k = 0; k < partialA[j].size(); ++k) {
+				partialADouble[k].resize(partialA[j][k].size(),0.);
+			}
+			
+			for(int k = 0; k < v[i].size(); ++k) {
+				for(int l = k; l < v[i].size(); ++l) {
+					if(l == k) {
+						partialADouble[k][l] = toDouble(partialA[j][k][l]);
+					}
+					else {
+						partialADouble[k][l] = toDouble(partialA[j][k][l])/2.;
+						partialADouble[l][k] = toDouble(partialA[j][k][l])/2.;
+					}
+				}
+			}
+		
+			auto MosekA = Matrix::sparse(monty::new_array_ptr<double>(partialADouble));
+			
+			//Is this fastest? Is adding to a constraint slow? Is it better to do all at once?
+			if(i == 0) {
+				auto MosekC = monty::new_array_ptr<double>(C[j]);
+				expressionConstraint.push_back(Expr::add(Expr::sub(Expr::dot(MosekA,MosekM), Expr::dot(MosekC,y)),x));
+			}
+			
+			else {
+				expressionConstraint[j] = Expr::add(expressionConstraint[j], Expr::dot(MosekA,MosekM));
+			}
+		}
+		
+		/*
 		//Combine partialA into A
 		for(int index1 = 0; index1 < (int)partialA.size(); ++index1) {
 			for(int index2 = 0; index2 < (int)partialA[index1].size(); ++index2) {
@@ -4429,53 +4522,49 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 					}
 				}
 			}
+		}*/
+	}
+	
+	for(int j = 0; j < allGraphs.size(); ++j) {
+		if(maximize) {
+			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(1.-B[j]-eps));
+			constraints.push_back(c);
+		}
+		
+		else {
+			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(B[j]-eps));
+			constraints.push_back(c);
 		}
 	}
 	
 	cout << endl;
 	
-	Frac zeroFrac(0,1);
-	//Calculating B
-	cout << "Calculating B." << endl << endl;
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		B.push_back(zeroFrac);
-	}
+	M->objective(ObjectiveSense::Maximize, Expr::sub(x, Expr::dot(MosekC1,y)));
+	M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
+	M->writeTask("sdp.ptf");
+	M->writeTask("data.task.gz");
+	M->writeTask("data.opf");
+   M->solve();
+   cout << endl;
+   
+   if(maximize) {
+   	cout << "The objective function is: " << 1.-M->dualObjValue() << endl << endl;
+   }
+   
+   else {
+   	cout << "The objective function is: " << M->dualObjValue() << endl << endl;
+   }
+   
+   cout << "Print all non-zero (> 1E-5) dual values: " << endl;
+   for(int i = 0; i < constraints.size(); ++i) {
+   	if((*constraints[i]->dual())[0] > 1E-5) {
+   		cout << "Graph " << i << " has a dual value of " << (*constraints[i]->dual())[0] << endl;
+   	}
+   }
+   cout << endl;
 	
-	for(int i = 0; i < fSize; ++i) {
-		for(int j = 0; j < (int)allGraphs.size(); ++j) {
-			if(isomorphic(f[i],allGraphs[j])) {
-				B[j] = f[i].getCoefficient();
-				j = (int)allGraphs.size();
-			}
-		}
-	}
-	
-	//First has 0 for ==, 1 for <=
-	//Next entry is bound
-	//Finally, it's the vector of coefficients in known (after it's been resized)
-	
-	//Calculating C
-	cout << "Calculating C." << endl << endl;
-	C.resize(knownSize);
-	for(int i = 0; i < knownSize; ++i) {
-		C[i].resize(allGraphs.size()+1,zeroFrac);
-	}
-	
-	for(int i = 0; i < knownSize; ++i) {
-		C[i][0] = known[i].getAns();
-		
-		for(int j = 0; j < known[i].getNumVariables(); ++j) {
-			for(int k = 0; k < (int)allGraphs.size(); ++k) {
-				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
-					C[i][k+1] = known[i].getVariable(j).getCoefficient();
-					k = (int)allGraphs.size();
-				}
-			}
-		}
-	}
-	
-	//Non-integer version
-	typedef std::numeric_limits<long double> ldbl;
+	//Non-integer version For printing to files
+	/*typedef std::numeric_limits<long double> ldbl;
 	
 	ofstream myFile1;
 	myFile1.open("plainFlagAlgebra1.txt");
@@ -4512,7 +4601,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 			myFile3 << (long double)C[i][j].getNum() / (long double)C[i][j].getDen() << " ";
 		}
 		myFile3 << endl;
-	}
+	}*/
 	
 	
 	//Integer Version

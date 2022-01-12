@@ -494,3 +494,11 @@ bool operator<=(int val, Frac frac1) {
 	
 	return (frac1 <= frac2);
 }
+
+//-------------------
+//-----To Double-----
+//-------------------
+
+double toDouble(Frac frac) {
+	return ((double)frac.getNum())/((double)frac.getDen());
+}
