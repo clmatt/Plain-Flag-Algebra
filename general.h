@@ -209,7 +209,14 @@ long long int lcm(long long int a, long long int b) {
 		return a*(b/gcd(a,b));
 	}
 	
-	return b*(a/gcd(a,b));
+	long long int ans = b*(a/gcd(a,b));
+	
+	if(ans < 0) { 
+		cout << "Overflow in lcm." << endl << endl;
+		throw exception();
+	}
+	
+	return ans;
 }
 
 

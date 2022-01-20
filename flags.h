@@ -1,5 +1,5 @@
 //Nauty
-#define MAXN 1000    /* Define this before including nauty.h */
+//#define MAXN 1000    /* Define this before including nauty.h */
 extern "C" {
 	#include "nauty.h"   
 	#include "naututil.h"
@@ -2064,7 +2064,7 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 	
 	//Actual generation
 	unordered_set<string> canonLabels;
-	vector<Graph> output;
+	
 	
 	//Needed everytime since they are always the same
 	vector<Edge> flagEdges;
@@ -2076,7 +2076,9 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 			}
 		}
 	}
-	
+
+	vector<Graph> output;
+
 	for(auto G: input) {
 		vector<Edge> GEdges = flagEdges;
 		vector<int> permanentZeroDegree(n+1,0); //Value 0 for 0,1,...,sizeOfFlag
@@ -2277,24 +2279,35 @@ vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph> &zeros) {
 	vector<Graph> allGraphs = generate(n,numColors,zeros);
 	vector<Graph> output;
-	
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		vector<int> sigma;
-		unordered_set<string> canonLabels;
-		
-		for(int j = 0; j < n; ++j) {
-			sigma.push_back(j);
+	#pragma omp parallel 
+	{
+		vector<Graph> privateOutput;
+				
+		#pragma omp for nowait schedule(static) ordered
+		for(int i = 0; i < (int)allGraphs.size(); ++i) {
+			vector<int> sigma;
+			unordered_set<string> canonLabels;
+			
+			for(int j = 0; j < n; ++j) {
+				sigma.push_back(j);
+			}
+			
+			do {
+				Graph G = allGraphs[i];
+				G.setFlag(sigma);
+				
+				if(canonLabels.count(G.getCanonLabel()) == 0) {
+					canonLabels.insert(G.getCanonLabel());
+					privateOutput.push_back(G);
+				}
+			} while(next_permutation(sigma.begin(),sigma.end()));
 		}
 		
-		do {
-			Graph G = allGraphs[i];
-			G.setFlag(sigma);
-			
-			if(canonLabels.count(G.getCanonLabel()) == 0) {
-				canonLabels.insert(G.getCanonLabel());
-				output.push_back(G);
-			}
-		} while(next_permutation(sigma.begin(),sigma.end()));
+		#pragma omp for schedule(static) ordered
+    	for(int i=0; i<omp_get_num_threads(); i++) {
+        #pragma omp ordered
+        output.insert(output.end(), privateOutput.begin(), privateOutput.end());
+    	}
 	}
 	
 	return output;
@@ -2314,16 +2327,27 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 		
 		if(sizeOfFlag > 0) {
 			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
-			
-			for(int j = 0; j < (int)flags.size(); ++j) {
-				cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
-				vector<Graph> expanded = {flags[j]};
-			
-				while((expanded[0].getN()*2 - sizeOfFlag) != n) {
-					expanded = expandGraphs(expanded,zeros);
+			#pragma omp parallel 
+			{
+				vector < vector <Graph> > privateOutput;
+				
+				#pragma omp for nowait schedule(static) ordered
+				for(int j = 0; j < (int)flags.size(); ++j) {
+					cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
+					vector<Graph> expanded = {flags[j]};
+				
+					while((expanded[0].getN()*2 - sizeOfFlag) != n) {
+						expanded = expandGraphs(expanded,zeros);
+					}
+					
+					privateOutput.push_back(expanded);
 				}
 				
-				output.push_back(expanded);
+				#pragma omp for schedule(static) ordered
+    			for(int i=0; i<omp_get_num_threads(); i++) {
+     			   #pragma omp ordered
+       			 output.insert(output.end(), privateOutput.begin(), privateOutput.end());
+    			}
 			}
 		}
 	}
@@ -2331,6 +2355,10 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 	return output;
 }
 
+
+//----------------------------------------
+//-----Generate All Graphs With Flags-----
+//----------------------------------------
 
 //Use in plain flag algebra
 vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numColors, const vector<Graph> &zeros) {
@@ -2352,7 +2380,7 @@ vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numCol
 	
 	//index is number of flags
 	vector<Graph> allGraphs = generate(n,numColors,zeros);
-	vector < vector < Graph > > output(index);
+	vector < vector < Graph > > output(index); //Index is number of flags
 	vector<int> index2(index);
 	
 	for(int i = n/2; i <= n-1; ++i) {
@@ -4311,7 +4339,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	//This works well as we have already generated all graphs of size n and multiplication basically just has us partially doing that every time so it saves time on generation
 	//The only slow down could come from looking up indices but unordered_maps are SO fast it doesn't matter
 	unordered_map<string, int> allGraphsMap;
-			
+					
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
 		allGraphsMap.insert(pair<string, int>(allGraphs[i].getCanonLabel(),i));
 	}
@@ -4375,6 +4403,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	cout << "Calculating A and setting up Mosek." << endl << endl;
 	
 	Model::t M = new Model("sdp"); auto _M = finally([&]() { M->dispose(); });
+   M->setSolverParam("numThreads", 0);
 	auto x = M->variable(Domain::greaterThan(0));
 	auto y = M->variable((int)known.size(), Domain::greaterThan(0));
 	vector<Constraint::t> constraints;
@@ -4503,29 +4532,11 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 				expressionConstraint[j] = Expr::add(expressionConstraint[j], Expr::dot(MosekA,MosekM));
 			}
 		}
-		
-		/*
-		//Combine partialA into A
-		for(int index1 = 0; index1 < (int)partialA.size(); ++index1) {
-			for(int index2 = 0; index2 < (int)partialA[index1].size(); ++index2) {
-				for(int index3 = 0; index3 < (int)partialA[index1][index2].size(); ++index3) {
-					if(partialA[index1][index2][index3] != 0) {
-						if(index2 != index3) {
-							auto tempTup = make_tuple(i,index1,index2,index3,partialA[index1][index2][index3]/2);
-							A.push(tempTup);
-						}
-						
-						else {
-							auto tempTup = make_tuple(i,index1,index2,index3,partialA[index1][index2][index3]);
-							A.push(tempTup);
-						}
-					}
-				}
-			}
-		}*/
 	}
+	cout << endl;
 	
 	for(int j = 0; j < allGraphs.size(); ++j) {
+		cout << "When adding contraints iteration " << j << " out of " << allGraphs.size() << endl;
 		if(maximize) {
 			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(1.-B[j]-eps));
 			constraints.push_back(c);
@@ -4541,19 +4552,11 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	M->objective(ObjectiveSense::Maximize, Expr::sub(x, Expr::dot(MosekC1,y)));
 	M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
-	M->writeTask("sdp.ptf");
-	M->writeTask("data.task.gz");
-	M->writeTask("data.opf");
+	//M->writeTask("sdp.ptf");
+	//M->writeTask("data.task.gz");
+	//M->writeTask("data.opf");
    M->solve();
    cout << endl;
-   
-   if(maximize) {
-   	cout << "The objective function is: " << 1.-M->dualObjValue() << endl << endl;
-   }
-   
-   else {
-   	cout << "The objective function is: " << M->dualObjValue() << endl << endl;
-   }
    
    cout << "Print all non-zero (> 1E-5) dual values: " << endl;
    for(int i = 0; i < constraints.size(); ++i) {
@@ -4563,6 +4566,16 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
    }
    cout << endl;
 	
+   
+   if(maximize) {
+   	cout << "The objective function is: " << 1.-M->dualObjValue() << endl << endl;
+   }
+   
+   else {
+   	cout << "The objective function is: " << M->dualObjValue() << endl << endl;
+   }
+   
+   
 	//Non-integer version For printing to files
 	/*typedef std::numeric_limits<long double> ldbl;
 	
