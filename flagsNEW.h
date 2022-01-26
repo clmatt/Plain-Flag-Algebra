@@ -8,6 +8,8 @@ extern "C" {
 
 const vector<long long int> numberOfGraphs = {1,1,2,4,11, 34, 156, 1044, 12346, 274668, 12005168, 1018997864, 165091172592}; //Up to 12 vertices
 
+#pragma omp declare reduction (merge : std::vector<int> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+
 //---------------------
 //-----Edge Struct-----
 //---------------------
@@ -2301,7 +2303,7 @@ vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph
 	{
 		vector<Graph> privateOutput;
 				
-		#pragma omp for nowait schedule(static) ordered
+		#pragma omp parallel for nowait schedule(static) ordered
 		for(int i = 0; i < (int)allGraphs.size(); ++i) {
 			vector<int> sigma;
 			unordered_set<string> canonLabels;
@@ -2350,7 +2352,9 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 				
 				#pragma omp for nowait schedule(static) ordered
 				for(int j = 0; j < (int)flags.size(); ++j) {
-					cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
+					if((j %100) ==0) {
+						cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
+					}
 					vector<Graph> expanded = {flags[j]};
 				
 					while((expanded[0].getN()*2 - sizeOfFlag) != n) {
@@ -2411,7 +2415,9 @@ vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numCol
 				
 				#pragma omp for nowait schedule(dynamic)
 				for(int j = 0; j < (int)allGraphs.size(); ++j) {
-					cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << endl;
+					if(j%100 == 0) {
+						cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << endl;
+					}
 					unordered_map<string,int> fGraph;
 					int den = choose(n, sizeOfFlag);
 				
@@ -4439,7 +4445,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
    M->setSolverParam("numThreads", 0);
 	auto x = M->variable(Domain::greaterThan(0));
 	auto y = M->variable((int)known.size(), Domain::greaterThan(0));
-	vector<Constraint::t> constraints;
+	//vector<Constraint::t> constraints;
 	vector<Expression::t> expressionConstraint;
 	
 	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
@@ -4574,25 +4580,18 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	}
 	cout << endl;
 	
-	
-	auto MosekB = monty::new_array_ptr<double>(B);
-	auto test = monty::new_array_ptr<Expression::t>(expressionConstraint);
-	auto MosekExpressionConstraint = Expr::sub(test,MosekB);
-	
-	//auto c = M->constraint(new_array_ptr<expressionConstraint>,Domain::equals(0));
-	
-	/*for(int j = 0; j < allGraphs.size(); ++j) {
+	for(int j = 0; j < allGraphs.size(); ++j) {
 		cout << "When adding contraints iteration " << j << " out of " << allGraphs.size() << endl;
 		if(maximize) {
 			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(1.-B[j]-eps));
-			constraints.push_back(c);
+			//constraints.push_back(c);
 		}
 		
 		else {
 			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(B[j]-eps));
-			constraints.push_back(c);
+			//constraints.push_back(c);
 		}
-	}*/
+	}
 	
 	cout << endl;
 	

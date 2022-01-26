@@ -962,24 +962,6 @@ class Graph {
 //------------------------------------
 //------------------------------------
 
-
-//------------------------
-//-----Graph Equality-----
-//------------------------
-
-bool operator==(const Graph &G, const Graph &H) {
-	if(G.getCanonLabel() != H.getCanonLabel()) {
-		return false;
-	}
-	
-	if(G.getNumColors() != H.getNumColors()) {
-		return false;
-	}
-	
-	return true;
-}
-
-
 //----------------------------------------------
 //-----Convert from Nauty to my Graph Class-----
 //----------------------------------------------
@@ -2320,6 +2302,7 @@ vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph
 				}
 			} while(next_permutation(sigma.begin(),sigma.end()));
 		}
+		
 		#pragma omp for schedule(static) ordered
     	for(int i=0; i<omp_get_num_threads(); i++) {
         #pragma omp ordered
@@ -2398,53 +2381,42 @@ vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numCol
 	//index is number of flags
 	vector<Graph> allGraphs = generate(n,numColors,zeros);
 	vector < vector < Graph > > output(index); //Index is number of flags
-	#pragma omp parallel
-	{
-		vector<int> index2(index);
+	vector<int> index2(index);
+	
+	for(int i = n/2; i <= n-1; ++i) {
+		int sizeOfFlag = 2*i-n;
 		
-		for(int i = n/2; i <= n-1; ++i) {
-			int sizeOfFlag = 2*i-n;
+		if(sizeOfFlag > 0) {
+			for(int j = 0; j < (int)allGraphs.size(); ++j) {
+				cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << endl;
+				unordered_map<string,int> fGraph;
+				int den = choose(n, sizeOfFlag);
 			
-			if(sizeOfFlag > 0) {
-
-				vector < vector < Graph > > privateOutput(index); //Index is number of flags
-				
-				#pragma omp for nowait schedule(dynamic)
-				for(int j = 0; j < (int)allGraphs.size(); ++j) {
-					cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << endl;
-					unordered_map<string,int> fGraph;
-					int den = choose(n, sizeOfFlag);
-				
-					vector<int> X(sizeOfFlag);
-					for(int k = 0; k < sizeOfFlag; ++k) {
-						X[k] = k;
-					}
-					
-					do {
-						do {
-							Graph G = allGraphs[j];
-							G.setFlag(X);
-							Graph flag = G.getFlag();
-							
-							if(fGraph.find(G.getCanonLabel()) == fGraph.end()) {
-								fGraph[G.getCanonLabel()] = index2[fFlag[flag.getCanonLabel()]];
-								++index2[fFlag[flag.getCanonLabel()]];
-								G.setCoefficient(Frac(1,den));
-								privateOutput[fFlag[flag.getCanonLabel()]].push_back(G);
-							}
-							
-							else {
-								privateOutput[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].setCoefficient(privateOutput[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].getCoefficient()+Frac(1,den));
-							}
-							
-						} while(next_permutation(X.begin(), X.end()));
-					} while(nextSubset(X,n,sizeOfFlag));
+				vector<int> X(sizeOfFlag);
+				for(int k = 0; k < sizeOfFlag; ++k) {
+					X[k] = k;
 				}
 				
-				#pragma omp critical
-     			for(int j = 0; j < index; ++j) {
-       			output[j].insert(output[j].end(), privateOutput[j].begin(), privateOutput[j].end());
-       		}
+				do {
+					do {
+						Graph G = allGraphs[j];
+						G.setFlag(X);
+						Graph flag = G.getFlag();
+						
+						
+						if(fGraph.find(G.getCanonLabel()) == fGraph.end()) {
+							fGraph[G.getCanonLabel()] = index2[fFlag[flag.getCanonLabel()]];
+							++index2[fFlag[flag.getCanonLabel()]];
+							G.setCoefficient(Frac(1,den));
+							output[fFlag[flag.getCanonLabel()]].push_back(G);
+						}
+						
+						else {
+							output[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].setCoefficient(output[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].getCoefficient()+Frac(1,den));
+						}
+						
+					} while(next_permutation(X.begin(), X.end()));
+				} while(nextSubset(X,n,sizeOfFlag));
 			}
 		}
 	}
@@ -2635,7 +2607,7 @@ class Equation {
 
 			//Checks that all flags in variables are the same
 			//Could probably make faster after canonically relabelling 
-
+			//TODO Do we actually want the same adjacency matrices? 
 			if(numVariables != 0) {
 				for(int i = 1; i < numVariables; ++i) {
 					if(!isomorphic(variables[i].getFlag(), variables[0].getFlag())) {
@@ -4346,7 +4318,6 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	//Resize known
 	cout << "Resizing known." << endl;
-	#pragma omp parallel for
 	for(int i = 0; i < knownSize; ++i) {
 		cout << i+1 << " out of " << knownSize << endl;
 		known[i] = resize(known[i],allGraphs);
@@ -4392,7 +4363,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	B.resize(allGraphs.size(),0.);
 	
 	//TODO use map
-	#pragma omp parallel for
+	#pragma omp parallel for schedule(dynamic)
 	for(int i = 0; i < fSize; ++i) {
 		for(int j = 0; j < (int)allGraphs.size(); ++j) {
 			if(isomorphic(f[i],allGraphs[j])) {
@@ -4411,13 +4382,13 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	C.resize(allGraphs.size());
 	C1.resize(knownSize,0.);
 	
-	#pragma omp parallel for
+	#pragma omp parallel for schedule(dynamic)
 	for(int i = 0; i < allGraphs.size(); ++i) {
 		C[i].resize(knownSize,0.);
 	}
 	
-	//Note I'm changing the order of indices of C from when I had the Python Script
-	#pragma omp parallel for
+	//Note I'm changing the order or indices of C from when I had the Python Script
+	#pragma omp parallel for schedule(dynamic)
 	for(int i = 0; i < knownSize; ++i) {
 		C1[i] = toDouble(known[i].getAns());
 		
@@ -4448,9 +4419,9 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 		unordered_map<string, int> f;
 		for(int j = 0; j < (int)v[i].size(); ++j) {
 			f.insert(pair<string, int>(v[i][j].getCanonLabel(),j));
-		}	
+		}
 		
-		vector< vector < vector <Frac> > > partialA((int)allGraphs.size(), vector< vector<Frac> > ((int)v[i].size(), vector<Frac>((int)v[i].size(), Frac(0,1))));
+		vector< vector < vector <Frac> > > partialA( (int)allGraphs.size(), vector< vector<Frac> > ((int)v[i].size(), vector<Frac>((int)v[i].size(), Frac(0,1))));
 		
 		int sizeOfFlag = v[i][0].getSizeOfFlag();
 		
@@ -4574,14 +4545,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	}
 	cout << endl;
 	
-	
-	auto MosekB = monty::new_array_ptr<double>(B);
-	auto test = monty::new_array_ptr<Expression::t>(expressionConstraint);
-	auto MosekExpressionConstraint = Expr::sub(test,MosekB);
-	
-	//auto c = M->constraint(new_array_ptr<expressionConstraint>,Domain::equals(0));
-	
-	/*for(int j = 0; j < allGraphs.size(); ++j) {
+	for(int j = 0; j < allGraphs.size(); ++j) {
 		cout << "When adding contraints iteration " << j << " out of " << allGraphs.size() << endl;
 		if(maximize) {
 			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(1.-B[j]-eps));
@@ -4592,7 +4556,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(B[j]-eps));
 			constraints.push_back(c);
 		}
-	}*/
+	}
 	
 	cout << endl;
 	
@@ -4725,6 +4689,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	cout << "Finished plainFlagAlgebra." << endl << endl;*/
 }
+
 
 
 

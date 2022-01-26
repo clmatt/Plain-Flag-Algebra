@@ -311,6 +311,15 @@ Frac operator+(int i, Frac frac) {
 
 
 //---------------------
+//-----Plus Equals-----
+//---------------------
+
+Frac operator+=(Frac frac1, Frac frac2) {
+	return frac1 + frac2;
+}	 
+
+
+//---------------------
 //-----Subtraction-----
 //---------------------
 

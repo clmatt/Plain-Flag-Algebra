@@ -15,7 +15,6 @@ using namespace std;
 #include <threads.h>
 
 
-
 using namespace std::chrono;
 using namespace mosek::fusion;
 using namespace monty;
