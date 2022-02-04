@@ -3170,6 +3170,7 @@ Equation operator+(Equation eq, Graph G) {
 //First Define for graphs - put into equation with = 0
 //Really more of a vector of graphs, but in this form it allows us to use overridden +
 //TODO add edge between parts in a smarter way?
+//G1 has fewer vertices
 Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) {
 	if(G1.getN() > H1.getN()) {
 		return multiply(H1,G1,zeros);
@@ -3236,6 +3237,12 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	if((G.getN() == 0) || (H.getN() == 0)) {
 		cout << "Can't multiply empty graphs." << endl << endl;
 		throw exception();
+	}
+	
+	if(G.getN() == 1) {
+		Graph Hcopy = H;
+		Hcopy.setCoefficient(H.getCoefficient()*G.getCoefficient());
+		return Equation({H}, zeros, Frac(0,1), 0, false);
 	}
 	
 	//Need to reorder vertices so flags are first
@@ -3422,7 +3429,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	}
 	}
 
-	Equation eq(variables,zeros, Frac(0,1), 0, false); //When converting to equation, removes isomorphisms
+	Equation eq(variables, zeros, Frac(0,1), 0, false); //When converting to equation, removes isomorphisms
 	
 	//Makes coefficients correct
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
@@ -4382,25 +4389,26 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	cout << endl;
 
 	//queue<tuple<int,int,int,int,Frac> > A;
-	vector<double> B; //Gives numbers to be printed
-	vector< vector<double> > C; //From Known
-	vector<double> C1;
+	vector<Frac> B; //Gives numbers to be printed
+	vector< vector<Frac> > C; //From Known
+	vector<Frac> C1;
 	
 	Frac zeroFrac(0,1);
 	//Calculating B
 	cout << "Calculating B." << endl << endl;
-	B.resize(allGraphs.size(),0.);
+	B.resize(allGraphs.size(),zeroFrac);
 	
 	//TODO use map
 	#pragma omp parallel for
 	for(int i = 0; i < fSize; ++i) {
 		for(int j = 0; j < (int)allGraphs.size(); ++j) {
 			if(isomorphic(f[i],allGraphs[j])) {
-				B[j] = toDouble(f[i].getCoefficient());
+				B[j] = f[i].getCoefficient();
 				j = (int)allGraphs.size();
 			}
 		}
 	}
+	
 	
 	//First has 0 for ==, 1 for <=
 	//Next entry is bound
@@ -4409,29 +4417,30 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	//Calculating C
 	cout << "Calculating C." << endl << endl;
 	C.resize(allGraphs.size());
-	C1.resize(knownSize,0.);
+	C1.resize(knownSize,zeroFrac);
 	
 	#pragma omp parallel for
 	for(int i = 0; i < allGraphs.size(); ++i) {
-		C[i].resize(knownSize,0.);
+		C[i].resize(knownSize,zeroFrac);
 	}
 	
 	//Note I'm changing the order of indices of C from when I had the Python Script
 	#pragma omp parallel for
 	for(int i = 0; i < knownSize; ++i) {
-		C1[i] = toDouble(known[i].getAns());
+		C1[i] = known[i].getAns();
 		
 		for(int j = 0; j < known[i].getNumVariables(); ++j) {
 			for(int k = 0; k < (int)allGraphs.size(); ++k) {
 				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
-					C[k][i] = toDouble(known[i].getVariable(j).getCoefficient());
+					C[k][i] = known[i].getVariable(j).getCoefficient();
 					k = (int)allGraphs.size();
 				}
 			}
 		}
 	}
 	
-	auto MosekC1 = monty::new_array_ptr<double>(C1);
+	//auto MosekC1 = monty::new_array_ptr<double>(C1);
+	//auto MosekC = monty::new_array_ptr<double>(C1);
 	
 	cout << "Calculating A and setting up Mosek." << endl << endl;
 	
@@ -4440,7 +4449,10 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	auto x = M->variable(Domain::greaterThan(0));
 	auto y = M->variable((int)known.size(), Domain::greaterThan(0));
 	vector<Constraint::t> constraints;
-	vector<Expression::t> expressionConstraint;
+	vector< Variable::t > MosekM;
+	vector< vector< vector< vector< Frac > > > > A;
+	A.resize(allGraphs.size());
+	
 	
 	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
 		cout << "In A, iteration " << i+1 << " out of " << v.size() << endl;  
@@ -4530,77 +4542,123 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 					int c = min(G1Index,G2Index);
 					int d = max(G1Index,G2Index);
 					
+					int divide;
+					if(c == d) {
+						divide = 1;
+					}
+					
+					else {
+						divide = 1;
+					}
+					
 					#pragma omp critical
-					partialA[b][c][d] = partialA[b][c][d] + e;
+					partialA[b][c][d] = partialA[b][c][d] + e/divide;
 				
 				} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
 			}
 		}
 		
-		auto MosekM = M->variable("M"+to_string(i),Domain::inPSDCone(v[i].size()));
+		auto MosekMTemp = M->variable("M"+to_string(i),Domain::inPSDCone(v[i].size()));
+		MosekM.push_back(MosekMTemp);
 		
 		for(int j = 0; j < (int)allGraphs.size(); ++j) {
-			vector< vector< double> > partialADouble;
-			partialADouble.resize(partialA[j].size());
-			
-			for(int k = 0; k < partialA[j].size(); ++k) {
-				partialADouble[k].resize(partialA[j][k].size(),0.);
-			}
-			
-			for(int k = 0; k < v[i].size(); ++k) {
-				for(int l = k; l < v[i].size(); ++l) {
-					if(l == k) {
-						partialADouble[k][l] = toDouble(partialA[j][k][l]);
-					}
-					else {
-						partialADouble[k][l] = toDouble(partialA[j][k][l])/2.;
-						partialADouble[l][k] = toDouble(partialA[j][k][l])/2.;
-					}
-				}
-			}
-		
-			auto MosekA = Matrix::sparse(monty::new_array_ptr<double>(partialADouble));
-			
-			//Is this fastest? Is adding to a constraint slow? Is it better to do all at once?
-			if(i == 0) {
-				auto MosekC = monty::new_array_ptr<double>(C[j]);
-				expressionConstraint.push_back(Expr::add(Expr::sub(Expr::dot(MosekA,MosekM), Expr::dot(MosekC,y)),x));
-			}
-			
-			else {
-				expressionConstraint[j] = Expr::add(expressionConstraint[j], Expr::dot(MosekA,MosekM));
-			}
+			A[j].push_back(partialA[j]);
 		}
 	}
 	cout << endl;
 	
 	
-	auto MosekB = monty::new_array_ptr<double>(B);
-	auto test = monty::new_array_ptr<Expression::t>(expressionConstraint);
-	auto MosekExpressionConstraint = Expr::sub(test,MosekB);
+	//This is definitely not the fastest way
+	//Could remove elements using a set
+	vector<int> constraintsSigma;
 	
-	//auto c = M->constraint(new_array_ptr<expressionConstraint>,Domain::equals(0));
-	
-	/*for(int j = 0; j < allGraphs.size(); ++j) {
-		cout << "When adding contraints iteration " << j << " out of " << allGraphs.size() << endl;
+	#pragma omp parallel for schedule(dynamic)
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		cout << "Making everything integer, iteration " << i << " out of " << allGraphs.size() << endl;
+		int mult = 1;
+		
+		for(int j = 0; j < (int)v.size(); ++j) {
+			for(int k = 0; k < v[j].size(); ++k) {
+				for(int l = k; l < v[j].size(); ++l) {
+					mult = lcm(mult,A[i][j][k][l].getDen());
+				}
+			}
+		}
+		
+		for(int j = 0; j < known.size(); ++j) {
+			mult = lcm(mult,C[i][j].getDen());
+		}
+		
+		mult = lcm(mult,B[i].getDen());
+		
+		vector<Matrix::t> MosekA;
+		
+		for(int j = 0; j < (int)v.size(); ++j) {
+			vector<vector<double> > intA; //Stupid Mosek requires matrices to have floats
+			intA.resize(v[j].size());
+			
+			for(int k = 0; k < v[j].size(); ++k) {
+				intA[k].resize(v[j].size());
+				for(int l = 0; l < v[j].size(); ++l) {
+					intA[k][l] = round((A[i][j][k][l].getNum() * mult)/A[i][j][k][l].getDen());
+				}
+			}
+			
+			MosekA.push_back(Matrix::sparse(monty::new_array_ptr<double>(intA)));
+		}
+		
+		int intB;
+		
 		if(maximize) {
-			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(1.-B[j]-eps));
-			constraints.push_back(c);
+			intB = mult - (B[i].getNum()*mult)/B[i].getDen();
 		}
 		
 		else {
-			auto c = M->constraint(expressionConstraint[j],Domain::lessThan(B[j]-eps));
-			constraints.push_back(c);
+			intB = (B[i].getNum()*mult)/B[i].getDen();
 		}
-	}*/
+		
+		vector<double> intC;
+		intC.resize(known.size());
+		
+		for(int j = 0; j < known.size(); ++j) {
+			intC[j] = (round)((C[i][j].getNum()*mult)/C[i][j].getDen());
+		}
+		
+		auto MosekC = monty::new_array_ptr<double>(intC);
+		
+		#pragma omp critical
+		{
+			auto forConstraint = Expr::sub(Expr::mul(mult,x),Expr::dot(MosekC,y));
+			
+			for(int j = 0; j < (int)v.size(); ++j) {
+				forConstraint = Expr::add(forConstraint,Expr::dot(MosekA[j],MosekM[j]));
+			}
+			
+			auto c = M->constraint(forConstraint, Domain::lessThan(intB)); 
+			constraints.push_back(c);
+			constraintsSigma.push_back(i);
+		}
+	}
 	
 	cout << endl;
 	
-	M->objective(ObjectiveSense::Maximize, Expr::sub(x, Expr::dot(MosekC1,y)));
+	int mult = 1;
+	for(int i = 0; i < (int)known.size(); ++i) {
+		mult = lcm(mult,C1[i].getDen());
+	} 
+	
+	vector<double> C1Int;
+	
+	for(int i = 0; i < (int)known.size(); ++i) {
+		C1Int.push_back((round)((C1[i].getNum()*mult)/C1[i].getDen()));
+	}
+	
+	auto MosekC1 = new_array_ptr(C1Int);
+	
+	M->objective(ObjectiveSense::Maximize, Expr::sub(Expr::mul(x,mult), Expr::dot(MosekC1,y)));
 	M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
-	//M->writeTask("sdp.ptf");
+	//M->writeTask("sdp.ptf"); // Use for debugging
 	//M->writeTask("data.task.gz");
-	//M->writeTask("data.opf");
    M->solve();
    cout << endl;
    
@@ -4614,116 +4672,12 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
    
    if(maximize) {
-   	cout << "The objective function is: " << 1.-M->dualObjValue() << endl << endl;
+   	cout << "The objective function is: " << mult-M->dualObjValue() << endl << endl;
    }
    
    else {
    	cout << "The objective function is: " << M->dualObjValue() << endl << endl;
    }
-   
-   
-	//Non-integer version For printing to files
-	/*typedef std::numeric_limits<long double> ldbl;
-	
-	ofstream myFile1;
-	myFile1.open("plainFlagAlgebra1.txt");
-	myFile1.precision(ldbl::max_digits10);
-	
-	//Tells python the size of the matrix
-	myFile1 << v.size() << " " << allGraphs.size() << " ";
-	for(int i = 0; i < (int)v.size(); ++i) {
-		myFile1 << v[i].size() << " ";
-	}
-	myFile1 << endl;
-	
-	while(!A.empty()) {	
-		auto tempTup = A.front();
-		A.pop();
-		
-		myFile1 << get<0>(tempTup) << " " << get<1>(tempTup)  << " " << get<2>(tempTup)  << " " << get<3>(tempTup)  << " " << (long double)get<4>(tempTup).getNum() / (long double)get<4>(tempTup).getDen() << endl;
-	}
-	
-	ofstream myFile2;
-	myFile2.open("plainFlagAlgebra2.txt");
-	myFile2.precision(ldbl::max_digits10);
-	
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		myFile2 << (long double)B[i].getNum() / (long double)B[i].getDen() << " ";
-	}
-
-	ofstream myFile3;
-	myFile3.open("plainFlagAlgebra3.txt");
-	myFile3.precision(ldbl::max_digits10);
-	
-	for(int i = 0; i < knownSize; ++i) {
-		for(int j = 0; j < (int)allGraphs.size()+1; ++j) {
-			myFile3 << (long double)C[i][j].getNum() / (long double)C[i][j].getDen() << " ";
-		}
-		myFile3 << endl;
-	}*/
-	
-	
-	//Integer Version
-	/*long long int mult = 1;
-	
-	queue<tuple<int,int,int,int,Frac> > Acopy = A;
-	
-	while(!Acopy.empty()) {
-		auto tempTup = Acopy.front();
-		Acopy.pop();
-
-		mult = lcm(mult,get<4>(tempTup).getDen());
-	}
-	
-	for(int i = 0; i < everything.getNumVariables(); ++i) {
-		mult = lcm(mult,B[i].getDen());
-	}
-	
-	for(int i = 0; i < knownSize; ++i) {
-		for(int j = 0; j < everything.getNumVariables()+1; ++j) {
-			mult = lcm(mult,C[i][j].getDen());
-		}
-	}
-	
-	ofstream myFile1;
-	myFile1.open("plainFlagAlgebra1.txt");
-	
-	//Tells python the size of the matrix
-	myFile1 << v.size() << " " << everything.getNumVariables() << " ";
-	for(int i = 0; i < (int)v.size(); ++i) {
-		myFile1 << v[i].size() << " ";
-	}
-	myFile1 << endl;
-	
-	while(!A.empty()) {	
-		auto tempTup = A.front();
-		A.pop();
-		
-		myFile1 << get<0>(tempTup) << " " << get<1>(tempTup)  << " " << get<2>(tempTup)  << " " << get<3>(tempTup)  << " " << get<4>(tempTup).getNum()*mult/get<4>(tempTup).getDen() << endl;
-	}
-	
-	ofstream myFile2;
-	myFile2.open("plainFlagAlgebra2.txt");
-	
-	for(int i = 0; i < everything.getNumVariables(); ++i) {
-		myFile2 << B[i].getNum()*mult/B[i].getDen() << " ";
-	}
-
-	ofstream myFile3;
-	myFile3.open("plainFlagAlgebra3.txt");
-	
-	for(int i = 0; i < knownSize; ++i) {
-		for(int j = 0; j < everything.getNumVariables()+1; ++j) {
-			myFile3 << C[i][j].getNum()*mult/C[i][j].getDen() << " ";
-		}
-		myFile3 << endl;
-	}
-	
-	ofstream myFile4;
-	myFile4.open("plainFlagAlgebra4.txt");
-	myFile4 << mult;
-	
-	cout << "Finished plainFlagAlgebra." << endl << endl;*/
 }
 
 
