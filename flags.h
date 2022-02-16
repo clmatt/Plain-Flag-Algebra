@@ -52,7 +52,7 @@ class Graph {
 		
 		//Need to specify NUMCOLORS, because it's possible that it differs
 		//from actual number of colors
-		Graph(const vector<Edge> &edgeList, const int N, const int NUMCOLORS) {
+		Graph(const vector<Edge> &edgeList, const int N, const int NUMCOLORS, const vector<int> &FLAG = {}) {
 			numColors = NUMCOLORS;
 			n = N;
 			
@@ -100,6 +100,28 @@ class Graph {
             adjMat[edge.b][edge.a] = edge.color;
   			}
   			
+  			sizeOfFlag = 0;
+		
+			for(auto &i : FLAG) {
+				++sizeOfFlag;
+				
+				if((i >= n) || (i < 0)) {
+					cout << "In setFlag in constructor an element is outside of the vertex range." << endl << endl;
+					throw exception();
+				}	
+			}
+			
+			for(int i = 0; i < (int)FLAG.size(); ++i) {
+				for(int j = i+1; j < (int)FLAG.size(); ++j) {
+					if(FLAG[i] == FLAG[j]) {
+						cout << "In setFlag in constructor all elements of the vector must be different." << endl << endl;
+						throw exception();
+					}
+				}
+			}
+		
+			flag = FLAG;
+  			
   			Frac frac(1,1);
   			coefficient = frac;
   			
@@ -120,10 +142,9 @@ class Graph {
 				}
 			}
 			
-			Graph G(edges,n,numColors);
+			Graph G(edges,n,numColors,flag);
 			
 			G.setCoefficient(coefficient);
-			G.setFlag(flag);
 			
 			return G;
 		}
@@ -183,20 +204,6 @@ class Graph {
 				}
 			}
 			
-			Graph G(newEdges, k, numColors);
-			
-			//Flag
-			/*vector<int> newFlag;
-			for(int i = 0; i < n; ++i) {
-				if(sigma[i] != -1) {
-					for(int j = 0;  j < sizeOfFlag; ++j) {
-						if(i == flag[j]) {
-							newFlag.push_back(sigma[i]);
-						}
-					}
-				}
-			}*/
-			
 			//Flag
 			vector<int> newFlag;
 			for(int j = 0; j < sizeOfFlag; ++j) {
@@ -205,8 +212,8 @@ class Graph {
 				}
 			}
 			
-			G.setFlag(newFlag);
-			//G.canonRelabel();
+			Graph G(newEdges, k, numColors,newFlag);
+
 			return G;
 		}
 		
@@ -642,14 +649,12 @@ class Graph {
 				++i;
 			}
 			
-			Graph G(edges, sizeOfFlag, numColors);
-			
 			vector<int> flag;
 			for(int i = 0; i < sizeOfFlag; ++i) {
 				flag.push_back(i);
 			}
 			
-			G.setFlag(flag);
+			Graph G(edges, sizeOfFlag, numColors,flag);
 			
 			return G;
 			
@@ -2163,9 +2168,15 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 					}
 				}
 			
-				if(cont) {	
-					Graph Gv(edges,n+1,numColors);
-					vector<int> GvFlag;												
+				if(cont) {
+					vector<int> GvFlag;
+				
+					for(int j = 0; j < sizeOfFlag; ++j) {
+						GvFlag.push_back(j);
+					}
+				
+					Graph Gv(edges,n+1,numColors,GvFlag);
+																	
 					
 					//Removes zeros
 			 		for(int j = 0; j < (int)zeros.size(); ++j) {
@@ -2173,13 +2184,6 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 			 				cont = false;
 			 				j = zeros.size();
 			 			}
-			 		}
-			 		
-			 		if(cont) {
-				 		for(int j = 0; j < sizeOfFlag; ++j) {
-							GvFlag.push_back(j);
-						}
-				 		Gv.setFlag(GvFlag);
 			 		}
 				 				
 				 	if(cont && (canonLabels.count(Gv.getCanonLabel()) == 0)) {
@@ -2524,7 +2528,7 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 		}
 	}
 	
-	Graph G(Edges,n,numColors);
+	
 	
 	if(flagSize > 0) {
 		vector<int> flag;
@@ -2550,10 +2554,14 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 		}
 		
 		
-		G.setFlag(flag);
+		Graph G(Edges,n,numColors,flag);
+		return G;
 	}
 	
-	return G;
+	else {
+		Graph G(Edges,n,numColors);
+		return G;
+	}
 }
 
 
@@ -2595,7 +2603,7 @@ class Equation {
 		
 		//ans must be a fraction
 		//unsafe doesn't do combine (should also fix combine probably)
-		Equation(vector<Graph> const &VARIABLES, vector<Graph> const &ZEROS, Frac ANS, int TYPE, bool safe = true) {
+		Equation(vector<Graph> const &VARIABLES, vector<Graph> const &ZEROS, Frac ANS, int TYPE) {
 			variables = VARIABLES;
 			zeros = ZEROS;
 			ans = ANS;
@@ -2657,7 +2665,6 @@ class Equation {
 			
 			//Check for isomorphism in Variables
 			//If isomorphic add the coefficients
-
 			combine();
 			
 		}
@@ -3315,8 +3322,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 			flag.push_back(G.getFlagVertex(j));
 		}
 		
-		Graph GH(edges, nG+nH-sizeOfFlag, c);
-		GH.setFlag(flag);
+		Graph GH(edges, nG+nH-sizeOfFlag, c,flag);
 		
 		if(variablesSet.count(GH.getCanonLabel()) == 0) {
 			variablesSet.insert(GH.getCanonLabel());
@@ -4586,6 +4592,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
    	cout << "The objective function is: " << M->dualObjValue() << endl << endl;
    }
 }
+
 
 
 

@@ -95,16 +95,12 @@ int main() {
 	Equation known2({K21},zeros,Frac(-15,40),1);
 	known.push_back(known2);
 	
-	Graph K21f({{0,1,1}},2,numColors);
-	K21f.setFlag({0});
+	Graph K21f({{0,1,1}},2,numColors,{0});
 
 	vector<Graph> vOne; //Identically equal to one when we have a single flag
-	vOne.push_back(Graph({{}},2,numColors));
-	vOne[0].setFlag({0});
-	vOne.push_back(Graph({{0,1,1}},2,numColors));
-	vOne[1].setFlag({0});
-	vOne.push_back(Graph({{0,1,2}},2,numColors));
-	vOne[2].setFlag({0});
+	vOne.push_back(Graph({{}},2,numColors,{0}));
+	vOne.push_back(Graph({{0,1,1}},2,numColors,{0}));
+	vOne.push_back(Graph({{0,1,2}},2,numColors,{0}));
 	
 	K21f.setCoefficient(Frac(40,1));
 
@@ -159,6 +155,10 @@ int main() {
 	Equation known9 = deg15*deg16*deg17;
 	known9.averageAll();
 	known.push_back(known9);
+	
+	//Equation known10 = deg15*deg15*deg16*deg16*deg17*deg17;
+	//known9.averageAll();
+	//known.push_back(known9);
 	
 	
 	plainFlagAlgebra(f,6,zeros,known,false);
