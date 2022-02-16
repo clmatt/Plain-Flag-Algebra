@@ -183,7 +183,7 @@ long long int convertToInt(Frac frac) {
 //-----Convert from Integer-----
 //------------------------------
 
-Frac convertFromInt(int i) {
+Frac convertFromInt(long long int i) {
 	return Frac(i,1);
 }
 

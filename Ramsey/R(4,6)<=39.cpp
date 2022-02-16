@@ -10,8 +10,14 @@ using namespace std;
 #include <limits> 
 #include <queue>
 #include <tuple>
+#include <fusion.h>
+#include <omp.h>
+#include <threads.h>
+
 
 using namespace std::chrono;
+using namespace mosek::fusion;
+using namespace monty;
 
 
 //My headers
@@ -19,7 +25,6 @@ using namespace std::chrono;
 #include "fractions.h"
 #include "flags.h"
 
-//#define MAXN 100    /* Define this before including nauty.h */
 
 //Nauty
 extern "C" {
@@ -30,8 +35,10 @@ extern "C" {
 
 //This is going to be extremely confusing, but graph is from Nauty and Graph is from me
 
-
-int main() {		
+//Doesn't work yet!
+int main() {
+	auto start=high_resolution_clock::now();
+		
 	//R(4,6) <= 39
 	vector<Graph> f;
 	vector<Graph> zeros;
@@ -74,7 +81,8 @@ int main() {
 	//CHANGE if running on more vertices
 	for(int i = 2; i <= 6; ++i) {
 		Graph Kempty({{}},i,numColors);
-		Equation knownEmpty({Kempty},zeros,Frac(1,myPow(39,i-1)),0);
+		Kempty.setCoefficient(Frac(myPow(39,i-1),1));
+		Equation knownEmpty({Kempty},zeros,Frac(1,1),0);
 		known.push_back(knownEmpty);
 	}
 	
@@ -83,39 +91,73 @@ int main() {
 	Equation known1({K21},zeros,Frac(17,39),1);
 	known.push_back(known1);
 	
-	K21.setCoefficient({-1});
+	K21.setCoefficient(Frac(-1,1));
 	Equation known2({K21},zeros,Frac(-14,39),1);
 	known.push_back(known2);
 	
 	Graph K21f({{0,1,1}},2,numColors);
 	K21f.setFlag({0});
-	Graph K11f({{}},1,numColors);
-	K11f.setFlag({0});
-	K11f.setCoefficient(Frac(-14,39));
-	Equation eq1({K21f,K11f},zeros,Frac(0,1),0);
-	K11f.setCoefficient(Frac(-15,39));
-	Equation eq2({K21f,K11f},zeros,Frac(0,1),0);
-	K11f.setCoefficient(Frac(-16,39));
-	Equation eq3({K21f,K11f},zeros,Frac(0,1),0);
-	K11f.setCoefficient(Frac(-17,39));
-	Equation eq4({K21f,K11f},zeros,Frac(0,1),0);
+
+	vector<Graph> vOne; //Identically equal to one when we have a single flag
+	vOne.push_back(Graph({{}},2,numColors));
+	vOne[0].setFlag({0});
+	vOne.push_back(Graph({{0,1,1}},2,numColors));
+	vOne[1].setFlag({0});
+	vOne.push_back(Graph({{0,1,2}},2,numColors));
+	vOne[2].setFlag({0});
 	
-	Equation known3 = eq1*eq1*eq2*eq3*eq4;
+	K21f.setCoefficient(Frac(39,1));
+	
+	//Degree 14
+	vector<Graph> deg14Vec = {K21f};
+	for(int i = 0; i < vOne.size(); ++i) {
+		vOne[i].setCoefficient(Frac(-14,1));
+		deg14Vec.push_back(vOne[i]);
+	}
+	Equation deg14(deg15Vec,zeros,Frac(0,1),0);
+
+	//Degree 15
+	vector<Graph> deg15Vec = {K21f};
+	for(int i = 0; i < vOne.size(); ++i) {
+		vOne[i].setCoefficient(Frac(-15,1));
+		deg15Vec.push_back(vOne[i]);
+	}
+	Equation deg15(deg15Vec,zeros,Frac(0,1),0);
+	
+	//Degree 16
+	vector<Graph> deg16Vec = {K21f};
+	for(int i = 0; i < vOne.size(); ++i) {
+		vOne[i].setCoefficient(Frac(-16,1));
+		deg16Vec.push_back(vOne[i]);
+	}
+	Equation deg16(deg16Vec,zeros,Frac(0,1),0);
+	
+	//Degree 17
+	vector<Graph> deg17Vec = {K21f};
+	for(int i = 0; i < vOne.size(); ++i) {
+		vOne[i].setCoefficient(Frac(-17,1));
+		deg17Vec.push_back(vOne[i]);
+	}
+	Equation deg17(deg17Vec,zeros,Frac(0,1),0);
+	
+	Equation known3 = deg14*deg14*deg15*deg16*deg17;
 	known3.averageAll();
 	known.push_back(known3);
 	
-	
-	/*Equation known4 = eq1*eq2*eq2*eq3*eq4;
+	Equation known4 = deg14*deg15*deg15*deg16*deg17;
 	known4.averageAll();
 	known.push_back(known4);
-	Equation known5 = eq1*eq2*eq3*eq3*eq4;
+	
+	Equation known5 = deg14*deg15*deg16*deg16*deg17;
 	known5.averageAll();
 	known.push_back(known5);
-	Equation known6 = eq1*eq2*eq3*eq4*eq4;
-	known6.averageAll();
-	known.push_back(known6);*/
 	
-	plainFlagAlgebra(f,7,zeros,known);
+	Equation known6 = deg14*deg15*deg16*deg17*deg17;
+	known6.averageAll();
+	known.push_back(known6);
+	
+	
+	plainFlagAlgebra(f,6,zeros,known);
 	
 	
 	auto end=high_resolution_clock::now();

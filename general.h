@@ -288,7 +288,7 @@ int binaryDigit(int n, int k) {
 //-----Factorial-----
 //-------------------
 
-int factorial(int n) {
+long long int factorial(int n) {
 	if(n < 0) {
 		cout << "Factorial doesn't take negative numbers." << endl;
 		cout << "n = " << n << endl << endl;

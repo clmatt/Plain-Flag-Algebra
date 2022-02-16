@@ -2670,17 +2670,21 @@ class Equation {
 		//Checks for isomorphisms and the adds coefficients
 		//Private?
 		void combine() {
-			for(int i = 0; i < numVariables-1; ++i) {
-				for(int j = i+1; j < numVariables; ++j) {
-					if(isomorphic(variables[i],variables[j])) {
-						variables[i].setCoefficient(variables[i].getCoefficient() + variables[j].getCoefficient());
-						variables.erase(variables.begin()+j);
-						--j;
-						--numVariables;
-					}
+			unordered_map<string, int> map;
+			
+			for(int i = 0; i < numVariables; ++i) {
+				if(map.find(variables[i].getCanonLabel()) == map.end()) {
+					map[variables[i].getCanonLabel()] = i;
+				}
+					
+				else{ 
+					int firstIndex = map[variables[i].getCanonLabel()];
+					variables[firstIndex].setCoefficient(variables[firstIndex].getCoefficient() + variables[i].getCoefficient());
+					variables.erase(variables.begin()+i);
+					--numVariables;
 				}
 			}
-			
+
 			for(int i = 0; i < numVariables; ++i) {
 				if((variables[i].getN() == 1) && (variables[i].getSizeOfFlag() == 0)) {
 					ans = ans - variables[i].getCoefficient(); 
@@ -3167,15 +3171,10 @@ Equation operator+(Equation eq, Graph G) {
 //-----Multiplication-----
 //------------------------
 
-//First Define for graphs - put into equation with = 0
-//Really more of a vector of graphs, but in this form it allows us to use overridden +
+//First Define for graphs - put into equation with = 0, and no zeros
+//Really more of a vector (or set) of graphs, but in this form it allows us to use overridden +
 //TODO add edge between parts in a smarter way?
-//G1 has fewer vertices
 Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) {
-	if(G1.getN() > H1.getN()) {
-		return multiply(H1,G1,zeros);
-	} 
-
 	vector<int> HReorder;
 	vector<int> GReorder;
 	
@@ -3239,12 +3238,6 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		throw exception();
 	}
 	
-	if(G.getN() == 1) {
-		Graph Hcopy = H;
-		Hcopy.setCoefficient(H.getCoefficient()*G.getCoefficient());
-		return Equation({H}, zeros, Frac(0,1), 0, false);
-	}
-	
 	//Need to reorder vertices so flags are first
 	int sizeOfFlag = G.getSizeOfFlag();
 	int c = G.getNumColors();
@@ -3253,185 +3246,87 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	
 	vector<Graph> variables;
 	unordered_set<string> variablesSet;
-	
-	vector<Edge> permanentEdges;
-	//First vertices G
-	for(int j = 0; j < nG-1; ++j) {
-		for(int k = j+1; k < nG; ++k) {
-			if(G.getEdgeColor(j,k) != 0) {
-				permanentEdges.push_back({j,k,G.getEdgeColor(j,k)});
-			}
-		}
-	}
-
-	//Flag Plus Last Vertices = H
-	for(int j = 0; j < nH-1; ++j) {
-		for(int k = j+1; k < nH; ++k) {
-			if(H.getEdgeColor(j,k) != 0) {
-				if((j < sizeOfFlag) && (k < sizeOfFlag)) {
-					permanentEdges.push_back({j,k,H.getEdgeColor(j,k)});
-				}
-					
-				else if((j < sizeOfFlag) && (k >= sizeOfFlag)) {
-					permanentEdges.push_back({j,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
-				}
-					
-				else {
-					permanentEdges.push_back({j+nG-sizeOfFlag,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
-				}
-			}
-		}
-	}
-	
-	//Create Flag
-	vector<int> flag;
-		
-	//Can do this because they are in canonical form
-	for(int j = 0; j < sizeOfFlag; ++j) {
-		flag.push_back(G.getFlagVertex(j));
-	}
-	
-	if(nG == sizeOfFlag) {
-		Equation eq({H},zeros, Frac(0,1), 0, false);
-		return eq;
-	}
 
 	//Create all possible variables
-	//In first vertex (index=sizeOfFlag) order of edges in each orbit doesn't matter
-	vector< vector< vector<Edge> > > edgesTemp;
-	
-	int index1 = 0;
-	
-	for(int i = 0; i < H.getNumOrbits(); ++i) {
-		if(H.getOrbit(i,0) >= sizeOfFlag) {
-			edgesTemp.push_back(vector< vector<Edge> >());
-		
-			vector<int> colors(c,0);		
-			colors[0] = H.getOrbitSize(i);
-			
-			int index2 = 0;
-			do {
-				edgesTemp[index1].push_back(vector<Edge>());
-					
-				int index3 = 0;
-				for(int j = 0; j < c; ++j) {
-					for(int k = 0; k < colors[j]; ++k) {
-						edgesTemp[index1][index2].push_back({sizeOfFlag,H.getOrbit(i,index3)+nG-sizeOfFlag,j});
-						++index3;
-					}	
-				}
-				++index2;
-			} while(nextOrderedSum(colors));
-			
-			++index1;
-		}
-	}
-	
-	//Combine info from each orbit from edgesTemp
-	vector< vector<Edge> > firstVertexEdge;
-	vector<int> maxVals;
-	vector<int> list(H.getNumOrbits()-sizeOfFlag,0);
-	
-	for(int i = 0; i < H.getNumOrbits(); ++i) {
-		if(H.getOrbit(i,0) >= sizeOfFlag) {
-			maxVals.push_back(H.getOrbitSize(i));
-		}
-	}
-	
-	index1 = 0;
-	do {
-		firstVertexEdge.push_back(vector<Edge>());
-		
-		int index2 = 0;
-		
-		for(int i = 0; i < H.getNumOrbits(); ++i) {
-			if(H.getOrbit(i,0) >= sizeOfFlag) {
-				for(int j = 0; j < H.getOrbitSize(i); ++j) {
-					firstVertexEdge[index1].push_back(edgesTemp[index2][list[index2]][j]);
-				}
-				
-				++index2;
-			}
-		}
-		
-		++index1;
-	
-	} while(nextList(list,maxVals));
-	
-	for(auto partialEdges : firstVertexEdge) {
-	for(int i = 0; i < myPow(c,(nG - sizeOfFlag-1)*(nH-sizeOfFlag)); ++i) { //c-ary mask
+	for(int i = 0; i < myPow(c,(nG - sizeOfFlag)*(nH-sizeOfFlag)); ++i) { //c-ary mask
 		//Convert i to c-ary number
 		vector<int> ary;
 		int temp = i;
 		
-		for(int j = 0; j < (nG-sizeOfFlag-1)*(nH-sizeOfFlag); ++ j) {
-			int temp2 = temp/myPow(c,(nG-sizeOfFlag-1)*(nH-sizeOfFlag)-j-1); //Need to be careful with rounding? 
+		for(int j = 0; j < (nG-sizeOfFlag)*(nH-sizeOfFlag); ++ j) {
+			int temp2 = temp/myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1); //Need to be careful with rounding? 
 		   ary.push_back(temp2);
-		   temp = temp-temp2*myPow(c,(nG-sizeOfFlag-1)*(nH-sizeOfFlag)-j-1);
+		   temp = temp-temp2*myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1);
+		   
+		   if((temp2 < 0) || (temp2 >= c)) { //This really shouldn't happen I've checked, but better safe than sorry
+		   	cout << "Something went wrong in graph multiplication." << endl << endl;
+		   	throw exception();
+		   }
 		}
 		
-		vector<Edge> newEdges;
+		//Create edge list for new Graph
+		vector<Edge> edges;
+		
+		//First vertices G
+		for(int j = 0; j < nG-1; ++j) {
+			for(int k = j+1; k < nG; ++k) {
+				if(G.getEdgeColor(j,k) != 0) {
+					edges.push_back({j,k,G.getEdgeColor(j,k)});
+				}
+			}
+		}
+
+		//Flag Plus Last Vertices = H
+		for(int j = 0; j < nH-1; ++j) {
+			for(int k = j+1; k < nH; ++k) {
+				if(H.getEdgeColor(j,k) != 0) {
+					if((j < sizeOfFlag) && (k < sizeOfFlag)) {
+						edges.push_back({j,k,H.getEdgeColor(j,k)});
+					}
+					
+					else if((j < sizeOfFlag) && (k >= sizeOfFlag)) {
+						edges.push_back({j,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
+					}
+					
+					else {
+						edges.push_back({j+nG-sizeOfFlag,k+nG-sizeOfFlag,H.getEdgeColor(j,k)});
+					}
+				}
+			}
+		}
 		
 		//Add edges from i
 		//Easier to just iterate through than to make a function
 		int index = 0;
 		for(int j = nG; j < nG+nH-sizeOfFlag; ++j) {
-			for(int k = sizeOfFlag+1; k < nG; ++k) {
+			for(int k = sizeOfFlag; k < nG; ++k) {
 				if(ary[index] != 0) {
-					newEdges.push_back({k,j,ary[index]});
+					edges.push_back({j,k,ary[index]});
 				}
 				++index;
 			}
 		}
 		
-		for(int j = 0; j < (int)partialEdges.size(); ++j) {
-			newEdges.push_back(partialEdges[j]);
+		//Create Flag
+		vector<int> flag;
+		
+		//Can do this because they are in canonical form
+		for(int j = 0; j < sizeOfFlag; ++j) {
+			flag.push_back(G.getFlagVertex(j));
 		}
 		
-		//May assume that within each orbit the degrees are decreasing
-		bool cont = true;
-
-		vector<int> degreeG(nG-sizeOfFlag,0); //0 indexed rather than sizeOfFlag indexed
-		for(int j = 0; j < (int)newEdges.size(); ++j) {
-			if(newEdges[j].color == 1) {
-				++degreeG[newEdges[j].a-sizeOfFlag];
-			}
-		}
-			
-		for(int j = 0; j < G.getNumOrbits(); ++j) {	
-			for(int k = 1; k < G.getOrbitSize(j); ++k) { //Makes it so we don't look at flag vertices
-				if(degreeG[G.getOrbit(j,k-1)-sizeOfFlag] < degreeG[G.getOrbit(j,k)-sizeOfFlag]) {
-					cont = false;
-					k = G.getOrbitSize(j);
-				}
-			}	
-				
-			if(!cont) {
-				j = G.getNumOrbits();
-			}
-		}
+		Graph GH(edges, nG+nH-sizeOfFlag, c);
+		GH.setFlag(flag);
 		
-		if(cont) {
-			vector<Edge> edges = permanentEdges;
-			for(int j = 0; j < (int)newEdges.size(); ++j) {
-				edges.push_back(newEdges[j]);
-			}
-
-			
-			Graph GH(edges, nG+nH-sizeOfFlag, c);
-			GH.setFlag(flag);
-			
-			if(variablesSet.count(GH.getCanonLabel()) == 0) {
-				variablesSet.insert(GH.getCanonLabel());
-				variables.push_back(GH);
-			}
+		if(variablesSet.count(GH.getCanonLabel()) == 0) {
+			variablesSet.insert(GH.getCanonLabel());
+			variables.push_back(GH);
 		}
 	}
-	}
 
-	Equation eq(variables, zeros, Frac(0,1), 0, false); //When converting to equation, removes isomorphisms
-	
+	Equation eq(variables,zeros, Frac(0,1), 0, false); //When converting to equation, removes isomorphisms
 	//Makes coefficients correct
+
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
 		int num = 0;
 		
@@ -3459,6 +3354,8 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 				++num;
 			}
 		}
+		
+	
 		
 		int den = choose(nG+nH-2*sizeOfFlag,nG-sizeOfFlag);
 		eq.setCoefficient(i,Frac(num,den)*GCoefficient*HCoefficient);
@@ -3536,6 +3433,7 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 	
 	for(int i = 0; i < eq1.getNumVariables(); ++i) {
 		for(int j = 0; j < eq2.getNumVariables(); ++j) {
+			cout << "In multiply (" << i << ", " << j << ") out of (" << eq1.getNumVariables() << ", " << eq2.getNumVariables() << ")." << endl;
 			if((i != 0) || (j != 0)) {
 				eq = eq + multiply(eq1.getVariable(i), eq2.getVariable(j), zeros);
 			}
@@ -4575,7 +4473,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	#pragma omp parallel for schedule(dynamic)
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
 		cout << "Making everything integer, iteration " << i << " out of " << allGraphs.size() << endl;
-		int mult = 1;
+		long long int mult = 1;
 		
 		for(int j = 0; j < (int)v.size(); ++j) {
 			for(int k = 0; k < v[j].size(); ++k) {
@@ -4591,6 +4489,8 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 		
 		mult = lcm(mult,B[i].getDen());
 		
+		double multD = (double)mult;
+		
 		vector<Matrix::t> MosekA;
 		
 		for(int j = 0; j < (int)v.size(); ++j) {
@@ -4600,35 +4500,35 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 			for(int k = 0; k < v[j].size(); ++k) {
 				intA[k].resize(v[j].size());
 				for(int l = 0; l < v[j].size(); ++l) {
-					intA[k][l] = round((A[i][j][k][l].getNum() * mult)/A[i][j][k][l].getDen());
+					intA[k][l] = round((A[i][j][k][l].getNum() * multD)/A[i][j][k][l].getDen());
 				}
 			}
 			
 			MosekA.push_back(Matrix::sparse(monty::new_array_ptr<double>(intA)));
 		}
 		
-		int intB;
+		double intB;
 		
 		if(maximize) {
-			intB = mult - (B[i].getNum()*mult)/B[i].getDen();
+			intB = multD - (B[i].getNum()*multD)/B[i].getDen();
 		}
 		
 		else {
-			intB = (B[i].getNum()*mult)/B[i].getDen();
+			intB = (B[i].getNum()*multD)/B[i].getDen();
 		}
 		
 		vector<double> intC;
 		intC.resize(known.size());
 		
 		for(int j = 0; j < known.size(); ++j) {
-			intC[j] = (round)((C[i][j].getNum()*mult)/C[i][j].getDen());
+			intC[j] = (round)((C[i][j].getNum()*multD)/C[i][j].getDen());
 		}
 		
 		auto MosekC = monty::new_array_ptr<double>(intC);
 		
 		#pragma omp critical
 		{
-			auto forConstraint = Expr::sub(Expr::mul(mult,x),Expr::dot(MosekC,y));
+			auto forConstraint = Expr::sub(Expr::mul(multD,x),Expr::dot(MosekC,y));
 			
 			for(int j = 0; j < (int)v.size(); ++j) {
 				forConstraint = Expr::add(forConstraint,Expr::dot(MosekA[j],MosekM[j]));
@@ -4642,25 +4542,32 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	cout << endl;
 	
-	int mult = 1;
+	long long int mult = 1;
 	for(int i = 0; i < (int)known.size(); ++i) {
 		mult = lcm(mult,C1[i].getDen());
 	} 
 	
+	double multD = (double)mult;
+	
 	vector<double> C1Int;
 	
 	for(int i = 0; i < (int)known.size(); ++i) {
-		C1Int.push_back((round)((C1[i].getNum()*mult)/C1[i].getDen()));
+		C1Int.push_back((round)((C1[i].getNum()*multD)/C1[i].getDen()));
 	}
 	
 	auto MosekC1 = new_array_ptr(C1Int);
 	
-	M->objective(ObjectiveSense::Maximize, Expr::sub(Expr::mul(x,mult), Expr::dot(MosekC1,y)));
+	M->setSolverParam("intpntTolStepSize", 0.);
+   //M->setSolverParam("intpntSolveForm", "dual");
+
+	M->objective(ObjectiveSense::Maximize, Expr::sub(Expr::mul(x,multD), Expr::dot(MosekC1,y)));
 	M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
 	//M->writeTask("sdp.ptf"); // Use for debugging
-	//M->writeTask("data.task.gz");
+	//M->writeTask("data.task.gz"); //Use if using Mosek Console
    M->solve();
    cout << endl;
+   
+   cout << "Divide those objective values by: " << multD << endl << endl;
    
    cout << "Print all non-zero (> 1E-5) dual values: " << endl;
    for(int i = 0; i < constraints.size(); ++i) {
@@ -4672,7 +4579,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
    
    if(maximize) {
-   	cout << "The objective function is: " << mult-M->dualObjValue() << endl << endl;
+   	cout << "The objective function is: " << multD-M->dualObjValue() << endl << endl;
    }
    
    else {
