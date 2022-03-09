@@ -2602,7 +2602,7 @@ class Equation {
 		//---------------------
 		
 		//ans must be a fraction
-		//unsafe doesn't do combine (should also fix combine probably)
+		//TYPE 0 ==, TYPE 1 <=
 		Equation(vector<Graph> const &VARIABLES, vector<Graph> const &ZEROS, Frac ANS, int TYPE) {
 			variables = VARIABLES;
 			zeros = ZEROS;
@@ -2655,7 +2655,7 @@ class Equation {
 			
 			fixZeros(); 
 			
-			valid = checkValid();
+			//valid = checkValid();
 			
 			//Not entirely sure I want to throw an exception here, I'll change it later if it doesn't work right
 			/*if(!valid) {
@@ -2688,10 +2688,12 @@ class Equation {
 					int firstIndex = map[variables[i].getCanonLabel()];
 					variables[firstIndex].setCoefficient(variables[firstIndex].getCoefficient() + variables[i].getCoefficient());
 					variables.erase(variables.begin()+i);
+					--i;
 					--numVariables;
 				}
 			}
 
+			//Do I want this?
 			for(int i = 0; i < numVariables; ++i) {
 				if((variables[i].getN() == 1) && (variables[i].getSizeOfFlag() == 0)) {
 					ans = ans - variables[i].getCoefficient(); 
@@ -2700,8 +2702,7 @@ class Equation {
 					--numVariables;
 				}
 			}
-		}
-		
+		}	
 		
 		//-------------------
 		//-----Fix Zeros-----
@@ -3075,7 +3076,7 @@ bool operator==(const Equation &eq1, const Equation &eq2) {
 		bool check = false;
 	
 		for(int j = 0; j < eq2.getNumVariables(); ++j) {
-			if(isomorphic(eq1.getVariable(i),eq2.getVariable(j))) {
+			if(isomorphic(eq1.getVariable(i),eq2.getVariable(j)) && (eq1.getVariable(i).getCoefficient() == eq2.getVariable(i).getCoefficient())) {
 				check = true;
 				j = eq2.getNumVariables();
 			}
@@ -3114,22 +3115,19 @@ Equation operator+(const Equation &eq1, const Equation &eq2) {
 	}
 	
 	vector<Graph> zeros;
+	unordered_set<string> zeros1;
+	unordered_set<string> zeros2;
 	
-	bool val;
 	for(int i = 0; i < numZeros; ++i) {
-		val = false;
-		for(int j = 0; j < numZeros; ++j) {
-			if(isomorphic(eq1.getZero(i),eq2.getZero(j))) {
-				val = true;
-				j = eq1.getNumZeros();
-				zeros.push_back(eq1.getZero(i));
-			}
-		}
+		zeros.push_back(eq1.getZero(i));
 		
-		if(!val) {
-			cout << "When adding equations, they must have the same set of zeros." << endl << endl;
-			throw exception();
-		}
+		zeros1.insert(eq1.getZero(i).getCanonLabel());
+		zeros2.insert(eq2.getZero(i).getCanonLabel());
+	}
+	
+	if(zeros1 != zeros2) {
+		cout << "When adding equations, they must have the same set of zeros." << endl << endl;
+		throw exception();
 	}
 	
 	//Constructor actually does the adding already
@@ -3141,15 +3139,6 @@ Equation operator+(const Equation &eq1, const Equation &eq2) {
 	
 	for(int i = 0; i < eq2.getNumVariables(); ++i) {
 		variables.push_back(eq2.getVariable(i));
-	}
-	
-	for(int i = 0; i < (int)variables.size(); ++i) {
-		for(int j = i+1; j < (int)variables.size(); ++j) {
-			if(variables[i].getCanonLabel() == variables[j].getCanonLabel()) {
-				variables[i].setCoefficient(variables[i].getCoefficient() + variables[j].getCoefficient());
-				variables.erase(variables.begin()+j);
-			}
-		}
 	}
 	
 	return Equation(variables, zeros, eq1.getAns() + eq2.getAns(), type);
@@ -3323,14 +3312,14 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		}
 		
 		Graph GH(edges, nG+nH-sizeOfFlag, c,flag);
-		
+
 		if(variablesSet.count(GH.getCanonLabel()) == 0) {
 			variablesSet.insert(GH.getCanonLabel());
 			variables.push_back(GH);
 		}
 	}
 
-	Equation eq(variables,zeros, Frac(0,1), 0, false); //When converting to equation, removes isomorphisms
+	Equation eq(variables,zeros, Frac(0,1), 0); //When converting to equation, removes isomorphisms
 	//Makes coefficients correct
 
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
@@ -3360,7 +3349,6 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 				++num;
 			}
 		}
-		
 	
 		
 		int den = choose(nG+nH-2*sizeOfFlag,nG-sizeOfFlag);
@@ -3436,12 +3424,13 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 	
 	//Distributive
 	Equation eq = multiply(eq1.getVariable(0), eq2.getVariable(0), zeros);
-	
+
 	for(int i = 0; i < eq1.getNumVariables(); ++i) {
 		for(int j = 0; j < eq2.getNumVariables(); ++j) {
 			cout << "In multiply (" << i << ", " << j << ") out of (" << eq1.getNumVariables() << ", " << eq2.getNumVariables() << ")." << endl;
 			if((i != 0) || (j != 0)) {
-				eq = eq + multiply(eq1.getVariable(i), eq2.getVariable(j), zeros);
+				Equation toAdd = multiply(eq1.getVariable(i), eq2.getVariable(j), zeros);
+				eq = eq + toAdd;
 			}
 		}
 	}
@@ -3449,9 +3438,6 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 	eq.setType(type);
 	eq.setAns(eq1.getAns() * eq2.getAns());
 	
-	//for(int i = 0; i < (int)zeros.size(); ++i) {
-		//eq.addZero(zeros[i]);
-	//}
 	
 	//Switch coefficients if we have type 0 and 1, and a negative answer for the equation of type 0
 	if((eq1.getType() == 0) && (eq2.getType() == 1) && (eq1.getAns() < 0)) {
@@ -4350,7 +4336,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	Model::t M = new Model("sdp"); auto _M = finally([&]() { M->dispose(); });
    M->setSolverParam("numThreads", 0);
-	auto x = M->variable(Domain::greaterThan(0));
+	auto x = M->variable();
 	auto y = M->variable((int)known.size(), Domain::greaterThan(0));
 	vector<Constraint::t> constraints;
 	vector< Variable::t > MosekM;
@@ -4563,12 +4549,17 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	auto MosekC1 = new_array_ptr(C1Int);
 	
-	M->setSolverParam("intpntTolStepSize", 0.);
+	//M->setSolverParam("intpntTolStepSize", 0.);
    //M->setSolverParam("intpntSolveForm", "dual");
+   
+
+   M->setSolverParam("intpntCoTolDfeas", 0.);
+
+
 
 	M->objective(ObjectiveSense::Maximize, Expr::sub(Expr::mul(x,multD), Expr::dot(MosekC1,y)));
-	M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
-	//M->writeTask("sdp.ptf"); // Use for debugging
+	//M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
+	M->writeTask("sdp.cbf"); // Use for debugging
 	//M->writeTask("data.task.gz"); //Use if using Mosek Console
    M->solve();
    cout << endl;
@@ -4585,11 +4576,11 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
    
    if(maximize) {
-   	cout << "The objective function is: " << multD-M->dualObjValue() << endl << endl;
+   	cout << "The objective function is: " << 1.-M->dualObjValue()/multD << endl << endl;
    }
    
    else {
-   	cout << "The objective function is: " << M->dualObjValue() << endl << endl;
+   	cout << "The objective function is: " << M->dualObjValue()/multD << endl << endl;
    }
 }
 
