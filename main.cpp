@@ -1,4 +1,4 @@
-using namespace std;
+//using namespace std;
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -13,11 +13,13 @@ using namespace std;
 #include <fusion.h>
 #include <omp.h>
 #include <threads.h>
+#include <boost/functional/hash.hpp>
 
 
-using namespace std::chrono;
-using namespace mosek::fusion;
-using namespace monty;
+
+//using namespace std::chrono;
+//using namespace mosek::fusion;
+//using namespace monty;
 
 
 //My headers
@@ -37,13 +39,15 @@ extern "C" {
 
 
 int main() {
-	auto start=high_resolution_clock::now();
-	cout.precision(17);
+	omp_set_num_threads(1); //Use for debugging
 
-	vector<Graph> f;
-	vector<Graph> zeros;
-	vector<Equation> known;
-	vector<Edge> edges;
+	auto start=std::chrono::high_resolution_clock::now();
+	std::cout.precision(17);
+
+	std::vector<Graph> f;
+	std::vector<Graph> zeros;
+	std::vector<Equation> known;
+	std::vector<Edge> edges;
 	const int numColors = 2;
 	
 	//vector<Edge> C5edges = {{0,1,1},{1,2,1},{2,3,1},{3,4,1},{4,0,1}};
@@ -52,24 +56,27 @@ int main() {
 	
 	//f.push_back(C5);
 	
-	//Graph K2({{0,1,1}},2,numColors);
-	
-	//K2.setCoefficient(Frac(-1,1));
-	//Equation K2Dens({K2},zeros,Frac(-9,10),1);
-	//known.push_back(K2Dens);
-	
 	Graph K3({{0,1,1},{0,2,1},{1,2,1}},3,numColors);
 	Graph K3c({{}},3,numColors);
 	
 	f.push_back(K3);
 	f.push_back(K3c);
 	
-	//Minimize for false
-	plainFlagAlgebra(f,7,zeros,known,false);
+	Graph K2({{0,1,1}},2,numColors);
 	
-	auto end=high_resolution_clock::now();
-	auto duration = duration_cast<seconds>(end - start);
-	cout << "Running time in seconds: " << duration.count() << endl << endl;
+	K2.setCoefficient(Frac(-1,1));
+	Equation K2Dens({K2},zeros,Frac(-9,10),0);
+	known.push_back(K2Dens);
+	
+	Equation K3cDens({K3c},zeros,Frac(1,100),0);
+	known.push_back(K3cDens);
+	
+	//Minimize for false
+	plainFlagAlgebra(f,6,zeros,known,false);
+	
+	auto end=std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	std::cout << "Running time in seconds: " << duration.count() << std::endl << std::endl;
 	
 	return 0;
 }

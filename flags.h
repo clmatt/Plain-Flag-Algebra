@@ -6,7 +6,7 @@ extern "C" {
 	#include "gtools.h"
 }
 
-const vector<long long int> numberOfGraphs = {1,1,2,4,11, 34, 156, 1044, 12346, 274668, 12005168, 1018997864, 165091172592}; //Up to 12 vertices
+const std::vector<long long int> numberOfGraphs = {1,1,2,4,11, 34, 156, 1044, 12346, 274668, 12005168, 1018997864, 165091172592}; //Up to 12 vertices
 
 //---------------------
 //-----Edge Struct-----
@@ -38,10 +38,10 @@ class Graph {
 		int numColors = -1; //Number of colors
 		Frac coefficient = Frac(1,1); //Helpful for averaging, can assume 1 if not using
 		int sizeOfFlag = 0;
-		vector<vector<int> > adjMat; //Adjacency Matrix
-		vector<int> flag; //The flag can be determined by a subset of edges
-		string canonLabel;
-		vector<vector<int> > orbits; //orbits in automorphsim group (from nauty) orbits[i] is the ith orbit of vertices, if vertex is a flag it is in its own orbit (not iff)
+		std::vector<std::vector<int> > adjMat; //Adjacency Matrix
+		std::vector<int> flag; //The flag can be determined by a subset of edges
+		std::string canonLabel;
+		std::vector<std::vector<int> > orbits; //orbits in automorphsim group (from nauty) orbits[i] is the ith orbit of vertices, if vertex is a flag it is in its own orbit (not iff)
 		int numOrbits = 0;
 
 	public:
@@ -52,18 +52,18 @@ class Graph {
 		
 		//Need to specify NUMCOLORS, because it's possible that it differs
 		//from actual number of colors
-		Graph(const vector<Edge> &edgeList, const int N, const int NUMCOLORS, const vector<int> &FLAG = {}) {
+		Graph(const std::vector<Edge> &edgeList, const int N, const int NUMCOLORS, const std::vector<int> &FLAG = {}) {
 			numColors = NUMCOLORS;
 			n = N;
 			
 			if(numColors < 0) {
-				cout << "In constructor need a non-negative number of colors" << endl << endl;
-				throw exception();
+				std::cout << "In constructor need a non-negative number of colors" << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			if(n < 0) {
-				cout << "In constructor need a non-negative number of vertices" << endl << endl;
-				throw exception();
+				std::cout << "In constructor need a non-negative number of vertices" << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			//Intialize Adjacency Matrix
@@ -82,18 +82,18 @@ class Graph {
 			//Insert edges for edgeList
 			for (auto &edge: edgeList) {
 				if(edge.color >= numColors) {
-					cout << "In constructor too few colors specified, or range is wrong, note that non-edges count as a color, and colors are zero indexed"  << endl << endl;
-					throw exception();
+					std::cout << "In constructor too few colors specified, or range is wrong, note that non-edges count as a color, and colors are zero indexed"  << std::endl << std::endl;
+					throw std::exception();
 				}
 				
 				if(edge.a >= n) {
-					cout << "In constructor an edge has a vertex outside of the range." << endl << endl;
-					throw exception();
+					std::cout << "In constructor an edge has a vertex outside of the range." << std::endl << std::endl;
+					throw std::exception();
 				}
 				
 				if(edge.b >= n) {
-					cout << "In constructor an edge has a vertex outside of the range." << endl << endl;
-					throw exception();
+					std::cout << "In constructor an edge has a vertex outside of the range." << std::endl << std::endl;
+					throw std::exception();
 				}
 			
             adjMat[edge.a][edge.b] = edge.color;
@@ -106,16 +106,16 @@ class Graph {
 				++sizeOfFlag;
 				
 				if((i >= n) || (i < 0)) {
-					cout << "In setFlag in constructor an element is outside of the vertex range." << endl << endl;
-					throw exception();
+					std::cout << "In setFlag in constructor an element is outside of the vertex range." << std::endl << std::endl;
+					throw std::exception();
 				}	
 			}
 			
 			for(int i = 0; i < (int)FLAG.size(); ++i) {
 				for(int j = i+1; j < (int)FLAG.size(); ++j) {
 					if(FLAG[i] == FLAG[j]) {
-						cout << "In setFlag in constructor all elements of the vector must be different." << endl << endl;
-						throw exception();
+						std::cout << "In setFlag in constructor all elements of the std::vector must be different." << std::endl << std::endl;
+						throw std::exception();
 					}
 				}
 			}
@@ -134,7 +134,7 @@ class Graph {
 		//---------------
 		
 		Graph clone() const{
-			vector<Edge> edges;
+			std::vector<Edge> edges;
 		
 			for(int i = 0; i < n-1; ++i) {
 				for(int j = i+1; j < n; ++j) {
@@ -159,12 +159,12 @@ class Graph {
 		//E.g. range is 0,1,..,k-1 and -1
 		//Make everything else -1
 		//Doesn't actually change the graph
-		Graph restriction(const vector<int> &sigma) const{
+		Graph restriction(const std::vector<int> &sigma) const{
 			if(int(sigma.size()) != n) {
-				cout << "In restriction, sigma size wrong." << endl;
-				cout << "Sigma size = " << sigma.size() << endl;
-				cout << "n = " << n << endl << endl;
-				throw exception();
+				std::cout << "In restriction, sigma size wrong." << std::endl;
+				std::cout << "Sigma size = " << sigma.size() << std::endl;
+				std::cout << "n = " << n << std::endl << std::endl;
+				throw std::exception();
 			}		
 					
 			//Check that it's a subset
@@ -175,10 +175,10 @@ class Graph {
 				++k;
 					for(int j = i+1; j < n; ++j) {
 						if(sigma[i] == sigma[j]) {
-							cout << "In restriction there is a duplicate in the input." << endl;
-							cout << "Indices : " << i << ", " << j << endl;
-							cout << "Value: " << sigma[i] << endl << endl;
-							throw exception();
+							std::cout << "In restriction there is a duplicate in the input." << std::endl;
+							std::cout << "Indices : " << i << ", " << j << std::endl;
+							std::cout << "Value: " << sigma[i] << std::endl << std::endl;
+							throw std::exception();
 						}
 					}
 				}
@@ -187,15 +187,15 @@ class Graph {
 			//Check if sigma has elements outside of range
 			for(int i = 0; i < n; ++i) {
 				if((sigma[i] >= k) || (sigma[i] < -1)) {
-					cout << "In restriction an element of sigma falls outside of range of vertices." << endl;
-					cout << "Index: " << i << endl;
-					cout << "Value: " << sigma[i] << endl << endl;
-					throw exception();
+					std::cout << "In restriction an element of sigma falls outside of range of vertices." << std::endl;
+					std::cout << "Index: " << i << std::endl;
+					std::cout << "Value: " << sigma[i] << std::endl << std::endl;
+					throw std::exception();
 				}
 			}
 			
 			//Edges
-			vector<Edge> newEdges;
+			std::vector<Edge> newEdges;
 			for(int i = 0; i < n-1; ++i) {
 				for(int j = i+1; j < n; ++j) {
 					if((adjMat[i][j] != 0) && (sigma[i] != -1) && (sigma[j] != -1)) {
@@ -205,7 +205,7 @@ class Graph {
 			}
 			
 			//Flag
-			vector<int> newFlag;
+			std::vector<int> newFlag;
 			for(int j = 0; j < sizeOfFlag; ++j) {
 				if(sigma[flag[j]] != -1) {
 					newFlag.push_back(sigma[flag[j]]);
@@ -225,9 +225,9 @@ class Graph {
 		void printAdjMat() const{
 			for(int i = 0; i < n; ++i) {
 				for(int j = 0; j < n; ++j) {
-					cout << adjMat[i][j] << " ";
+					std::cout << adjMat[i][j] << " ";
 				}
-				cout << endl;
+				std::cout << std::endl;
 			}
 		}
 		
@@ -235,12 +235,12 @@ class Graph {
 		//-----Print Adjacency Matrix to File-----
 		//----------------------------------------
 		
-		void printAdjMatToFile(ofstream& myFile) const{
+		void printAdjMatToFile(std::ofstream& myFile) const{
 			for(int i = 0; i < n; ++i) {
 				for(int j = 0; j < n; ++j) {
 					myFile << adjMat[i][j] << " ";
 				}
-				myFile << endl;
+				myFile << std::endl;
 			}
 		}	
 	
@@ -251,14 +251,14 @@ class Graph {
 		
 		void printFlagVertices() const{
 			if (sizeOfFlag == 0) {
-				cout << "There are no flag vertices." << endl;
+				std::cout << "There are no flag vertices." << std::endl;
 			}	
 			
 			else {
 				for(auto i : flag) {
-					cout << i << " ";
+					std::cout << i << " ";
 				}
-				cout << endl;
+				std::cout << std::endl;
 			} 
 		}	
 		
@@ -269,11 +269,11 @@ class Graph {
 		
 		void printOrbits() const{
 			for(int i = 0; i < int(orbits.size()); ++i) {
-				cout << "Orbit " << i+1 << " contains vertices ";
+				std::cout << "Orbit " << i+1 << " contains vertices ";
 				for(int j = 0; j < int(orbits[i].size()); ++j) {
-					cout << orbits[i][j] << " "; 
+					std::cout << orbits[i][j] << " "; 
 				}
-				cout << endl;
+				std::cout << std::endl;
 			}
 		}
 		
@@ -348,8 +348,8 @@ class Graph {
 			for(int i = 0; i < n-1; ++i) {
 				for(int j = 0; j < n; ++j) {
 					if (c <= adjMat[i][j]) {
-						cout << "In setNumColors, input too small." << endl << endl;
-						throw exception();
+						std::cout << "In setNumColors, input too small." << std::endl << std::endl;
+						throw std::exception();
 					}
 				}
 			}
@@ -364,13 +364,13 @@ class Graph {
 		
 		int getEdgeColor(int i, int j) const{
 			if((i < 0) || (i >= n)) {
-				cout << "First vertex out of range in getEdgeColor." << endl << endl;
-				throw exception();
+				std::cout << "First vertex out of range in getEdgeColor." << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			else if((j < 0) || (j >= n)) {
-				cout << "Second vertex out of range in getEdgeColor." << endl << endl;
-				throw exception();
+				std::cout << "Second vertex out of range in getEdgeColor." << std::endl << std::endl;
+				throw std::exception();
 			}
 		
 			return adjMat[i][j];
@@ -381,7 +381,7 @@ class Graph {
 		//-----Get Canon Label-----
 		//-------------------------
 		
-		string getCanonLabel() const{ 
+		std::string getCanonLabel() const{ 
 			return canonLabel;
 		}
 	
@@ -438,21 +438,21 @@ class Graph {
 		void printEdges() const{
 			for(int i = 0; i < numColors; ++i) {
 				bool comma = false;
-				cout << "The edge list for color " << i << " is: {";
+				std::cout << "The edge list for color " << i << " is: {";
 				for(int j = 0; j < n-1; ++j) {
 					for(int k = j+1; k < n; ++k) {
 						if(adjMat[j][k] == i) {
 							if(comma) {
-								cout << ",";
+								std::cout << ",";
 							}
 							comma = true;
-							cout << "{" << j << "," << k << "}";
+							std::cout << "{" << j << "," << k << "}";
 						}
 					}
 				}
-				cout << "}" << endl;
+				std::cout << "}" << std::endl;
 			}	
-			cout << endl;
+			std::cout << std::endl;
 		}
 		
 		
@@ -462,13 +462,13 @@ class Graph {
 		
 		void changeEdge(Edge edge) {
 			if((edge.a >= n) || (edge.b >= n)) {
-				cout << "In changeEdge an edge has a vertex outside of the range." << endl << endl;
-				throw exception();
+				std::cout << "In changeEdge an edge has a vertex outside of the range." << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			if(edge.color >= numColors) { 
-				cout << "In changeEdge the color is outside of the range." << endl << endl;
-				throw exception();
+				std::cout << "In changeEdge the color is outside of the range." << std::endl << std::endl;
+				throw std::exception();
 			}
 		
 			adjMat[edge.a][edge.b] = edge.color;
@@ -485,7 +485,7 @@ class Graph {
 		//Always adds a vertex with highest label
 		//Default color is 0
 		void addVertex() {
-			vector<int> zeros;
+			std::vector<int> zeros;
 			
 			for(int i = 0; i < n; ++i) {
 				adjMat[i].push_back(0);
@@ -507,8 +507,8 @@ class Graph {
 		//Relabels all vertices to be from 0 to n-1
 		void removeVertex(int i) {
 			if(i >= n) {
-				cout << "In removeVertex the input is outside of the range." << endl << endl;
-				throw exception();
+				std::cout << "In removeVertex the input is outside of the range." << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			//Remove from flag
@@ -572,23 +572,23 @@ class Graph {
 		//-------------------
 		
 		//Note that flags have order, so order of &FLAG does matter
-		void setFlag(vector<int> const &FLAG) {
+		void setFlag(std::vector<int> const &FLAG) {
 			sizeOfFlag = 0;
 		
 			for(auto &i : FLAG) {
 				++sizeOfFlag;
 				
 				if((i >= n) || (i < 0)) {
-					cout << "In setFlag an element is outside of the vertex range." << endl << endl;
-					throw exception();
+					std::cout << "In setFlag an element is outside of the vertex range." << std::endl << std::endl;
+					throw std::exception();
 				}	
 			}
 			
 			for(int i = 0; i < (int)FLAG.size(); ++i) {
 				for(int j = i+1; j < (int)FLAG.size(); ++j) {
 					if(FLAG[i] == FLAG[j]) {
-						cout << "In setFlag all elements of the vector must be different." << endl << endl;
-						throw exception();
+						std::cout << "In setFlag all elements of the std::vector must be different." << std::endl << std::endl;
+						throw std::exception();
 					}
 				}
 			}
@@ -613,9 +613,9 @@ class Graph {
 		
 		bool isFlag(int i) const{
 			if((i < 0) || (i >= n)) {
-				cout << "i is outside of range in isFlag." << endl;
-				cout << "i = " << i << endl << endl;
-				throw exception();
+				std::cout << "i is outside of range in isFlag." << std::endl;
+				std::cout << "i = " << i << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			for(int j = 0; j < sizeOfFlag; ++j) {
@@ -639,7 +639,7 @@ class Graph {
 			//Create Edges
 			int i = 0;
 			int j = 0; 
-			vector<Edge> edges;
+			std::vector<Edge> edges;
 			for(int k : flag) {
 				for(int l : flag) {
 					edges.push_back({i, j, adjMat[k][l]});
@@ -649,7 +649,7 @@ class Graph {
 				++i;
 			}
 			
-			vector<int> flag;
+			std::vector<int> flag;
 			for(int i = 0; i < sizeOfFlag; ++i) {
 				flag.push_back(i);
 			}
@@ -665,11 +665,11 @@ class Graph {
 		//-----------------------------
 		
 		void printFlag() const{
-			cout << "The vertices of the flag are (in order): ";
+			std::cout << "The vertices of the flag are (in order): ";
 			for(auto j : flag) {
-				cout << j << " ";
+				std::cout << j << " ";
 			}
-			cout << endl << endl;
+			std::cout << std::endl << std::endl;
 		}
 		
 		
@@ -692,7 +692,7 @@ class Graph {
 		//Note that this removes flags but the info is encoded in c
 		//This just returns adjMat as otherwise we get infinite loop when creating graph
 
-		void convertToLayer(vector<vector<int> > &newAdjMat, vector<int> &c, int &np) {		
+		void convertToLayer(std::vector<std::vector<int> > &newAdjMat, std::vector<int> &c, int &np) {		
 			int k = floor(log2(getNumColors()-1)+1); //number of layers
 			np = n * k;
 			
@@ -755,7 +755,7 @@ class Graph {
 		//-----Canoncial Relabelling-----
 		//-------------------------------
 		
-		//This doesn't actually change the graph but gives the unique string from Nauty 
+		//This doesn't actually change the graph but gives the unique std::string from Nauty 
 		
 		void canonRelabel() {
 
@@ -773,8 +773,8 @@ class Graph {
 			SG_INIT((*sg));	
 			int np,mp;
 			
-			vector<int> c;
-			vector<vector<int> > newAdjMat;
+			std::vector<int> c;
+			std::vector<std::vector<int> > newAdjMat;
 			convertToLayer(newAdjMat,c,np); //Nauty doesn't allow for edge colored graphs
 			
 			mp = SETWORDSNEEDED(np);
@@ -864,7 +864,7 @@ class Graph {
 				} 
 			}
 			
-			canonLabel = string(sgtos6(canong));
+			canonLabel = std::string(sgtos6(canong));
 			
 
 			DYNFREE(lab,lab_sz);
@@ -897,7 +897,7 @@ class Graph {
 		//---------------------	
 		void averageAll() {
 			bool isomorphic(const Graph&, const Graph&);
-			void returnSubgraphs(const Graph&, const Graph&, vector<vector<int> >&);
+			void returnSubgraphs(const Graph&, const Graph&, std::vector<std::vector<int> >&);
 			int k = sizeOfFlag;
 			
 			Graph G = clone();
@@ -925,10 +925,10 @@ class Graph {
 			
 			else {
 				//Add flag back in in anyway possible
-				vector<int> subset;
+				std::vector<int> subset;
 				subset.resize(k);
 				
-				vector<vector<int> > subgraphs;
+				std::vector<std::vector<int> > subgraphs;
 				returnSubgraphs(GFlag,H,subgraphs);
 				
 				for(auto X: subgraphs) {
@@ -993,7 +993,7 @@ bool operator==(const Graph &G, const Graph &H) {
 //Careful with this- when converting to Nauty we use the layerGraph so this isn't a direct inverse, it drops the flags and colors and lots of other things, mostly just used for debugging
 
 Graph convertFromNauty(const sparsegraph &sg) {
-	vector<Edge> edges;
+	std::vector<Edge> edges;
 	
 	for(int i = 0; i < sg.nv; ++i) {
 		for(int j = 0; j < sg.d[i]; ++j) {
@@ -1055,14 +1055,14 @@ bool isomorphic(const Graph &G, const Graph &H) {
 //-----Returns Subgraphs No Flags-----
 //------------------------------------
 
-//Return of vectors that could be used in restriction
+//Return of std::vectors that could be used in restriction
 //Almost the same as numSubgraphs, just with different output
 //Needs no flags (used in the version with flags)
-void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> > &output) {
+void returnSubgraphsNoFlags(const Graph &H, const Graph &G, std::vector<std::vector<int> > &output) {
 	//No flags
 	if((H.getSizeOfFlag() != 0) || (G.getSizeOfFlag() != 0)) {
-		cout << "In returnSubgraphsNoFlags H and G can't have flags." << endl << endl;
-		throw exception();
+		std::cout << "In returnSubgraphsNoFlags H and G can't have flags." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if(H.getNumColors() != G.getNumColors()) {
@@ -1075,7 +1075,7 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 
 	if(G.getN() == H.getN()) {
 		if(isomorphic(H,G)) {
-			vector<int> outputEntry;
+			std::vector<int> outputEntry;
 			for(int i = 0; i < G.getN(); ++i) {
 				outputEntry.push_back(i);
 			}
@@ -1092,7 +1092,7 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 	//Single Vertex
 	if(H.getN() == 1) {
 		for(int i = 0; i < G.getN(); ++i) {
-			vector<int> temp(G.getN(),-1);
+			std::vector<int> temp(G.getN(),-1);
 			temp[i] = 0;
 			output.push_back(temp);
 		}
@@ -1102,7 +1102,7 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 	
 	//Fastest way to do edges
 	if(H.getN() == 2) {
-		vector<int> temp(G.getN(),-1);
+		std::vector<int> temp(G.getN(),-1);
 			
 		for(int i = 0; i < G.getN(); ++i) {
 			for(int j = i+1; j < G.getN(); ++j) {
@@ -1143,12 +1143,12 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 	if(minVal == 0) {
 		Graph Gcopy = G;
 		Gcopy.removeVertex(vertex);
-		vector<vector<int> > output2;
+		std::vector<std::vector<int> > output2;
 		
 		returnSubgraphsNoFlags(H,Gcopy,output2);
 		
 		for(auto X : output2) {
-			vector<int> Y;
+			std::vector<int> Y;
 			Y.resize(G.getN(),-1);
 		
 			for(int i = 0; i <= (int)X.size(); ++i) {
@@ -1170,7 +1170,7 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 	
 	for(int i = 0; i < H.getNumOrbits(); ++i) {
 		bool val = true;
-		vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
+		std::vector< std::vector < std::vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
 		int Hvertex = H.getOrbit(i,0);	
 		bool dominating = true; //If our vertex is dominating we don't have to make final isomorphism call
 
@@ -1189,8 +1189,8 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 			if((Gdegree >= Hdegree) && (Hdegree > 0)) {
 				//Recursively call returnSubgraphsNoFlags for each nbrhd
 				
-				vector<int> Grestriction(G.getN(),-1);
-				vector<int> Hrestriction(H.getN(),-1);
+				std::vector<int> Grestriction(G.getN(),-1);
+				std::vector<int> Hrestriction(H.getN(),-1);
 				
 				int temp = 0;
 				for(int j = 0; j < G.getN(); ++j) {
@@ -1212,12 +1212,12 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 					}
 				}
 				
-				vector< vector< int > > possibleTemp; 
+				std::vector< std::vector< int > > possibleTemp; 
 					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
 				//Make possibleTemp actually correspond to indices in G		
 				for(int j = 0; j < (int)possibleTemp.size(); ++j) {
 					int index = 0;
-					vector<int> tempVec(G.getN(),-1);
+					std::vector<int> tempVec(G.getN(),-1);
 					
 					for(int k = 0; k < G.getN(); ++k) {
 						if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
@@ -1238,8 +1238,8 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 		
 		//Go through all possibilities and see if any of them combine to give a subgraph
 		if(val) {	
-			vector<int> maxVals; //Use in next_list
-			vector<int> list;
+			std::vector<int> maxVals; //Use in next_list
+			std::vector<int> list;
 			list.resize(H.getNumColors(),0);
 				
 			for(int c = 0; c < H.getNumColors(); ++c) {
@@ -1253,7 +1253,7 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 			}
 				
 			do {
-				vector<int> Grestriction;
+				std::vector<int> Grestriction;
 				Grestriction.resize(G.getN(),-1);
 				int index = 0;
 					
@@ -1286,12 +1286,12 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 	
 	Graph Gcopy = G;
 	Gcopy.removeVertex(vertex);
-	vector<vector<int> > output2;
+	std::vector<std::vector<int> > output2;
 	
 	returnSubgraphsNoFlags(H,Gcopy,output2);
 	
 	for(auto X : output2) {
-		vector<int> Y;
+		std::vector<int> Y;
 		Y.resize(G.getN(),-1);
 	
 		for(int i = 0; i <= (int)X.size(); ++i) {
@@ -1315,8 +1315,8 @@ void returnSubgraphsNoFlags(const Graph &H, const Graph &G, vector<vector<int> >
 //-----Returns Subgraphs-----
 //---------------------------
 
-//Return of vectors that could be used in restriction
-void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &output) {
+//Return of std::vectors that could be used in restriction
+void returnSubgraphs(const Graph &H, const Graph &G, std::vector<std::vector<int> > &output) {
 	int HFlagSize = H.getSizeOfFlag();
 	int GFlagSize = G.getSizeOfFlag();
 	
@@ -1343,7 +1343,7 @@ void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &outpu
 
 	if(G.getN() == H.getN()) {
 		if(isomorphic(H,G)) {
-			vector<int> outputEntry;
+			std::vector<int> outputEntry;
 			for(int i = 0; i < G.getN(); ++i) {
 				outputEntry.push_back(i);
 			}
@@ -1358,7 +1358,7 @@ void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &outpu
 	}
 	
 	if(H.getN() == HFlagSize) {
-		vector<int> temp(G.getN(),-1);
+		std::vector<int> temp(G.getN(),-1);
 		for(int i = 0; i < HFlagSize; ++i) {
 			temp[G.getFlagVertex(0)] = 0;
 		}
@@ -1371,7 +1371,7 @@ void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &outpu
 	if(H.getN() == 2) {
 		for(int i = 0; i < G.getN(); ++i) {
 			if((i != G.getFlagVertex(0)) && (G.getEdgeColor(i,G.getFlagVertex(0)) == H.getEdgeColor(0,1))) {
-				vector<int> temp(G.getN(),-1);
+				std::vector<int> temp(G.getN(),-1);
 				temp[G.getFlagVertex(0)] = 0;
 				temp[i] = 1;
 				
@@ -1395,7 +1395,7 @@ void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &outpu
 		GNoFlags.removeVertex(GNoFlags.getFlagVertex(0));
 	} while(GNoFlags.getSizeOfFlag() != 0);
 	
-	vector< vector <int> > outputNoFlags;
+	std::vector< std::vector <int> > outputNoFlags;
 	
 	returnSubgraphsNoFlags(HNoFlags,GNoFlags,outputNoFlags);
 	
@@ -1403,7 +1403,7 @@ void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &outpu
 	
 	
 	for(int i = 0; i < (int)outputNoFlags.size(); ++i) {
-		vector<int> possibleOutput(G.getN(),-1);
+		std::vector<int> possibleOutput(G.getN(),-1);
 		for(int i = 0; i < GFlagSize; ++i) {
 			possibleOutput[G.getFlagVertex(i)] = i;
 		}
@@ -1441,8 +1441,8 @@ void returnSubgraphs(const Graph &H, const Graph &G, vector<vector<int> > &outpu
 int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 	//No flags
 	if((H.getSizeOfFlag() != 0) || (G.getSizeOfFlag() != 0)) {
-		cout << "In returnSubgraphsNoFlags H and G can't have flags." << endl << endl;
-		throw exception();
+		std::cout << "In returnSubgraphsNoFlags H and G can't have flags." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if(H.getNumColors() != G.getNumColors()) {
@@ -1515,7 +1515,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 	
 	for(int i = 0; i < H.getNumOrbits(); ++i) {
 		bool val = true;
-		vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
+		std::vector< std::vector < std::vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
 		int Hvertex = H.getOrbit(i,0);
 		bool dominating = true;
 
@@ -1534,8 +1534,8 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 			if((Gdegree >= Hdegree) && (Hdegree > 0)) {
 				//Recursively call returnSubgraphsNoFlags for each nbrhd
 				
-				vector<int> Grestriction(G.getN(),-1);
-				vector<int> Hrestriction(H.getN(),-1);
+				std::vector<int> Grestriction(G.getN(),-1);
+				std::vector<int> Hrestriction(H.getN(),-1);
 				
 				int temp = 0;
 				for(int j = 0; j < G.getN(); ++j) {
@@ -1557,7 +1557,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 					}
 				}
 				
-				vector< vector< int > > possibleTemp; 
+				std::vector< std::vector< int > > possibleTemp; 
 					
 				
 				//Make possibleTemp actually correspond to indices in G		
@@ -1565,7 +1565,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
 					for(int j = 0; j < (int)possibleTemp.size(); ++j) {
 						int index = 0;
-						vector<int> tempVec(G.getN(),-1);
+						std::vector<int> tempVec(G.getN(),-1);
 						
 						for(int k = 0; k < G.getN(); ++k) {
 							if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
@@ -1592,8 +1592,8 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 		
 		//Go through all possibilities and see if any of them combine to give a subgraph
 		if(val && !dominating) {	
-			vector<int> maxVals; //Use in next_list
-			vector<int> list;
+			std::vector<int> maxVals; //Use in next_list
+			std::vector<int> list;
 			list.resize(H.getNumColors(),0);
 				
 			for(int c = 0; c < H.getNumColors(); ++c) {
@@ -1607,7 +1607,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 			}
 				
 			do {
-				vector<int> Grestriction;
+				std::vector<int> Grestriction;
 				Grestriction.resize(G.getN(),-1);
 				int index = 0;
 					
@@ -1634,7 +1634,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 	
 	Graph Gcopy = G;
 	Gcopy.removeVertex(vertex);
-	vector<vector<int> > output2;
+	std::vector<std::vector<int> > output2;
 	
 	return (output + numSubgraphsNoFlags(H,Gcopy));
 }
@@ -1643,7 +1643,7 @@ int numSubgraphsNoFlags(const Graph &H, const Graph &G) {
 //-----Number of Subgraphs-----
 //-----------------------------
 
-//Return of vectors that could be used in restriction
+//Return of std::vectors that could be used in restriction
 int numSubgraphs(const Graph &H, const Graph &G) {
 	int HFlagSize = H.getSizeOfFlag();
 	int GFlagSize = G.getSizeOfFlag();
@@ -1707,7 +1707,7 @@ int numSubgraphs(const Graph &H, const Graph &G) {
 		GNoFlags.removeVertex(GNoFlags.getFlagVertex(0));
 	} while(GNoFlags.getSizeOfFlag() != 0);
 	
-	vector< vector <int> > outputNoFlags;
+	std::vector< std::vector <int> > outputNoFlags;
 	
 	returnSubgraphsNoFlags(HNoFlags,GNoFlags,outputNoFlags);
 	
@@ -1715,7 +1715,7 @@ int numSubgraphs(const Graph &H, const Graph &G) {
 	
 	int output = 0;
 	for(int i = 0; i < (int)outputNoFlags.size(); ++i) {
-		vector<int> possibleOutput(G.getN(),-1);
+		std::vector<int> possibleOutput(G.getN(),-1);
 		for(int i = 0; i < GFlagSize; ++i) {
 			possibleOutput[G.getFlagVertex(i)] = i;
 		}
@@ -1867,7 +1867,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 	
 	for(int i = 0; i < H.getNumOrbits(); ++i) {
 		bool val = true;
-		vector< vector < vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
+		std::vector< std::vector < std::vector < int > > > possible; //Subsets of vertices in each collor which could create a copy of H
 		int Hvertex = H.getOrbit(i,0);
 		bool dominating = true; 
 
@@ -1886,8 +1886,8 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 			if((Gdegree >= Hdegree) && (Hdegree > 0)) {
 				//Recursively call returnSubgraphsNoFlags for each nbrhd
 				
-				vector<int> Grestriction(G.getN(),-1);
-				vector<int> Hrestriction(H.getN(),-1);
+				std::vector<int> Grestriction(G.getN(),-1);
+				std::vector<int> Hrestriction(H.getN(),-1);
 				
 				int temp = 0;
 				for(int j = 0; j < G.getN(); ++j) {
@@ -1909,7 +1909,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 					}
 				}
 				
-				vector< vector< int > > possibleTemp; 
+				std::vector< std::vector< int > > possibleTemp; 
 					returnSubgraphsNoFlags(H.restriction(Hrestriction),G.restriction(Grestriction),possibleTemp);
 					
 				if((possibleTemp.size() != 0) && dominating) {
@@ -1919,7 +1919,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 				//Make possibleTemp actually correspond to indices in G		
 				for(int j = 0; j < (int)possibleTemp.size(); ++j) {
 					int index = 0;
-					vector<int> tempVec(G.getN(),-1);
+					std::vector<int> tempVec(G.getN(),-1);
 					
 					for(int k = 0; k < G.getN(); ++k) {
 						if((k != vertex) && G.getEdgeColor(vertex,k) == c) {
@@ -1940,8 +1940,8 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 		
 		//Go through all possibilities and see if any of them combine to give a subgraph
 		if(val) {	
-			vector<int> maxVals; //Use in next_list
-			vector<int> list;
+			std::vector<int> maxVals; //Use in next_list
+			std::vector<int> list;
 			list.resize(H.getNumColors(),0);
 				
 			for(int c = 0; c < H.getNumColors(); ++c) {
@@ -1955,7 +1955,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 			}
 				
 			do {
-				vector<int> Grestriction;
+				std::vector<int> Grestriction;
 				Grestriction.resize(G.getN(),-1);
 				int index = 0;
 					
@@ -1978,7 +1978,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 					}
 
 					//Now check if isomorphic with flag added back in
-					vector<int> possibleSubgraph(GWithFlag.getN(),-1);
+					std::vector<int> possibleSubgraph(GWithFlag.getN(),-1);
 					
 					for(int j = 0; j < GFlagSize; ++j) {
 						possibleSubgraph[GWithFlag.getFlagVertex(j)] = j;
@@ -2037,7 +2037,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 //Need all flag vertices to be first and in order
 //Doesn't check for duplicates in input (does in output) so if needed check that ahead of time
 //TODO add version which preserves coefficients (shouldn't be too bad)
-vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zeros) {
+std::vector<Graph> expandGraphs(const std::vector<Graph> &input, const std::vector<Graph> &zeros) {
 	int size = input.size();
 	
 	if(size == 0) {
@@ -2051,46 +2051,46 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 	
 	for(int i = 1; i < size; ++i) {
 		if(input[i].getN() != n) {
-			cout << "In expandGraphs, everything in input must be the same size." << endl << endl;
-			throw exception();
+			std::cout << "In expandGraphs, everything in input must be the same size." << std::endl << std::endl;
+			throw std::exception();
 		}
 		
 		if(input[i].getNumColors() != numColors) {
-			cout << "In expandGraphs, everything in input must have the same number of colors." << endl << endl;
-			throw exception();
+			std::cout << "In expandGraphs, everything in input must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 		
 		if(input[i].getFlag().getCanonLabel() != flag.getCanonLabel()) {
-			cout << "In expandGraphs, everything in input must have the same flag." << endl << endl;
-			throw exception();
+			std::cout << "In expandGraphs, everything in input must have the same flag." << std::endl << std::endl;
+			throw std::exception();
 		}
 		
 		for(int j = 0; j < sizeOfFlag; ++j) {
 			if(input[i].getFlagVertex(j) != j) {
-				cout << "In expandGraphs, in input, flag vertices must be first in the correct order." << endl << endl;
-				throw exception();
+				std::cout << "In expandGraphs, in input, flag vertices must be first in the correct order." << std::endl << std::endl;
+				throw std::exception();
 			}
 		}
 	}
 	
 	for(int i = 0; i < (int)zeros.size(); ++i) {
 		if(zeros[i].getNumColors() != numColors) {
-			cout << "In expandGraphs, at least one zero doesn't have the correct number of colors." << endl << endl;
-			throw exception();
+			std::cout << "In expandGraphs, at least one zero doesn't have the correct number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 		
 		if(zeros[i].getFlag().getN() != 0) {
-			cout << "In expandGraphs, everything in zeros must not have a flag." << endl << endl;
-			throw exception();
+			std::cout << "In expandGraphs, everything in zeros must not have a flag." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	//Actual generation
-	unordered_set<string> canonLabels;
+	std::unordered_set<std::string> canonLabels;
 	
 	
 	//Needed everytime since they are always the same
-	vector<Edge> flagEdges;
+	std::vector<Edge> flagEdges;
 	
 	for(int i = 0; i < sizeOfFlag-1; ++i) {
 		for(int j = i+1; j < sizeOfFlag; ++j) {
@@ -2100,14 +2100,14 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 		}
 	}
 
-	vector<Graph> output;
+	std::vector<Graph> output;
 
 	for(auto G: input) {
-		vector<Edge> GEdges = flagEdges;
-		vector<int> permanentZeroDegree(n+1,0); //Value 0 for 0,1,...,sizeOfFlag
+		std::vector<Edge> GEdges = flagEdges;
+		std::vector<int> permanentZeroDegree(n+1,0); //Value 0 for 0,1,...,sizeOfFlag
 		
 		for(int i = 0; i < n-1; ++i) {
-			for(int j = max(sizeOfFlag,i+1); j < n; ++j) {
+			for(int j = std::max(sizeOfFlag,i+1); j < n; ++j) {
 				if(G.getEdgeColor(i,j) != 0) {
 					GEdges.push_back({i,j,G.getEdgeColor(i,j)});
 				}
@@ -2123,9 +2123,9 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 		
 		for(int i = 0; i < myPow(numColors,n); ++i) {		
 		 	int temp = i;
-		 	vector<Edge> edges = GEdges;
-		 	vector<int> zeroDegree = permanentZeroDegree;
-		 	vector<int> check; //Used in an isomorphism check
+		 	std::vector<Edge> edges = GEdges;
+		 	std::vector<int> zeroDegree = permanentZeroDegree;
+		 	std::vector<int> check; //Used in an isomorphism check
 		 			
 		 	for(int j = 0; j < n; ++j) {
 		 		if((temp % numColors) != 0) {
@@ -2169,7 +2169,7 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 				}
 			
 				if(cont) {
-					vector<int> GvFlag;
+					std::vector<int> GvFlag;
 				
 					for(int j = 0; j < sizeOfFlag; ++j) {
 						GvFlag.push_back(j);
@@ -2204,23 +2204,23 @@ vector<Graph> expandGraphs(const vector<Graph> &input, const vector<Graph> &zero
 //-------------------------
 
 //Generates all graphs of size n
-vector<Graph> generate(const int n, const int numColors, const vector<Graph> &zeros) {
+std::vector<Graph> generate(const int n, const int numColors, const std::vector<Graph> &zeros) {
 	if(numColors < 2) {
-		cout << "You need at least two colors in generate." << endl << endl;
-		throw exception();
+		std::cout << "You need at least two colors in generate." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Check all zeros have the correct number of colors
 	for(int i = 0; i < (int)zeros.size(); ++i) {
 		if(zeros[i].getNumColors() != numColors) {
-			cout << "In generate all zeros must have the correct number of colors." << endl << endl;
-			throw exception();
+			std::cout << "In generate all zeros must have the correct number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	
 	Graph G({},1,numColors);
-	vector<Graph> output = {G};
+	std::vector<Graph> output = {G};
 	for(int k = 2; k <= n; ++k) {
 		output = expandGraphs(output,zeros);
 	}
@@ -2234,31 +2234,31 @@ vector<Graph> generate(const int n, const int numColors, const vector<Graph> &ze
 //-----------------------
 
 //Gives all possible ways to add 
-//Used in plainFlagAlgebra to get v vectors
+//Used in plainFlagAlgebra to get v std::vectors
 //flag isn't a flag but a graph
-vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
+std::vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 	int n = G.getN();
-	unordered_set<string> canonLabels;
-	vector<Graph> output;
-	vector<vector<int> > restrictions;
+	std::unordered_set<std::string> canonLabels;
+	std::vector<Graph> output;
+	std::vector<std::vector<int> > restrictions;
 	Graph noFlag = flag;
 	noFlag.removeFlag();
 	
 	returnSubgraphs(noFlag,G,restrictions);
 	
 	if(G.getSizeOfFlag() != 0) {
-		cout << "In addAllFlag G must not have a flag." << endl << endl;
-		throw exception();
+		std::cout << "In addAllFlag G must not have a flag." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if(flag.getSizeOfFlag() != flag.getN()) {
-		cout << "In addAllFlag flag must have all vertices as flag vertices." << endl << endl;
-		throw exception();
+		std::cout << "In addAllFlag flag must have all vertices as flag vertices." << std::endl << std::endl;
+		throw std::exception();
 	}
 		
 	//Convert restrictions into input for adding flag
-	vector<vector <int> > possibleFlags;
-	possibleFlags.resize(restrictions.size(), vector<int>(flag.getN()));
+	std::vector<std::vector <int> > possibleFlags;
+	possibleFlags.resize(restrictions.size(), std::vector<int>(flag.getN()));
 	
 	for(int i = 0; i < (int)restrictions.size(); ++i) {
 		int temp = 0;
@@ -2298,17 +2298,17 @@ vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 
 //Used in generateV
 //TODO make faster? Use iterated approach?
-vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph> &zeros) {
-	vector<Graph> allGraphs = generate(n,numColors,zeros);
-	vector<Graph> output;
+std::vector<Graph> generateFlags(const int n, const int numColors, const std::vector<Graph> &zeros) {
+	std::vector<Graph> allGraphs = generate(n,numColors,zeros);
+	std::vector<Graph> output;
 	#pragma omp parallel 
 	{
-		vector<Graph> privateOutput;
+		std::vector<Graph> privateOutput;
 				
 		#pragma omp for nowait schedule(static) ordered
 		for(int i = 0; i < (int)allGraphs.size(); ++i) {
-			vector<int> sigma;
-			unordered_set<string> canonLabels;
+			std::vector<int> sigma;
+			std::unordered_set<std::string> canonLabels;
 			
 			for(int j = 0; j < n; ++j) {
 				sigma.push_back(j);
@@ -2340,22 +2340,22 @@ vector<Graph> generateFlags(const int n, const int numColors, const vector<Graph
 //--------------------
 
 //Use in plain flag algebra
-vector< vector<Graph> > generateV(const int n, const int numColors, const vector<Graph> &zeros) {
-	vector< vector< Graph > > output;
+std::vector< std::vector<Graph> > generateV(const int n, const int numColors, const std::vector<Graph> &zeros) {
+	std::vector< std::vector< Graph > > output;
 
 	for(int i = n/2; i <= n-1; ++i) {
 		int sizeOfFlag = 2*i-n;
 		
 		if(sizeOfFlag > 0) {
-			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
+			std::vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
 			#pragma omp parallel 
 			{
-				vector < vector <Graph> > privateOutput;
+				std::vector < std::vector <Graph> > privateOutput;
 				
 				#pragma omp for nowait schedule(static) ordered
 				for(int j = 0; j < (int)flags.size(); ++j) {
-					cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << endl;
-					vector<Graph> expanded = {flags[j]};
+					std::cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << std::endl;
+					std::vector<Graph> expanded = {flags[j]};
 				
 					while((expanded[0].getN()*2 - sizeOfFlag) != n) {
 						expanded = expandGraphs(expanded,zeros);
@@ -2382,16 +2382,16 @@ vector< vector<Graph> > generateV(const int n, const int numColors, const vector
 //----------------------------------------
 
 //Use in plain flag algebra
-vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numColors, const vector<Graph> &zeros) {
+std::vector< std::vector<Graph> > generateAllGraphsWithFlags(const int n, const int numColors, const std::vector<Graph> &zeros) {
 	//Need generateV and this to have the same indexing
-	unordered_map<string,int> fFlag; //Takes flag canonLabels and maps to index in v
+	std::unordered_map<std::string,int> fFlag; //Takes flag canonLabels and maps to index in v
 	int index = 0;
 	
 	for(int i = n/2; i <= n-1; ++i) {
 		int sizeOfFlag = 2*i-n;
 		
 		if(sizeOfFlag > 0) {
-			vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
+			std::vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
 			for(int j = 0; j < (int)flags.size(); ++j) {
 				fFlag[flags[j].getCanonLabel()] = index;
 				++index;
@@ -2400,26 +2400,26 @@ vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numCol
 	}
 	
 	//index is number of flags
-	vector<Graph> allGraphs = generate(n,numColors,zeros);
-	vector < vector < Graph > > output(index); //Index is number of flags
+	std::vector<Graph> allGraphs = generate(n,numColors,zeros);
+	std::vector < std::vector < Graph > > output(index); //Index is number of flags
 	#pragma omp parallel
 	{
-		vector<int> index2(index);
+		std::vector<int> index2(index);
 		
 		for(int i = n/2; i <= n-1; ++i) {
 			int sizeOfFlag = 2*i-n;
 			
 			if(sizeOfFlag > 0) {
 
-				vector < vector < Graph > > privateOutput(index); //Index is number of flags
+				std::vector < std::vector < Graph > > privateOutput(index); //Index is number of flags
 				
 				#pragma omp for nowait schedule(dynamic)
 				for(int j = 0; j < (int)allGraphs.size(); ++j) {
-					cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << endl;
-					unordered_map<string,int> fGraph;
+					std::cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << std::endl;
+					std::unordered_map<std::string,int> fGraph;
 					int den = choose(n, sizeOfFlag);
 				
-					vector<int> X(sizeOfFlag);
+					std::vector<int> X(sizeOfFlag);
 					for(int k = 0; k < sizeOfFlag; ++k) {
 						X[k] = k;
 					}
@@ -2462,37 +2462,37 @@ vector< vector<Graph> > generateAllGraphsWithFlags(const int n, const int numCol
 //----------------------
 
 //p[0] + p[1] + ... + p[numColors-1] = 1
-Graph randomGraph(const int n, const int numColors, const vector<double> &p, const int flagSize) {
+Graph randomGraph(const int n, const int numColors, const std::vector<double> &p, const int flagSize) {
 	if((int)p.size() != numColors) {
-		cout << "In randomGraph, p must have size numColors." << endl;
-		cout << "P size = " << p.size() << endl;
-		cout << "numColors = " << numColors << endl << endl;
-		throw exception();
+		std::cout << "In randomGraph, p must have size numColors." << std::endl;
+		std::cout << "P size = " << p.size() << std::endl;
+		std::cout << "numColors = " << numColors << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if(flagSize > n) {
-		cout << "In randomGraph, we can't have flagSize > n." << endl;
-		cout << "flagSize = " << flagSize << endl;
-		cout << "n = " << n << endl;
-		throw exception();
+		std::cout << "In randomGraph, we can't have flagSize > n." << std::endl;
+		std::cout << "flagSize = " << flagSize << std::endl;
+		std::cout << "n = " << n << std::endl;
+		throw std::exception();
 	}
 	
 	if(numColors < 0) {
-		cout << "In randomGraph, we can't have numColors < 0." << endl;
-		cout << "numColors = " << numColors << endl << endl;
-		throw exception();
+		std::cout << "In randomGraph, we can't have numColors < 0." << std::endl;
+		std::cout << "numColors = " << numColors << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if(n < 0) {
-		cout << "In randomGraph, we can't have n < 0." << endl;
-		cout << "n = " << n << endl << endl;
-		throw exception();
+		std::cout << "In randomGraph, we can't have n < 0." << std::endl;
+		std::cout << "n = " << n << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if(flagSize < 0) {
-		cout << "In randomGraph, we can't have flagSize < 0." << endl;
-		cout << "flagSize = " << flagSize << endl << endl;
-		throw exception();
+		std::cout << "In randomGraph, we can't have flagSize < 0." << std::endl;
+		std::cout << "flagSize = " << flagSize << std::endl << std::endl;
+		throw std::exception();
 	}
 
 	double temp = 0;
@@ -2501,15 +2501,15 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 	}
 	
 	if(abs(temp - 1) > 0.000001) {
-		cout << "In randomGraph, p[0] + ... + p[numColors-1] = 1." << endl;
+		std::cout << "In randomGraph, p[0] + ... + p[numColors-1] = 1." << std::endl;
 		for(int i = 0; i < numColors; ++i) {
-			cout << "p[" << i << "] = " << p[i] << endl;
+			std::cout << "p[" << i << "] = " << p[i] << std::endl;
 		}
-		cout << endl;
-		throw exception();
+		std::cout << std::endl;
+		throw std::exception();
 	}
 	
-	vector<Edge> Edges;
+	std::vector<Edge> Edges;
 	//srand (time(NULL));
 	
 	for(int i = 0; i < n-1; ++i) {
@@ -2531,7 +2531,7 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 	
 	
 	if(flagSize > 0) {
-		vector<int> flag;
+		std::vector<int> flag;
 		
 		for(int i = 0; i < flagSize; ++i) {
 			int ran = rand()%n;
@@ -2570,7 +2570,7 @@ Graph randomGraph(const int n, const int numColors, const vector<double> &p, con
 //------------------------------
 
 Graph uniformRandomGraph(const int n, const int numColors, const int flagSize) {
-	vector<double> p(numColors,1./numColors);
+	std::vector<double> p(numColors,1./numColors);
 
 	return randomGraph(n, numColors, p, flagSize);
 }
@@ -2586,9 +2586,9 @@ class Equation {
 
 	private: 
 	
-		vector<Graph> variables;
+		std::vector<Graph> variables;
 		int numVariables;
-		vector<Graph> zeros; //No Flag on zeros (remove flag from Graph to check subgraph)
+		std::vector<Graph> zeros; //No Flag on zeros (remove flag from Graph to check subgraph)
 		int numZeros;
 		int numColors = -1;
 		Frac ans = Frac(0,1);
@@ -2603,7 +2603,7 @@ class Equation {
 		
 		//ans must be a fraction
 		//TYPE 0 ==, TYPE 1 <=
-		Equation(vector<Graph> const &VARIABLES, vector<Graph> const &ZEROS, Frac ANS, int TYPE) {
+		Equation(std::vector<Graph> const &VARIABLES, std::vector<Graph> const &ZEROS, Frac ANS, int TYPE) {
 			variables = VARIABLES;
 			zeros = ZEROS;
 			ans = ANS;
@@ -2613,8 +2613,8 @@ class Equation {
 			
 			//Check type is -1,0,or 1
 			if((type != 0) && (type != 1)) {
-				cout << "In equation constructor, type must be 0, or 1." << endl << endl;
-				throw exception();
+				std::cout << "In equation constructor, type must be 0, or 1." << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			//Check if all graphs have same number of colors
@@ -2624,8 +2624,8 @@ class Equation {
 			
 			for(auto G: variables) {
 				if(G.getNumColors() != numColors) {
-					cout << "All graphs in Equation Constructor must have same number of colors." << endl << endl;
-					throw exception();
+					std::cout << "All graphs in Equation Constructor must have same number of colors." << std::endl << std::endl;
+					throw std::exception();
 				}
 			}
 			
@@ -2647,8 +2647,8 @@ class Equation {
 			if(numVariables != 0) {
 				for(int i = 1; i < numVariables; ++i) {
 					if(!isomorphic(variables[i].getFlag(), variables[0].getFlag())) {
-						cout << "All flag have to be isomorphic in equation constructor." << endl << endl; 
-						throw exception();
+						std::cout << "All flag have to be isomorphic in equation constructor." << std::endl << std::endl; 
+						throw std::exception();
 					}
 				}
 			}
@@ -2659,8 +2659,8 @@ class Equation {
 			
 			//Not entirely sure I want to throw an exception here, I'll change it later if it doesn't work right
 			/*if(!valid) {
-				cout << "Equation not valid - no variables, and it is false." << endl << endl;
-				throw exception(); 
+				std::cout << "Equation not valid - no variables, and it is false." << std::endl << std::endl;
+				throw std::exception(); 
 			}*/
 			
 			//Check for isomorphism in Variables
@@ -2677,7 +2677,7 @@ class Equation {
 		//Checks for isomorphisms and the adds coefficients
 		//Private?
 		void combine() {
-			unordered_map<string, int> map;
+			std::unordered_map<std::string, int> map;
 			
 			for(int i = 0; i < numVariables; ++i) {
 				if(map.find(variables[i].getCanonLabel()) == map.end()) {
@@ -2714,8 +2714,8 @@ class Equation {
 			if(numVariables > 0) {
 				for(auto G: zeros) {
 					if(G.getNumColors() != numColors) {
-						cout << "All zeros in Equation Constructor must have same number of colors as variables." << endl << endl;
-						throw exception();
+						std::cout << "All zeros in Equation Constructor must have same number of colors as variables." << std::endl << std::endl;
+						throw std::exception();
 					}
 				}
 			}
@@ -2725,8 +2725,8 @@ class Equation {
 				
 				for(auto G: zeros) {
 					if(G.getNumColors() != numColors) {
-						cout << "All zeros in Equation Constructor must have same number of colors." << endl << endl;
-						throw exception();
+						std::cout << "All zeros in Equation Constructor must have same number of colors." << std::endl << std::endl;
+						throw std::exception();
 					}
 				}
 			}
@@ -2735,8 +2735,8 @@ class Equation {
 			//I'm not entirely sure that this needs to be true, but I can't think of any reasonable examples were it isn't though
 			for(auto G: zeros) {
 				if(G.getSizeOfFlag() != 0) {
-					cout << "Zeros can't have any flags." << endl << endl;
-					throw exception();
+					std::cout << "Zeros can't have any flags." << std::endl << std::endl;
+					throw std::exception();
 				}
 			}
 		
@@ -2823,8 +2823,8 @@ class Equation {
 			valid = checkValid();
 			
 			if(!valid) {
-				cout << "Equation not valid - no variables, and it is false." << endl << endl;
-				throw exception(); 
+				std::cout << "Equation not valid - no variables, and it is false." << std::endl << std::endl;
+				throw std::exception(); 
 			}
 		}
 		
@@ -2848,8 +2848,8 @@ class Equation {
 			valid = checkValid();
 			
 			if(!valid) {
-				cout << "Equation not valid - no variables, and it is false." << endl << endl;
-				throw exception(); 
+				std::cout << "Equation not valid - no variables, and it is false." << std::endl << std::endl;
+				throw std::exception(); 
 			}
 		}
 		
@@ -2882,10 +2882,10 @@ class Equation {
 		
 		Graph getVariable(int i) const {
 			if((i < 0) || (i >= numVariables)) {
-				cout << "Trying to get variable outside of range." << endl;
-				cout << "Index = " << i << endl;
-				cout << "Number of Variables = " << numVariables << endl;
-				throw exception();
+				std::cout << "Trying to get variable outside of range." << std::endl;
+				std::cout << "Index = " << i << std::endl;
+				std::cout << "Number of Variables = " << numVariables << std::endl;
+				throw std::exception();
 			}
 			
 			return variables[i];
@@ -2898,8 +2898,8 @@ class Equation {
 		
 		Graph getZero(int i) const {
 			if((i < 0) || (i >= numZeros)) {
-				cout << "Trying to get zero outside of range: i = " << i << ", numZeros = " << numVariables << endl << endl;
-				throw exception();
+				std::cout << "Trying to get zero outside of range: i = " << i << ", numZeros = " << numVariables << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			return zeros[i];
@@ -2920,8 +2920,8 @@ class Equation {
 			valid = checkValid();
 			
 			if(!valid) {
-				cout << "Equation not valid - no variables, and it is false." << endl << endl;
-				throw exception(); 
+				std::cout << "Equation not valid - no variables, and it is false." << std::endl << std::endl;
+				throw std::exception(); 
 			}
 		}
 		
@@ -2932,23 +2932,23 @@ class Equation {
 		
 		void printVariables() const {
 			if(numVariables == 0) {
-				cout << "There are no variables." << endl << endl;
+				std::cout << "There are no variables." << std::endl << std::endl;
 			}
 			
 			else {
 				for(int i = 0; i < numVariables; ++i) {
-					cout << "Variable " << i << " has adjacency matrix: " << endl;
+					std::cout << "Variable " << i << " has adjacency matrix: " << std::endl;
 					variables[i].printAdjMat();
 					if(variables[i].getSizeOfFlag() != 0) {
-						cout << "The flag vertices are: ";
+						std::cout << "The flag vertices are: ";
 						variables[i].printFlagVertices();
 					}
 					else {
-						cout << "There are no flag vertices." << endl;
+						std::cout << "There are no flag vertices." << std::endl;
 					}
-					cout << "It has coefficient: " << variables[i].getCoefficient() << endl << endl;
+					std::cout << "It has coefficient: " << variables[i].getCoefficient() << std::endl << std::endl;
 					//Could add this back in, but it doesn't seem necessary unless debugging
-					//cout << "Its canon label is: " << variables[i].getCanon() << endl << endl;
+					//std::cout << "Its canon label is: " << variables[i].getCanon() << std::endl << std::endl;
 				}
 			}
 		}
@@ -2960,14 +2960,14 @@ class Equation {
 		
 		void printZeros() const {
 			if(numZeros == 0) {
-				cout << "There are no zeros." << endl << endl;
+				std::cout << "There are no zeros." << std::endl << std::endl;
 			}
 			
 			else {
 				for(int i = 0; i < numZeros; ++i) {
-					cout << "Zero " << i << " has adjacency matrix: " << endl;
+					std::cout << "Zero " << i << " has adjacency matrix: " << std::endl;
 					zeros[i].printAdjMat();
-					cout << endl;
+					std::cout << std::endl;
 				}
 			}
 		}
@@ -3034,8 +3034,8 @@ class Equation {
 
 //Mostly used in debugging
 bool operator==(const Equation &eq1, const Equation &eq2) {
-	vector<Graph> variables;
-	vector<Graph> zeros; //No Flag on zeros (remove flag from Graph to check subgraph)
+	std::vector<Graph> variables;
+	std::vector<Graph> zeros; //No Flag on zeros (remove flag from Graph to check subgraph)
 	
 	if(eq1.getType() != eq2.getType()) {
 		return false;
@@ -3110,13 +3110,13 @@ Equation operator+(const Equation &eq1, const Equation &eq2) {
 	int numZeros = eq1.getNumZeros();
 	
 	if(numZeros != eq2.getNumZeros()) {
-		cout << "When adding equations, they must have the same set of zeros." << endl << endl;
-		throw exception();
+		std::cout << "When adding equations, they must have the same set of zeros." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
-	vector<Graph> zeros;
-	unordered_set<string> zeros1;
-	unordered_set<string> zeros2;
+	std::vector<Graph> zeros;
+	std::unordered_set<std::string> zeros1;
+	std::unordered_set<std::string> zeros2;
 	
 	for(int i = 0; i < numZeros; ++i) {
 		zeros.push_back(eq1.getZero(i));
@@ -3126,12 +3126,12 @@ Equation operator+(const Equation &eq1, const Equation &eq2) {
 	}
 	
 	if(zeros1 != zeros2) {
-		cout << "When adding equations, they must have the same set of zeros." << endl << endl;
-		throw exception();
+		std::cout << "When adding equations, they must have the same set of zeros." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Constructor actually does the adding already
-	vector<Graph> variables;
+	std::vector<Graph> variables;
 	
 	for(int i = 0; i < eq1.getNumVariables(); ++i) {
 		variables.push_back(eq1.getVariable(i));
@@ -3146,9 +3146,9 @@ Equation operator+(const Equation &eq1, const Equation &eq2) {
 
 //If adding Graph to Equation, like adding G = 0 to it
 Equation operator+(const Graph &G, const Equation &eq) {
-	vector<Graph> variables = {G};
+	std::vector<Graph> variables = {G};
 	
-	vector<Graph> zeros;
+	std::vector<Graph> zeros;
 	for(int i = 0; i < eq.getNumZeros(); ++i) {
 		zeros.push_back(eq.getZero(i));
 	}
@@ -3168,11 +3168,11 @@ Equation operator+(Equation eq, Graph G) {
 //------------------------
 
 //First Define for graphs - put into equation with = 0, and no zeros
-//Really more of a vector (or set) of graphs, but in this form it allows us to use overridden +
+//Really more of a std::vector (or set) of graphs, but in this form it allows us to use overridden +
 //TODO add edge between parts in a smarter way?
-Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) {
-	vector<int> HReorder;
-	vector<int> GReorder;
+Equation multiply(const Graph &G1, const Graph &H1, const std::vector<Graph> &zeros) {
+	std::vector<int> HReorder;
+	std::vector<int> GReorder;
 	
 	//Make sure all the flags are first
 	HReorder.resize(H1.getN(),H1.getN());
@@ -3214,24 +3214,24 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	
 	//Flags must be the same	
 	if(!isomorphic(G.getFlag(),H.getFlag())) {
-		cout << "Flags must be the same in multiplication." << endl << endl;
+		std::cout << "Flags must be the same in multiplication." << std::endl << std::endl;
 		G.printEdges();
 		G.printFlag();
 		H.printEdges();
 		H.printFlag();
-		throw exception();
+		throw std::exception();
 	}
 	
 	//Check that numColors are the same
 	if(G.getNumColors() != H.getNumColors()) {
-		cout << "Graphs in multiplication must have the same number of colors." << endl << endl;
-		throw exception();
+		std::cout << "Graphs in multiplication must have the same number of colors." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Can't multiply empty graph
 	if((G.getN() == 0) || (H.getN() == 0)) {
-		cout << "Can't multiply empty graphs." << endl << endl;
-		throw exception();
+		std::cout << "Can't multiply empty graphs." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Need to reorder vertices so flags are first
@@ -3240,13 +3240,13 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	int nG = G.getN();
 	int nH = H.getN();
 	
-	vector<Graph> variables;
-	unordered_set<string> variablesSet;
+	std::vector<Graph> variables;
+	std::unordered_set<std::string> variablesSet;
 
 	//Create all possible variables
 	for(int i = 0; i < myPow(c,(nG - sizeOfFlag)*(nH-sizeOfFlag)); ++i) { //c-ary mask
 		//Convert i to c-ary number
-		vector<int> ary;
+		std::vector<int> ary;
 		int temp = i;
 		
 		for(int j = 0; j < (nG-sizeOfFlag)*(nH-sizeOfFlag); ++ j) {
@@ -3255,13 +3255,13 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		   temp = temp-temp2*myPow(c,(nG-sizeOfFlag)*(nH-sizeOfFlag)-j-1);
 		   
 		   if((temp2 < 0) || (temp2 >= c)) { //This really shouldn't happen I've checked, but better safe than sorry
-		   	cout << "Something went wrong in graph multiplication." << endl << endl;
-		   	throw exception();
+		   	std::cout << "Something went wrong in graph multiplication." << std::endl << std::endl;
+		   	throw std::exception();
 		   }
 		}
 		
 		//Create edge list for new Graph
-		vector<Edge> edges;
+		std::vector<Edge> edges;
 		
 		//First vertices G
 		for(int j = 0; j < nG-1; ++j) {
@@ -3304,7 +3304,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 		}
 		
 		//Create Flag
-		vector<int> flag;
+		std::vector<int> flag;
 		
 		//Can do this because they are in canonical form
 		for(int j = 0; j < sizeOfFlag; ++j) {
@@ -3325,11 +3325,11 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
 		int num = 0;
 		
-		vector<vector<int> > subgraphs; 
+		std::vector<std::vector<int> > subgraphs; 
 		returnSubgraphs(G,eq.getVariable(i),subgraphs);
 		
 		for(auto X: subgraphs) {
-			vector<int> restrictionComp;
+			std::vector<int> restrictionComp;
 			restrictionComp.resize(nG+nH-sizeOfFlag,-1);
 			int index = 0;
 			
@@ -3361,8 +3361,8 @@ Equation multiply(const Graph &G1, const Graph &H1, const vector<Graph> &zeros) 
 Equation operator*(const Equation &eq1, const Equation &eq2) {
 	//Make sure types are right
 	if((eq1.getType() == 1) && (eq2.getType() == 1)) {
-		cout << "In multiplication, both types can't be 1, inequalities possibly not preserved." << endl << endl;
-		throw exception();
+		std::cout << "In multiplication, both types can't be 1, inequalities possibly not preserved." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	int type;
@@ -3378,31 +3378,31 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 	//Deal with empty equation(s)
 	//Not sure about throwing an excpetion - may change
 	if((eq1.getNumVariables() == 0) || (eq2.getNumVariables() == 0)) {
-		cout << "Can't multiply two equations together when one is empty." << endl << endl;
-		throw exception();
+		std::cout << "Can't multiply two equations together when one is empty." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Check the flags are the same
 	if(!isomorphic(eq1.getVariable(0).getFlag(),eq2.getVariable(0).getFlag())) {
-		cout << "Flags must be the same in multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Flags must be the same in multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Check that numColors are the same
 	if(eq1.getVariable(0).getNumColors() != eq2.getVariable(0).getNumColors()) {
-		cout << "Graphs in multiplication must have the same number of colors." << endl << endl;
-		throw exception();
+		std::cout << "Graphs in multiplication must have the same number of colors." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Check if Zeros are the same
 	int numZeros = eq1.getNumZeros();
 	
 	if(numZeros != eq2.getNumZeros()) {
-		cout << "When adding equations, they must have the same set of zeros." << endl << endl;
-		throw exception();
+		std::cout << "When adding equations, they must have the same set of zeros." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
-	vector<Graph> zeros;
+	std::vector<Graph> zeros;
 	
 	bool val;
 	for(int i = 0; i < numZeros; ++i) {
@@ -3416,8 +3416,8 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 		}
 		
 		if(!val) {
-			cout << "When adding equations, they must have the same set of zeros." << endl << endl;
-			throw exception();
+			std::cout << "When adding equations, they must have the same set of zeros." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 
@@ -3427,7 +3427,7 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 
 	for(int i = 0; i < eq1.getNumVariables(); ++i) {
 		for(int j = 0; j < eq2.getNumVariables(); ++j) {
-			cout << "In multiply (" << i << ", " << j << ") out of (" << eq1.getNumVariables() << ", " << eq2.getNumVariables() << ")." << endl;
+			std::cout << "In multiply (" << i << ", " << j << ") out of (" << eq1.getNumVariables() << ", " << eq2.getNumVariables() << ")." << std::endl;
 			if((i != 0) || (j != 0)) {
 				Equation toAdd = multiply(eq1.getVariable(i), eq2.getVariable(j), zeros);
 				eq = eq + toAdd;
@@ -3462,32 +3462,32 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 //Currently only works for equations with no flags
 //Make this a class function?
 //Use generate to get generated
-Equation resize(const Equation &eq, const vector<Graph> &generated) {
+Equation resize(const Equation &eq, const std::vector<Graph> &generated) {
 	if(eq.getNumVariables() == 0) {
-		cout << "In resize, need at least one graph in the equation to resize." << endl << endl;
-		throw exception();
+		std::cout << "In resize, need at least one graph in the equation to resize." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
 		if(eq.getVariable(i).getFlag().getN() != 0) {
-			cout << "In resize, we don't allow flags (there is no reason for this I'm just lazy, so future me you can implement this)." << endl << endl;
-			throw exception();
+			std::cout << "In resize, we don't allow flags (there is no reason for this I'm just lazy, so future me you can implement this)." << std::endl << std::endl;
+			throw std::exception();
 		}
 		
 		if(eq.getVariable(i).getN() > generated[0].getN()) {
-			cout << "In resize, we can't have the variables having larger size than things in generated." << endl;
-			throw exception();
+			std::cout << "In resize, we can't have the variables having larger size than things in generated." << std::endl;
+			throw std::exception();
 		}
 	}
 	
-	vector<Graph> zeros;
+	std::vector<Graph> zeros;
 	for(int i = 0; i < eq.getNumZeros(); ++i) {
 		zeros.push_back(eq.getZero(i));
 	}	
 	
 	Frac ans = eq.getAns();
 	
-	vector<Graph> resized;
+	std::vector<Graph> resized;
 	Equation output({},zeros,eq.getAns(),eq.getType());
 
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
@@ -3525,29 +3525,29 @@ Equation resize(const Equation &eq, const vector<Graph> &generated) {
 //Only used for == (right now, may change later)
 //Last entry is the ans
 void printMatrixCol(const Equation &everything, const Equation &eq) {
-	ofstream myFile;
-	myFile.open("matrix.txt",ios::out | ios::app);
+	std::ofstream myFile;
+	myFile.open("matrix.txt",std::ios::out | std::ios::app);
 	//Check if type of eq is right
 	if(eq.getType() == 1) {
-		cout << "Can only call augmented Matrix with a type of 0." << endl << endl; 
-		throw exception();
+		std::cout << "Can only call augmented Matrix with a type of 0." << std::endl << std::endl; 
+		throw std::exception();
 	}
 	
 	//Make sure no Equations are empty
 	if((everything.getNumVariables() == 0) || (eq.getNumVariables() == 0)) {
-		cout << "Can't use augmentedMatrix if an equation has no variables." << endl << endl;
-		throw exception();
+		std::cout << "Can't use augmentedMatrix if an equation has no variables." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Check the flags are the same
 	if(!isomorphic(eq.getVariable(0).getFlag(),everything.getVariable(0).getFlag())) {
-		cout << "Flags must be the same in multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Flags must be the same in multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	int numVariables = everything.getNumVariables();
 	
-	vector<int> var(numVariables+1,0);
+	std::vector<int> var(numVariables+1,0);
 	
 	//Determine lcm of all denominators so everything is a fraction
 	long long int den = lcm(eq.getVariable(0).getCoefficient().getDen(),eq.getAns().getDen());
@@ -3572,8 +3572,8 @@ void printMatrixCol(const Equation &everything, const Equation &eq) {
 		}
 		
 		if(!val) {
-			cout << "In printMatrixCol, eq has a variable not in everything." << endl << endl;
-			throw exception();
+			std::cout << "In printMatrixCol, eq has a variable not in everything." << std::endl << std::endl;
+			throw std::exception();
 		}		
 	}
 	
@@ -3581,7 +3581,7 @@ void printMatrixCol(const Equation &everything, const Equation &eq) {
 		myFile << var[i] << ",";
 	}
 	
-	myFile << var[numVariables] << endl;
+	myFile << var[numVariables] << std::endl;
 	
 }
 
@@ -3589,20 +3589,20 @@ void printMatrixCol(const Equation &everything, const Equation &eq) {
 //-----Generate Augmented Matrix-----
 //-----------------------------------
 
-//TODO Set would probably be better data structure than vector 
-void augmentedMatrix(vector<Equation> &known, int n) {
+//TODO Set would probably be better data structure than std::vector 
+void augmentedMatrix(std::vector<Equation> &known, int n) {
 
 	//Check n
 	if(n < 2) {
-		cout << "Need n of at least 2 for augmentedMatrix." << endl << endl;
-		throw exception();
+		std::cout << "Need n of at least 2 for augmentedMatrix." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//No equation can have 0 varaibles
 	for(auto eq: known) {
 		if(eq.getNumVariables() == 0) {
-			cout << "No empty equation in augmentedMatrix." << endl << endl;
-			throw exception();
+			std::cout << "No empty equation in augmentedMatrix." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
@@ -3612,8 +3612,8 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 	for(auto eq: known) {
 		for(int i = 0; i < eq.getNumVariables(); ++i) {
 			if(eq.getVariable(i).getNumColors() != c) {
-				cout << "In augmentedMatrix, everything must all numColors must be the same." << endl << endl;
-				throw exception();
+				std::cout << "In augmentedMatrix, everything must all numColors must be the same." << std::endl << std::endl;
+				throw std::exception();
 			}
 		}
 	}	
@@ -3621,8 +3621,8 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 	//Check that everything in known is type 0
 	for(auto eq: known) {
 		if(eq.getType() != 0) {
-			cout << "In augmentedMatrix, everything in known must be type 0." << endl << endl;
-			throw exception();
+			std::cout << "In augmentedMatrix, everything in known must be type 0." << std::endl << std::endl;
+			throw std::exception();
 		}	
 	}
 	
@@ -3630,21 +3630,21 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 	for(auto eq1: known) {
 		for(auto eq2: known) {
 			if(eq1.getNumZeros() != eq2.getNumZeros()) {
-				cout << "In augmentedMatrix, all known must have the same zeros (in the same order)." << endl << endl;
-				throw exception();
+				std::cout << "In augmentedMatrix, all known must have the same zeros (in the same order)." << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			for(int i = 0; i < eq1.getNumZeros(); ++i) {
 				if(!isomorphic(eq1.getZero(i),eq2.getZero(i))) { 
-					cout << "In augmentedMatrix, all known must have the same zeros (in the same order)." << endl << endl;
-					throw exception();
+					std::cout << "In augmentedMatrix, all known must have the same zeros (in the same order)." << std::endl << std::endl;
+					throw std::exception();
 				}
 			}
 		}
 	}
 	
 	//Gets 0 graphs
-	vector<Graph> zeros;
+	std::vector<Graph> zeros;
 	
 	for(int i = 0; i < known[0].getNumZeros(); ++i) {
 		zeros.push_back(known[0].getZero(i));
@@ -3655,14 +3655,14 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 		int number = eq.getVariable(0).getN();
 		for(int i = 1; i < eq.getNumVariables(); ++i) {
 			if(number != eq.getVariable(i).getN()) {
-				cout << "All equations in known in augmentedMatrix must have same size." << endl << endl;
-				throw exception();
+				std::cout << "All equations in known in augmentedMatrix must have same size." << std::endl << std::endl;
+				throw std::exception();
 			}
 		}
 	}
 		
 	//List of all flags
-	vector<Graph> flags;
+	std::vector<Graph> flags;
 	bool val;
 	
 	for(auto eq: known) {
@@ -3682,7 +3682,7 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 		}
 	}
 	
-	vector<Graph> flagsPlusVertex;
+	std::vector<Graph> flagsPlusVertex;
 	
 	for(auto G: flags) {
 		if(G.getFlag().getN() == 0) {
@@ -3691,11 +3691,11 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 		}
 		
 		if(G.getFlag().getN() != 0) {
-			vector<Graph> variables;		
+			std::vector<Graph> variables;		
 					
 			for(int i = 0; i < myPow(c,G.getFlag().getN()); ++i) {
 				//Convert i to c-ary number
-				vector<int> ary;
+				std::vector<int> ary;
 				int temp = i;
 				
 				for(int j = 0; j < G.getFlag().getN(); ++ j) {
@@ -3704,8 +3704,8 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 					temp = temp-temp2*myPow(c,G.getFlag().getN()-j-1);
 					
 					if((temp2 < 0) || (temp2 >= c)) { //This really shouldn't happen I've checked, but better safe than sorry
-						cout << "Something went wrong in augmentedMatrix." << endl << endl;
-						throw exception();
+						std::cout << "Something went wrong in augmentedMatrix." << std::endl << std::endl;
+						throw std::exception();
 					}
 				}
 							
@@ -3722,7 +3722,7 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 	}
 	
 	//Generate new known equations
-	vector<Equation> newKnown;
+	std::vector<Equation> newKnown;
 	
 	for(int i = 2; i <= n; ++i) {
 		newKnown.clear(); //use this so for loops don't change size
@@ -3733,7 +3733,7 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 					if(known[j].getVariable(0).getN() + known[k].getVariable(0).getN() - known[j].getVariable(0).getFlag().getN() == i) {
 						Equation eq = known[j]*known[k];
 						newKnown.push_back(eq);
-						cout << known.size() + newKnown.size() << endl;
+						std::cout << known.size() + newKnown.size() << std::endl;
 					}
 				}
 			}
@@ -3766,25 +3766,25 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 	}
 	
 	//Prints the variables first
-	ofstream myFile;
+	std::ofstream myFile;
 	myFile.open("graphs.txt");
 	
 	for(int i = 0; i < everything.getNumVariables(); ++i) {
-		myFile << "Variable " << i << " has adjacency matrix: " << endl;
+		myFile << "Variable " << i << " has adjacency matrix: " << std::endl;
 		for(int j = 0; j < everything.getVariable(i).getN(); ++j) {
 			for(int k = 0; k < everything.getVariable(i).getN(); ++k) {
 				myFile << everything.getVariable(i).getEdgeColor(j,k) << " ";
 			}
-			myFile << endl;
+			myFile << std::endl;
 		}				
-		myFile << "There are no flag vertices." << endl;
-		myFile << "It has coefficient: " << everything.getVariable(i).getCoefficient() << endl;
-		myFile << "Its canon label is: " << everything.getVariable(i).getCanonLabel() << endl << endl;
+		myFile << "There are no flag vertices." << std::endl;
+		myFile << "It has coefficient: " << everything.getVariable(i).getCoefficient() << std::endl;
+		myFile << "Its canon label is: " << everything.getVariable(i).getCanonLabel() << std::endl << std::endl;
 	}
 	myFile.close();
 	
 	//Specific to this problem, can remove
-	cout << "The variables with no empty edges of full size are: ";
+	std::cout << "The variables with no empty edges of full size are: ";
 	for(int i = 0; i < everything.getNumVariables(); ++i) {
 		if(everything.getVariable(i).getN() == n) {
 			bool temp = false;
@@ -3800,11 +3800,11 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 			}
 			
 			if(!temp) {
-				cout << i << " ";
+				std::cout << i << " ";
 			}
 		}
 	}
-	cout << endl << endl;
+	std::cout << std::endl << std::endl;
 	
 	//Clears matrix.txt
 	myFile.open("matrix.txt");
@@ -3816,8 +3816,8 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 		++numEquations;
 	}
 	
-	cout << endl << "The number of variables is: " << everything.getNumVariables() << endl;
-	cout << "The number of equations there are is: " << numEquations << endl;
+	std::cout << std::endl << "The number of variables is: " << everything.getNumVariables() << std::endl;
+	std::cout << "The number of equations there are is: " << numEquations << std::endl;
 }
 
 
@@ -3834,37 +3834,37 @@ void augmentedMatrix(vector<Equation> &known, int n) {
 
 //Prints to plainFlagAlgerba1.txt & plainFlagAlgebra2.txt necessary files for python SDP code 
 //f can be thought of as a linear combo of all graphs that we want to max/min
-//v is vector multiplied by matrix in SDP
-void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, vector<Equation> &known) {
-	cout << "Starting plainFlagAlgebra." << endl;
+//v is std::vector multiplied by matrix in SDP
+void plainFlagAlgebra(std::vector<Graph> &f, std::vector<Graph> &v, std::vector<Graph> &zeros, std::vector<Equation> &known) {
+	std::cout << "Starting plainFlagAlgebra." << std::endl;
 	int vSize = v.size();
 	int fSize = f.size();
 	int zerosSize = zeros.size();
 	int knownSize = known.size();
 	
 	if(vSize == 0) {
-		cout << "Need at least one vector in v in plainFlagAlgebra." << endl << endl;
-		throw exception();
+		std::cout << "Need at least one std::vector in v in plainFlagAlgebra." << std::endl << std::endl;
+		throw std::exception();
 	}
 
 	if(fSize == 0) {
-		cout << "Need at least one graph in f in plainFlagAlgebra." << endl << endl;
-		throw exception();
+		std::cout << "Need at least one graph in f in plainFlagAlgebra." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Check if every equation in known has at least one variable
 	for(int i = 0; i < knownSize; ++i) {
 		if(known[i].getNumVariables() == 0) {
-			cout << "Equations in known must have at least one graph in plainFlagAlgebra." << endl << endl;
-			throw exception();
+			std::cout << "Equations in known must have at least one graph in plainFlagAlgebra." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	//Check if every equation in known is type 1
 	for(int i = 0; i < knownSize; ++i) {
 		if(known[i].getType() != 1) {
-			cout << "Every equation in known must by type 1 in plainFlagAlgebra." << endl << endl;
-			throw exception();
+			std::cout << "Every equation in known must by type 1 in plainFlagAlgebra." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
@@ -3875,8 +3875,8 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 	//Check v has all same size
 	for(int i = 1; i < vSize; ++i) {
 		if(v[i].getN() != vN) {
-			cout << "All graphs in v in plainFlagAlgebra must be the same size." << endl << endl;
-			throw exception();
+			std::cout << "All graphs in v in plainFlagAlgebra must be the same size." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
@@ -3884,16 +3884,16 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 	Graph flag = v[0].getFlag();
 	for(int i = 1; i < vSize; ++i) {
 		if(!isomorphic(flag,v[i].getFlag())) {
-			cout << "All graphs in v in plainFlagAlgebra must have the same flag." << endl << endl;
-			throw exception();
+			std::cout << "All graphs in v in plainFlagAlgebra must have the same flag." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	//Graphs in f can't have flags
 	for(int i = 0; i < fSize; ++i) {
 		if(f[i].getFlag().getN() != 0) {
-			cout << "All graphs in f in plainFlagAlgebra must not have any flags." << endl << endl;
-			throw exception();
+			std::cout << "All graphs in f in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 
@@ -3902,8 +3902,8 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 	for(int i = 0; i < knownSize; ++i) {
 		for(int j = 0; j < known[i].getNumVariables(); ++j) {
 			if(known[i].getVariable(j).getFlag().getN() != 0) {
-				cout << "All graphs in known in plainFlagAlgebra must not have any flags." << endl << endl;
-				throw exception();
+				std::cout << "All graphs in known in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+				throw std::exception();
 			}
 		}
 	}
@@ -3913,30 +3913,30 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 	
 	for(int i = 1; i < fSize; ++i) {
 		if(f[i].getNumColors() != numColors) {
-			cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << endl << endl;
-			throw exception();
+			std::cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	for(int i = 0; i < vSize; ++i) {
 		if(v[i].getNumColors() != numColors) {
-			cout << "Everything in plainFlagAlgebra in v must have the same number of colors." << endl << endl;
-			throw exception();
+			std::cout << "Everything in plainFlagAlgebra in v must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	for(int i = 0; i < zerosSize; ++i) {
 		if(zeros[i].getNumColors() != numColors) {
-			cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << endl << endl;
-			throw exception();
+			std::cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	for(int i = 0; i < knownSize; ++i) {
 		for(int j = 0; j < known[i].getNumVariables(); ++j) {
 			if(known[i].getVariable(j).getNumColors() != numColors) {
-				cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << endl << endl;
-				throw exception();
+				std::cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << std::endl << std::endl;
+				throw std::exception();
 			}
 		}
 	}
@@ -3945,64 +3945,64 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 	
 	//Not sure if strictly necessary, but it would probably give trash bounds otherwise
 	if(fN > n) {
-		cout << "Make v large enough so it has vertices at least as many vertices when multiplied by itself as n." << endl << endl;
-		throw exception();
+		std::cout << "Make v large enough so it has vertices at least as many vertices when multiplied by itself as n." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
-	cout << endl;
+	std::cout << std::endl;
 	
 	Equation fEq(f,zeros,Frac(1,1),0); //Type doesn't matter
-	vector<Edge> edges {};
+	std::vector<Edge> edges {};
 	Graph H(edges,1,numColors);
 	Equation eq1({H},zeros,Frac(1,1),0);
 	Equation eq2({H},zeros,Frac(1,1),0);
 	
-	cout << "Generating graphs to be used in resize." << endl;
-	vector<Graph> allGraphs = generate(n,numColors,zeros);
+	std::cout << "Generating graphs to be used in resize." << std::endl;
+	std::vector<Graph> allGraphs = generate(n,numColors,zeros);
 	
-	cout << endl << "Resizing f." << endl;
+	std::cout << std::endl << "Resizing f." << std::endl;
 	Equation fEqResized = resize(fEq,allGraphs);
 	f.clear();
 	for(int i = 0; i < fEqResized.getNumVariables(); ++i) {
 		f.push_back(fEqResized.getVariable(i));
 	}
-	cout << endl;
+	std::cout << std::endl;
 	
 	fSize = f.size();
 	
 	//Resize known
-	cout << "Resizing known." << endl;
+	std::cout << "Resizing known." << std::endl;
 	for(int i = 0; i < knownSize; ++i) {
-		cout << i+1 << " out of " << knownSize << endl;
+		std::cout << i+1 << " out of " << knownSize << std::endl;
 		known[i] = resize(known[i],allGraphs);
 	}
-	cout << endl;
+	std::cout << std::endl;
 	
 	//Calculates everything
 	Graph G({},1,numColors);
 	Equation eq({G},zeros,Frac(1,1),0);
 	
 	if(n == 1) {
-		cout << "Plain flag algebra method not set up for graphs with one vertex." << endl << endl;
-		throw exception();
+		std::cout << "Plain flag algebra method not set up for graphs with one vertex." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
-	cout << "Creating everything equation." << endl;
+	std::cout << "Creating everything equation." << std::endl;
 	Equation everything (allGraphs,zeros,Frac(1,1),0);
-	cout << endl;
+	std::cout << std::endl;
 	
-	ofstream myFile;
+	std::ofstream myFile;
 	myFile.open("Duals.txt");
 	
 	for(int i = 0; i < everything.getNumVariables(); ++i) {
-		myFile << "Label: " << i+1 << endl;
+		myFile << "Label: " << i+1 << std::endl;
 		everything.getVariable(i).printAdjMatToFile(myFile);
-		myFile << endl;
+		myFile << std::endl;
 	}
 
-	vector< vector< vector<Frac> > > A; //Give adjacency matrix values to be printed
-	vector<Frac> B; //Gives numbers to be printed
-	vector< vector<Frac> > C; //From Known
+	std::vector< std::vector< std::vector<Frac> > > A; //Give adjacency matrix values to be printed
+	std::vector<Frac> B; //Gives numbers to be printed
+	std::vector< std::vector<Frac> > C; //From Known
 	
 	//Not sure if it will always initalize right with my own data structure
 	Frac zeroFrac(0,1);
@@ -4024,19 +4024,19 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 		C[i].resize(everything.getNumVariables()+1,zeroFrac);
 	}
 	
-	unordered_map<string, int> everythingMap;
+	std::unordered_map<std::string, int> everythingMap;
 			
 	for(int i = 0; i < everything.getNumVariables(); ++i) {
-		everythingMap.insert(pair<string, int>(everything.getVariable(i).getCanonLabel(),i));
+		everythingMap.insert(std::pair<std::string, int>(everything.getVariable(i).getCanonLabel(),i));
 	}
 	
 	for(int i = 0; i < vSize; ++i) {	
 		for(int j = i; j < vSize; ++j) {
-			cout << "In calculating A, (" << i+1 << ", " << vSize << "), (" << j+1 << ", " << vSize << ")" << endl;
+			std::cout << "In calculating A, (" << i+1 << ", " << vSize << "), (" << j+1 << ", " << vSize << ")" << std::endl;
 			Equation temp = multiply(v[i],v[j],zeros);
-			cout << "Finished multiplying." << endl;
+			std::cout << "Finished multiplying." << std::endl;
 			temp.averageAll();
-			cout << "Finished averaging." << endl;
+			std::cout << "Finished averaging." << std::endl;
 			
 			for(int k = 0; k < temp.getNumVariables(); ++k) {
 				if(i == j) {
@@ -4058,11 +4058,11 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 			}
 		}
 	}
-	cout << endl;
+	std::cout << std::endl;
 	
 	//First has 0 for ==, 1 for <=
 	//Next entry is bound
-	//Finally, it's the vector of coefficients in known (after it's been resized)
+	//Finally, it's the std::vector of coefficients in known (after it's been resized)
 	for(int i = 0; i < knownSize; ++i) {
 		C[i][0] = known[i].getAns();
 		
@@ -4076,7 +4076,7 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 		}
 	}
 	
-	ofstream myFile1;
+	std::ofstream myFile1;
 	myFile1.open("plainFlagAlgebra1.txt");
 	
 	for(int i = 0; i < everything.getNumVariables(); ++i) {
@@ -4084,19 +4084,19 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 			for(int k = 0; k < vSize; ++k) {
 				myFile1 << (double)A[i][j][k].getNum() / (double)A[i][j][k].getDen() << " ";
 			}
-			myFile1 << endl;
+			myFile1 << std::endl;
 		}
-		myFile1 << endl;
+		myFile1 << std::endl;
 	}
 	
-	ofstream myFile2;
+	std::ofstream myFile2;
 	myFile2.open("plainFlagAlgebra2.txt");
 	
 	for(int i = 0; i < everything.getNumVariables(); ++i) {
 		myFile2 << (double)B[i].getNum() / (double)B[i].getDen() << " ";
 	}
 	
-	ofstream myFile3;
+	std::ofstream myFile3;
 	myFile3.open("plainFlagAlgebra3.txt");
 	
 	for(int i = 0; i < knownSize; ++i) {
@@ -4105,7 +4105,7 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 		}
 	}
 	
-	cout << "Finished plainFlagAlgebra." << endl << endl;
+	std::cout << "Finished plainFlagAlgebra." << std::endl << std::endl;
 } 
 
 
@@ -4116,42 +4116,42 @@ void plainFlagAlgebra(vector<Graph> &f, vector<Graph> &v, vector<Graph> &zeros, 
 //Prints to plainFlagAlgerba1.txt & plainFlagAlgebra2.txt necessary files for python SDP code 
 //f can be thought of as a linear combo of all graphs that we want to max/min
 //Rather than taking a v this function takes the number of vertices to compute on (n)
-void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equation> &known, bool maximize = true, double eps = 1E-10) {
-	cout << "Starting plainFlagAlgebra." << endl;
+void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, std::vector<Equation> &known, bool maximize = true, double eps = 1E-10) {
+	std::cout << "Starting plainFlagAlgebra." << std::endl;
 	
 	//The way the python script is setup we need at least one known, this just says that edge density is <= 1
-	if(known.size() == 0) {
-		Graph K2({{}},2,f[0].getNumColors());
-		Equation knownTemp({K2},zeros,Frac(1,1),1);
-		known.push_back(knownTemp);
-	}
+	//if(known.size() == 0) {
+		//Graph K2({{}},2,f[0].getNumColors());
+		//Equation knownTemp({K2},zeros,Frac(1,1),1);
+		//known.push_back(knownTemp);
+	//}
 	
 	int fSize = f.size();
 	int zerosSize = zeros.size();
 	int knownSize = known.size();
 		
 	if(n <= 1) {
-		cout << "Plain flag algebra method not set up for graphs with fewer than two vertices." << endl << endl;
-		throw exception();
+		std::cout << "Plain flag algebra method not set up for graphs with fewer than two vertices." << std::endl << std::endl;
+		throw std::exception();
 	}
 
 	if(fSize == 0) {
-		cout << "Need at least one graph in f in plainFlagAlgebra." << endl << endl;
-		throw exception();
+		std::cout << "Need at least one graph in f in plainFlagAlgebra." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	//Check if every equation in known has at least one variable
 	for(int i = 0; i < knownSize; ++i) {
 		if(known[i].getNumVariables() == 0) {
-			cout << "Equations in known must have at least one graph in plainFlagAlgebra." << endl << endl;
-			throw exception();
+			std::cout << "Equations in known must have at least one graph in plainFlagAlgebra." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	//Make every equation in known type 1 (<=)
 	for(int i = 0; i < knownSize; ++i) {
 		if(known[i].getType() != 1) {
-			vector<Graph> variablesTemp;
+			std::vector<Graph> variablesTemp;
 			
 			for(int j = 0; j < known[i].getNumVariables(); ++j) {
 				Graph graphTemp = known[i].getVariable(j);
@@ -4172,8 +4172,8 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	//Graphs in f can't have flags
 	for(int i = 0; i < fSize; ++i) {
 		if(f[i].getFlag().getN() != 0) {
-			cout << "All graphs in f in plainFlagAlgebra must not have any flags." << endl << endl;
-			throw exception();
+			std::cout << "All graphs in f in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 
@@ -4182,8 +4182,8 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	for(int i = 0; i < knownSize; ++i) {
 		for(int j = 0; j < known[i].getNumVariables(); ++j) {
 			if(known[i].getVariable(j).getFlag().getN() != 0) {
-				cout << "All graphs in known in plainFlagAlgebra must not have any flags." << endl << endl;
-				throw exception();
+				std::cout << "All graphs in known in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+				throw std::exception();
 			}
 		}
 	}
@@ -4193,99 +4193,110 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	for(int i = 1; i < fSize; ++i) {
 		if(f[i].getNumColors() != numColors) {
-			cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << endl << endl;
-			throw exception();
+			std::cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	for(int i = 0; i < zerosSize; ++i) {
 		if(zeros[i].getNumColors() != numColors) {
-			cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << endl << endl;
-			throw exception();
+			std::cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
 	for(int i = 0; i < knownSize; ++i) {
 		for(int j = 0; j < known[i].getNumVariables(); ++j) {
 			if(known[i].getVariable(j).getNumColors() != numColors) {
-				cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << endl << endl;
-				throw exception();
+				std::cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << std::endl << std::endl;
+				throw std::exception();
 			}
 		}
 	}
 	
 	//Not sure if strictly necessary, but it would probably give trash bounds otherwise
 	if(fN > n) {
-		cout << "Make n large enough so it has vertices at least as many vertices when multiplied by itself as n." << endl << endl;
-		throw exception();
+		std::cout << "Make n large enough so it has vertices at least as many vertices when multiplied by itself as n." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
-	cout << endl;
+	std::cout << std::endl;
 	
 	Equation fEq(f,zeros,Frac(1,1),0); //Type doesn't matter
-	vector<Edge> edges {};
+	std::vector<Edge> edges {};
 	Graph H(edges,1,numColors);
 	Equation eq1({H},zeros,Frac(1,1),0);
 	Equation eq2({H},zeros,Frac(1,1),0);
 	
-	cout << "Generating graphs to be used in resize." << endl;
-	vector<Graph> allGraphs = generate(n,numColors,zeros);
+	std::cout << "Generating graphs to be used in resize." << std::endl;
+	std::vector<Graph> allGraphs = generate(n,numColors,zeros);
 	
-	cout << endl << "Resizing f." << endl;
+	std::cout << std::endl << "Resizing f." << std::endl;
 	Equation fEqResized = resize(fEq,allGraphs);
 	f.clear();
 	for(int i = 0; i < fEqResized.getNumVariables(); ++i) {
 		f.push_back(fEqResized.getVariable(i));
 	}
-	cout << endl;
+	std::cout << std::endl;
 	
 	fSize = f.size();
 	
 	//Resize known
-	cout << "Resizing known." << endl;
+	std::cout << "Resizing known." << std::endl;
 	#pragma omp parallel for
 	for(int i = 0; i < knownSize; ++i) {
-		cout << i+1 << " out of " << knownSize << endl;
+		std::cout << i+1 << " out of " << knownSize << std::endl;
 		known[i] = resize(known[i],allGraphs);
 	}
-	cout << endl;
+	std::cout << std::endl;
 
+	std::vector<Equation> knownEq;
+	std::vector<Equation> knownLess;
 	
-	ofstream myFile;
+	for(int i = 0; i < knownSize; ++i) {
+		if(known[i].getType() == 1) {
+			knownLess.push_back(known[i]);
+		}
+		
+		else {
+			knownEq.push_back(known[i]);
+		}	
+	}
+	
+	std::ofstream myFile;
 	myFile.open("Duals.txt");
 	
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		myFile << "Label: " << i+1 << endl;
+		myFile << "Label: " << i+1 << std::endl;
 		allGraphs[i].printAdjMatToFile(myFile);
-		myFile << endl;
+		myFile << std::endl;
 	}
 	
 	//Used to give indices of A
 	//Rather than multiplying we look at all graphs and work backwards to get coefficients
 	//This works well as we have already generated all graphs of size n and multiplication basically just has us partially doing that every time so it saves time on generation
-	//The only slow down could come from looking up indices but unordered_maps are SO fast it doesn't matter
-	unordered_map<string, int> allGraphsMap;
+	//The only slow down could come from looking up indices but std::unordered_maps are SO fast it doesn't matter
+	std::unordered_map<std::string, int> allGraphsMap;
 					
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		allGraphsMap.insert(pair<string, int>(allGraphs[i].getCanonLabel(),i));
+		allGraphsMap.insert(std::pair<std::string, int>(allGraphs[i].getCanonLabel(),i));
 	}
 	
 	//All graphs of size n with flags such that parity issues work out
-	cout << "Generating v." << endl;
-	vector < vector < Graph > > v = generateV(n,numColors,zeros);
-	cout << endl;
-	cout << "Generating allGraphsWithFlags." << endl;
-	vector < vector < Graph > > allGraphsWithFlags = generateAllGraphsWithFlags(n,numColors,zeros);
-	cout << endl;
+	std::cout << "Generating v." << std::endl;
+	std::vector < std::vector < Graph > > v = generateV(n,numColors,zeros);
+	std::cout << std::endl;
+	std::cout << "Generating allGraphsWithFlags." << std::endl;
+	std::vector < std::vector < Graph > > allGraphsWithFlags = generateAllGraphsWithFlags(n,numColors,zeros);
+	std::cout << std::endl;
 
-	//queue<tuple<int,int,int,int,Frac> > A;
-	vector<Frac> B; //Gives numbers to be printed
-	vector< vector<Frac> > C; //From Known
-	vector<Frac> C1;
+	std::vector<Frac> B; //Gives numbers to be printed
+	std::vector< std::vector<Frac> > C; //From Known
+	std::vector<Frac> C1;
 	
 	Frac zeroFrac(0,1);
 	//Calculating B
-	cout << "Calculating B." << endl << endl;
+	std::cout << "Calculating B." << std::endl << std::endl;
 	B.resize(allGraphs.size(),zeroFrac);
 	
 	//TODO use map
@@ -4302,10 +4313,10 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 	
 	//First has 0 for ==, 1 for <=
 	//Next entry is bound
-	//Finally, it's the vector of coefficients in known (after it's been resized)
+	//Finally, it's the std::vector of coefficients in known (after it's been resized)
 	
 	//Calculating C
-	cout << "Calculating C." << endl << endl;
+	std::cout << "Calculating C." << std::endl << std::endl;
 	C.resize(allGraphs.size());
 	C1.resize(knownSize,zeroFrac);
 	
@@ -4329,30 +4340,37 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 		}
 	}
 	
-	//auto MosekC1 = monty::new_array_ptr<double>(C1);
-	//auto MosekC = monty::new_array_ptr<double>(C1);
+	std::cout << "Calculating A and setting up Mosek." << std::endl << std::endl;
 	
-	cout << "Calculating A and setting up Mosek." << endl << endl;
-	
-	Model::t M = new Model("sdp"); auto _M = finally([&]() { M->dispose(); });
+	mosek::fusion::Model::t M = new mosek::fusion::Model("sdp"); auto _M = monty::finally([&]() { M->dispose(); });
    M->setSolverParam("numThreads", 0);
 	auto x = M->variable();
-	auto y = M->variable((int)known.size(), Domain::greaterThan(0));
-	vector<Constraint::t> constraints;
-	vector< Variable::t > MosekM;
-	vector< vector< vector< vector< Frac > > > > A;
+	auto y = M->variable((int)known.size(), mosek::fusion::Domain::greaterThan(0));
+	std::vector<mosek::fusion::Constraint::t> constraints;
+	std::vector< mosek::fusion::Variable::t > MosekM;
+	std::vector< std::vector< std::vector< std::vector< Frac > > > > A;
 	A.resize(allGraphs.size());
 	
+	//Stupid C++ doesn't have has for int[2]
+	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
+	std::vector< std::vector< std::unordered_map<std::pair<int,int>,Frac,boost::hash<std::pair<int,int> > > > > newA;
+	newA.resize(allGraphs.size());
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		newA[i].resize(v.size()); 
+	}
+	
+	int FCOORDcounter = 0;
 	
 	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
-		cout << "In A, iteration " << i+1 << " out of " << v.size() << endl;  
+		std::cout << "In A, iteration " << i+1 << " out of " << v.size() << std::endl;  
+		
 		//Create hash map for third and fourth indices of A
-		unordered_map<string, int> f;
+		std::unordered_map<std::string, int> f;
 		for(int j = 0; j < (int)v[i].size(); ++j) {
-			f.insert(pair<string, int>(v[i][j].getCanonLabel(),j));
+			f.insert(std::pair<std::string, int>(v[i][j].getCanonLabel(),j));
 		}	
 		
-		vector< vector < vector <Frac> > > partialA((int)allGraphs.size(), vector< vector<Frac> > ((int)v[i].size(), vector<Frac>((int)v[i].size(), Frac(0,1))));
+		std::vector< std::vector < std::vector <Frac> > > partialA((int)allGraphs.size(), std::vector< std::vector<Frac> > ((int)v[i].size(), std::vector<Frac>((int)v[i].size(), Frac(0,1))));
 		
 		int sizeOfFlag = v[i][0].getSizeOfFlag();
 		
@@ -4365,7 +4383,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 				
 				//Make sure all flag vertices in G are first
 				//TODO make a function of this
-				vector<int> reordering(n);
+				std::vector<int> reordering(n);
 				
 				for(int j = 0; j < sizeOfFlag; ++j) {
 					reordering[G.getFlagVertex(j)] = j;
@@ -4389,15 +4407,15 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 				int b = allGraphsMap[Gcopy.getCanonLabel()];	
 				Frac e = G.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
 				
-				vector<int> X((n-sizeOfFlag)/2 - 1); //X is zero indexed but it should actually be sizeOfFlag+1 indexed
+				std::vector<int> X((n-sizeOfFlag)/2 - 1); //X is zero indexed but it should actually be sizeOfFlag+1 indexed
 				//Wlog first non-flag vertex in X
 				for(int j = 0; j < (n-sizeOfFlag)/2 - 1; ++j) {
 					X[j] = j;
 				}
 				
 				do {
-					vector<int> restriction1(n,-1);
-					vector<int> restriction2(n,-1);
+					std::vector<int> restriction1(n,-1);
+					std::vector<int> restriction2(n,-1);
 					
 					for(int j = 0; j < sizeOfFlag; ++j) {
 						restriction1[j] = j;
@@ -4429,64 +4447,229 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 					int G1Index = f[G1.getCanonLabel()];
 					int G2Index = f[G2.getCanonLabel()];
 					
-					int c = min(G1Index,G2Index);
-					int d = max(G1Index,G2Index);
-					
-					int divide;
-					if(c == d) {
-						divide = 1;
-					}
-					
-					else {
-						divide = 1;
-					}
+					int c = std::min(G1Index,G2Index);
+					int d = std::max(G1Index,G2Index);
 					
 					#pragma omp critical
-					partialA[b][c][d] = partialA[b][c][d] + e/divide;
+					{
+						partialA[b][c][d] = partialA[b][c][d] + e;
+						
+						auto it = newA[b][i].find({c,d});
+						
+						if( it == newA[b][i].end() ) {
+							newA[b][i].insert({{c,d},e});
+							++FCOORDcounter;
+						}
+						
+						else {
+							it->second = it->second + e; 
+						}	
+					}
 				
 				} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
 			}
 		}
 		
-		auto MosekMTemp = M->variable("M"+to_string(i),Domain::inPSDCone(v[i].size()));
+		auto MosekMTemp = M->variable("M"+std::to_string(i), mosek::fusion::Domain::inPSDCone( v[i].size() ));
 		MosekM.push_back(MosekMTemp);
 		
 		for(int j = 0; j < (int)allGraphs.size(); ++j) {
 			A[j].push_back(partialA[j]);
 		}
 	}
-	cout << endl;
+	std::cout << std::endl;
+
+	std::cout << "Writing to file." << std::endl;
+
+	//Make my own mosek output
+	std::ofstream mosekFile("test.cbf");
 	
+	mosekFile << "VER\n3\n\n";
+	
+	mosekFile << "OBJSENSE\nMAX\n\n";
+	
+	mosekFile << "PSDVAR\n" << v.size() << "\n";
+	for(int i = 0; i < v.size(); ++i) {
+		mosekFile << v[i].size() << "\n";
+	} 
+	mosekFile << "\n";
+	
+	mosekFile << "VAR\n";
+	if(knownLess.size() != 0) {
+		mosekFile << knownSize + 1 << " " << 2 << "\n";
+		mosekFile << "F " << knownEq.size()+1 << "\n";
+		mosekFile << "L+ " << knownLess.size() << "\n\n";
+	}
+	else {
+		mosekFile << knownSize + 1 << " 1\n";
+		mosekFile << "F " << knownSize + 1 << "\n\n";
+	}
+	
+	mosekFile << "CON\n";
+	mosekFile << allGraphs.size() << " 1\n";
+	mosekFile << "L- " << allGraphs.size() << "\n\n";
+	
+	mosekFile << "OBJACOORD\n";
+	int OBJACOORDcounter = 1;
+	long long int mult = 1;
+	for(int i = 0; i < (int)known.size(); ++i) {
+		if(known[i].getAns().getNum() != 0) {
+			mult = lcm(mult,known[i].getAns().getDen());
+			++OBJACOORDcounter;
+		}
+	} 
+	
+	mosekFile << OBJACOORDcounter << "\n";
+	mosekFile << "0 " << mult << "\n";
+	for(int i = 0; i < (int)knownEq.size(); ++i) {
+		mosekFile << i+1 << " " << -knownEq[i].getAns().getNum() * (mult/knownEq[i].getAns().getDen()) << "\n" ;
+	}
+	for(int i = 0; i < (int)knownLess.size(); ++i) {
+		mosekFile << i+1+knownEq.size() << " " << -knownLess[i].getAns().getNum() * (mult/knownLess[i].getAns().getDen()) << "\n" ;
+	}
+	mosekFile << "\n";
+	
+	std::cout << "Making Integer." << std::endl;
+	
+	std::vector<long long int> constraintMult;
+	int BCOORDcounter = 0;
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		if(B[i].getNum() != 0) {
+			++BCOORDcounter;
+		}
+	
+		constraintMult.push_back(B[i].getDen());
+		
+		for(int j = 0; j < v.size(); ++j) {
+			for(auto k : newA[i][j]) {
+				constraintMult[i] = lcm(constraintMult[i],k.second.getDen());
+			}
+		}
+		
+		for(int j = 0; j < (int)known.size(); ++j) {
+			for(int k = 0; k < known[j].getNumVariables(); ++k) {
+				constraintMult[i] = lcm(constraintMult[i], known[j].getVariable(k).getCoefficient().getDen());
+			}
+		}
+	}
+	
+	mosekFile << "FCOORD\n";
+	mosekFile << FCOORDcounter << "\n";
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		std::cout << "In writing FCOORD iteration " << i + 1  << " out of " << allGraphs.size() << std::endl;
+		for(int j = 0; j < (int)v.size(); ++j) {
+			//Probably faster to use auto for loop, but easier to debug this way
+			for(int k = 0; k < (int)v[j].size(); ++k) {
+				for(int l = k; l < (int)v[j].size(); ++l) {
+					auto it = newA[i][j].find({k,l});
+				
+					if(it != newA[i][j].end()) {	
+						if(k != l) {
+							mosekFile << i << " " << j << " " << l << " " << k << " " << it->second.getNum() *(constraintMult[i] / (2.*it->second.getDen())) << "\n";
+						} //May give fractions, but at most 1/2 so we don't have precision issue
+						
+						else {
+							mosekFile << i << " " << j << " " << l << " " << k << " " << it->second.getNum() *(constraintMult[i] / it->second.getDen()) << "\n";
+						}
+					}
+				}
+			}
+		}
+	}
+	mosekFile <<"\n";
+	
+	mosekFile << "ACOORD\n";
+	
+	std::cout << "Writing ACOORD." << std::endl;
+	
+	int ACOORDcounter = 0;
+	std::vector< std::array<int, 3> > ACOORDvec;
+	
+	#pragma omp parallel for
+	for(int i = 0; i < (int)knownEq.size(); ++i) {
+		for(int j = 0; j < knownEq[i].getNumVariables(); ++j) {
+			for(int k = 0; k < (int)allGraphs.size(); ++k) {
+				if(isomorphic(knownEq[i].getVariable(j),allGraphs[k])) {		
+					#pragma omp critical 
+					{
+						++ACOORDcounter; 
+						ACOORDvec.push_back({k,i+1, static_cast<int> ( knownEq[i].getVariable(j).getCoefficient().getNum() * (constraintMult[k] / knownEq[i].getVariable(j).getCoefficient().getDen()) )});
+					}
+					k = (int)allGraphs.size();
+				}
+			}
+		}
+	}
+	
+	#pragma omp parallel for
+	for(int i = 0; i < (int)knownLess.size(); ++i) {
+		for(int j = 0; j < knownLess[i].getNumVariables(); ++j) {
+			for(int k = 0; k < (int)allGraphs.size(); ++k) {
+				if(isomorphic(knownLess[i].getVariable(j),allGraphs[k])) {		
+					#pragma omp critical 
+					{
+						++ACOORDcounter; 
+						ACOORDvec.push_back({k,i+1+(int)knownEq.size(), static_cast<int> ( knownLess[i].getVariable(j).getCoefficient().getNum() * (constraintMult[k] / knownLess[i].getVariable(j).getCoefficient().getDen()))});
+					}
+					k = (int)allGraphs.size();
+				}
+			}
+		}
+	}
+	
+	mosekFile << ACOORDcounter + allGraphs.size() << "\n"; 	
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		mosekFile << i << " 0 " << constraintMult[i] << "\n";
+	}
+	for(int i = 0; i < (int)ACOORDvec.size(); ++i) {
+		mosekFile << ACOORDvec[i][0] << " " << ACOORDvec[i][1] << " " << -ACOORDvec[i][2] << "\n";
+	}
+	mosekFile << "\n";
+	
+	std::cout << "Writing BCOORD." << std::endl;
+	
+	mosekFile << "BCOORD\n";
+	mosekFile << BCOORDcounter << "\n";
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		if(B[i].getNum() != 0) {
+			mosekFile << i << " " << -B[i].getNum() * (constraintMult[i]/B[i].getDen()) << "\n";
+		}
+	}
+	
+	//Flush Buffer
+	mosekFile << std::endl;
+	std::cout << std::endl;
 	
 	//This is definitely not the fastest way
 	//Could remove elements using a set
-	vector<int> constraintsSigma;
+	std::vector<int> constraintsSigma;
 	
 	#pragma omp parallel for schedule(dynamic)
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		cout << "Making everything integer, iteration " << i << " out of " << allGraphs.size() << endl;
-		long long int mult = 1;
+		std::cout << "Making everything integer, iteration " << i << " out of " << allGraphs.size() << std::endl;
+		long long int mymult = 1;
 		
 		for(int j = 0; j < (int)v.size(); ++j) {
 			for(int k = 0; k < v[j].size(); ++k) {
 				for(int l = k; l < v[j].size(); ++l) {
-					mult = lcm(mult,A[i][j][k][l].getDen());
+					mymult = lcm(mymult,A[i][j][k][l].getDen());
 				}
 			}
 		}
 		
 		for(int j = 0; j < known.size(); ++j) {
-			mult = lcm(mult,C[i][j].getDen());
+			mymult = lcm(mymult,C[i][j].getDen());
 		}
 		
-		mult = lcm(mult,B[i].getDen());
+		mymult = lcm(mymult,B[i].getDen());
 		
-		double multD = (double)mult;
+		double multD = (double)mymult;
 		
-		vector<Matrix::t> MosekA;
+		std::vector<mosek::fusion::Matrix::t> MosekA;
 		
 		for(int j = 0; j < (int)v.size(); ++j) {
-			vector<vector<double> > intA; //Stupid Mosek requires matrices to have floats
+			std::vector<std::vector<double> > intA; //Stupid Mosek requires matrices to have floats
 			intA.resize(v[j].size());
 			
 			for(int k = 0; k < v[j].size(); ++k) {
@@ -4496,7 +4679,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 				}
 			}
 			
-			MosekA.push_back(Matrix::sparse(monty::new_array_ptr<double>(intA)));
+			MosekA.push_back(mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(intA)));
 		}
 		
 		double intB;
@@ -4509,7 +4692,7 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 			intB = (B[i].getNum()*multD)/B[i].getDen();
 		}
 		
-		vector<double> intC;
+		std::vector<double> intC;
 		intC.resize(known.size());
 		
 		for(int j = 0; j < known.size(); ++j) {
@@ -4520,34 +4703,30 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 		
 		#pragma omp critical
 		{
-			auto forConstraint = Expr::sub(Expr::mul(multD,x),Expr::dot(MosekC,y));
+			auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(multD,x),mosek::fusion::Expr::dot(MosekC,y));
 			
 			for(int j = 0; j < (int)v.size(); ++j) {
-				forConstraint = Expr::add(forConstraint,Expr::dot(MosekA[j],MosekM[j]));
+				forConstraint = mosek::fusion::Expr::add(forConstraint,mosek::fusion::Expr::dot(MosekA[j],MosekM[j]));
 			}
 			
-			auto c = M->constraint(forConstraint, Domain::lessThan(intB)); 
+			auto c = M->constraint(forConstraint, mosek::fusion::Domain::lessThan(intB)); 
 			constraints.push_back(c);
 			constraintsSigma.push_back(i);
 		}
 	}
 	
-	cout << endl;
-	
-	long long int mult = 1;
-	for(int i = 0; i < (int)known.size(); ++i) {
-		mult = lcm(mult,C1[i].getDen());
-	} 
+	std::cout << std::endl;
+
 	
 	double multD = (double)mult;
 	
-	vector<double> C1Int;
+	std::vector<double> C1Int;
 	
 	for(int i = 0; i < (int)known.size(); ++i) {
 		C1Int.push_back((round)((C1[i].getNum()*multD)/C1[i].getDen()));
 	}
 	
-	auto MosekC1 = new_array_ptr(C1Int);
+	auto MosekC1 = monty::new_array_ptr(C1Int);
 	
 	//M->setSolverParam("intpntTolStepSize", 0.);
    //M->setSolverParam("intpntSolveForm", "dual");
@@ -4557,30 +4736,31 @@ void plainFlagAlgebra(vector<Graph> &f, int n, vector<Graph> &zeros, vector<Equa
 
 
 
-	M->objective(ObjectiveSense::Maximize, Expr::sub(Expr::mul(x,multD), Expr::dot(MosekC1,y)));
-	//M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
+	M->objective(mosek::fusion::ObjectiveSense::Maximize, mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(x,multD), mosek::fusion::Expr::dot(MosekC1,y)));
+	M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
+	M->writeTask("sdp.ptf");
 	M->writeTask("sdp.cbf"); // Use for debugging
 	//M->writeTask("data.task.gz"); //Use if using Mosek Console
    M->solve();
-   cout << endl;
+   std::cout << std::endl;
    
-   cout << "Divide those objective values by: " << multD << endl << endl;
+   std::cout << "Divide those objective values by: " << multD << std::endl << std::endl;
    
-   cout << "Print all non-zero (> 1E-5) dual values: " << endl;
+   std::cout << "Print all non-zero (> 1E-5) dual values: " << std::endl;
    for(int i = 0; i < constraints.size(); ++i) {
    	if((*constraints[i]->dual())[0] > 1E-5) {
-   		cout << "Graph " << i << " has a dual value of " << (*constraints[i]->dual())[0] << endl;
+   		std::cout << "Graph " << i << " has a dual value of " << (*constraints[i]->dual())[0] << std::endl;
    	}
    }
-   cout << endl;
+   std::cout << std::endl;
 	
    
    if(maximize) {
-   	cout << "The objective function is: " << 1.-M->dualObjValue()/multD << endl << endl;
+   	std::cout << "The objective function is: " << 1.-M->dualObjValue()/multD << std::endl << std::endl;
    }
    
    else {
-   	cout << "The objective function is: " << M->dualObjValue()/multD << endl << endl;
+   	std::cout << "The objective function is: " << M->dualObjValue()/multD << std::endl << std::endl;
    }
 }
 

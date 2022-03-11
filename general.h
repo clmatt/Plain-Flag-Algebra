@@ -12,7 +12,7 @@
 
 //Requires to be a subset from 0,1,...,n-1 of size k
 //Initialize with 0,...,k-1
-bool nextSubset(vector<int> &subset, int n, int k) {
+bool nextSubset(std::vector<int> &subset, int n, int k) {
 	int index,i;
 	bool val;
 
@@ -40,8 +40,8 @@ bool nextSubset(vector<int> &subset, int n, int k) {
 		}
 
 		else if (subset[index] > n - k + index) {
-			cout << "Error in nextSubset" << endl << endl;
-			throw exception();
+			std::cout << "Error in nextSubset" << std::endl << std::endl;
+			throw std::exception();
 		}
 
 		else {
@@ -60,35 +60,35 @@ bool nextSubset(vector<int> &subset, int n, int k) {
 //maxVals is the maximum each element can take in the list
 //unlike subset we allow repeats
 //Intialize list with all zeros
-bool nextList(vector<int> &list, const vector<int> &maxVals) {
+bool nextList(std::vector<int> &list, const std::vector<int> &maxVals) {
 	if(list.size() != maxVals.size()) {
-		cout << "In nextList the list size must be the same as maxVals size." << endl;
-		cout << "List size = " << list.size() << endl;
-		cout << "maxVals size = " << maxVals.size() << endl << endl;
-		throw exception();
+		std::cout << "In nextList the list size must be the same as maxVals size." << std::endl;
+		std::cout << "List size = " << list.size() << std::endl;
+		std::cout << "maxVals size = " << maxVals.size() << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	for(int i = 0; i < (int)list.size(); ++i) {
 		if(list[i] > maxVals[i]) {
-			cout << "In nextList the list entries must be <= the maxVal entries." << endl;
-			cout << "Index = " << i << endl;
-			cout << "List entry = " << list[i] << endl;
-			cout << "maxVals entry = " << maxVals[i] << endl << endl;
-			throw exception();
+			std::cout << "In nextList the list entries must be <= the maxVal entries." << std::endl;
+			std::cout << "Index = " << i << std::endl;
+			std::cout << "List entry = " << list[i] << std::endl;
+			std::cout << "maxVals entry = " << maxVals[i] << std::endl << std::endl;
+			throw std::exception();
 		}
 		
 		if(maxVals[i] < 0) {
-			cout << "In nextList, maxVals can't have negative entries." << endl;
-			cout << "Index = " << i << endl;
-			cout << "maxVals entry = " << maxVals[i] << endl << endl;
-			throw exception();
+			std::cout << "In nextList, maxVals can't have negative entries." << std::endl;
+			std::cout << "Index = " << i << std::endl;
+			std::cout << "maxVals entry = " << maxVals[i] << std::endl << std::endl;
+			throw std::exception();
 		}
 		
 		if(list[i] < 0) {
-			cout << "In nextList, list can't have negative entries." << endl;
-			cout << "Index = " << i << endl;
-			cout << "maxVals entry = " << list[i] << endl << endl;
-			throw exception();
+			std::cout << "In nextList, list can't have negative entries." << std::endl;
+			std::cout << "Index = " << i << std::endl;
+			std::cout << "maxVals entry = " << list[i] << std::endl << std::endl;
+			throw std::exception();
 		}
 	}
 	
@@ -116,7 +116,7 @@ bool nextList(vector<int> &list, const vector<int> &maxVals) {
 
 //Outputs all ordered sets of size k such that they sum to equal n
 //Intialize with n,0,0,...,0 goes until 0,0,...,0,n
-bool nextOrderedSum(vector<int> &sum) {
+bool nextOrderedSum(std::vector<int> &sum) {
 	int k = sum.size();
 	
 	int n = 0;
@@ -142,7 +142,7 @@ bool nextOrderedSum(vector<int> &sum) {
 	}
 	
 	else {
-		vector<int> partialSum(k-1);
+		std::vector<int> partialSum(k-1);
 		for(int i = 0; i < k-1; ++i) {
 			partialSum[i] = sum[i+1];
 		}
@@ -212,8 +212,8 @@ long long int lcm(long long int a, long long int b) {
 	long long int ans = b*(a/gcd(a,b));
 	
 	if(ans < 0) { 
-		cout << "Overflow in lcm." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in lcm." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	return ans;
@@ -229,8 +229,8 @@ long long int myPow(long long int a, int b) {
 	long long int val = a;
 
 	if (b < 0) {
-		cout << "Only using myPow if power is >= 0." << endl << endl;
-		throw exception();
+		std::cout << "Only using myPow if power is >= 0." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	else if(b == 0) {
@@ -252,10 +252,10 @@ long long int myPow(long long int a, int b) {
 
 long long int choose(long long int n, long long int k) {
 	if(n < 0 || k < 0) {
-		cout << "Choose can't take negative numbers." << endl;
-		cout << "n = " << n << endl;
-		cout << "k = " << k << endl;
-		throw exception();
+		std::cout << "Choose can't take negative numbers." << std::endl;
+		std::cout << "n = " << n << std::endl;
+		std::cout << "k = " << k << std::endl;
+		throw std::exception();
 	}
 	
 	if(n < k) {
@@ -290,9 +290,9 @@ int binaryDigit(int n, int k) {
 
 long long int factorial(int n) {
 	if(n < 0) {
-		cout << "Factorial doesn't take negative numbers." << endl;
-		cout << "n = " << n << endl << endl;
-		throw exception();
+		std::cout << "Factorial doesn't take negative numbers." << std::endl;
+		std::cout << "n = " << n << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((n == 1) || (n == 0)) {

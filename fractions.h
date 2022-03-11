@@ -20,8 +20,8 @@ class Frac {
 		
 		Frac(long long int a, long long int b) {
 			if( b == 0) {
-				cout << "Error in Frac constructor, no fractions with 0 denominator" << endl << endl;
-				throw exception();
+				std::cout << "Error in Frac constructor, no fractions with 0 denominator" << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			//Copied from reduce (need here because reduce works on already intialized fractions)			
@@ -56,8 +56,8 @@ class Frac {
 		
 		void reduce() {
 			if(den == 0) {
-				cout << "Error in reduce (shouldn't throw this error, so something is broken) 0 denominator" << endl << endl;
-				throw exception();
+				std::cout << "Error in reduce (shouldn't throw this error, so something is broken) 0 denominator" << std::endl << std::endl;
+				throw std::exception();
 			}
 			
 			if(num == 0) {
@@ -116,7 +116,7 @@ class Frac {
 		
 		void setDen(long long int b) {
 			if(b == 0) {
-				cout << "Can't set denominator to 0 in Frac." << endl << endl;
+				std::cout << "Can't set denominator to 0 in Frac." << std::endl << std::endl;
 			}
 			
 			den = b;
@@ -150,7 +150,7 @@ bool isInteger(Frac frac) {
 //-----Print Fraction-----
 //------------------------
 
-ostream& operator<<(ostream& os, Frac frac) {
+std::ostream& operator<<(std::ostream& os, Frac frac) {
 	if(isInteger(frac)) {
 		os << frac.getNum();
 	}
@@ -173,8 +173,8 @@ long long int convertToInt(Frac frac) {
 	}
 	
 	else {
-		cout << "Can't convert fraction to integer if not an integer." << endl << endl;
-		throw exception();
+		std::cout << "Can't convert fraction to integer if not an integer." << std::endl << std::endl;
+		throw std::exception();
 	}
 }
 
@@ -197,43 +197,43 @@ Frac operator*(Frac frac1, Frac frac2) {
 	long long int b = frac1.getDen() * frac2.getDen();
 	
 	if((frac1.getNum() > 0) && (frac2.getNum() > 0) && (a < 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getNum() < 0) && (frac2.getNum() > 0) && (a > 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 
 	if((frac1.getNum() > 0) && (frac2.getNum() < 0) && (a > 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getNum() < 0) && (frac2.getNum() < 0) && (a < 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getDen() > 0) && (frac2.getDen() > 0) && (b < 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getDen() < 0) && (frac2.getDen() > 0) && (b > 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 
 	if((frac1.getDen() > 0) && (frac2.getDen() < 0) && (b > 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getDen() < 0) && (frac2.getDen() < 0) && (b < 0)) {
-		cout << "Overflow in fraction multiplication." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction multiplication." << std::endl << std::endl;
+		throw std::exception();
 	}
 		
 	return Frac(a,b);
@@ -260,8 +260,8 @@ Frac operator*(Frac const &frac1, long long int i) {
 
 Frac inv(Frac frac) {
 	if(frac.getNum() == 0) {
-		cout << "Error in inv, can't take inverse of 0." << endl << endl;
-		throw exception();
+		std::cout << "Error in inv, can't take inverse of 0." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	return Frac(frac.getDen(),frac.getNum());
@@ -283,8 +283,8 @@ Frac operator/(Frac frac1, Frac frac2) {
 
 Frac operator/(Frac frac, int i) {
 	if(i == 0) {
-		cout << "Can't divide by 0" << endl << endl;
-		throw exception();
+		std::cout << "Can't divide by 0" << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	return(frac/convertFromInt(i));
@@ -334,80 +334,80 @@ Frac operator+(Frac frac1, Frac frac2) {
 	long long int b = frac1.getDen() * frac2.getDen();
 	
 	if((frac1.getNum() > 0) && (frac2.getDen() > 0) && (frac1.getNum() * frac2.getDen() < 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getNum() < 0) && (frac2.getDen() > 0) && (frac1.getNum() * frac2.getDen() > 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 
 	if((frac1.getNum() > 0) && (frac2.getDen() < 0) && (frac1.getNum() * frac2.getDen() > 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getNum() < 0) && (frac2.getDen() < 0) && (frac1.getNum() * frac2.getDen() < 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	
 	
 	if((frac2.getNum() > 0) && (frac1.getDen() > 0) && (frac1.getDen() * frac2.getNum() < 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac2.getNum() < 0) && (frac1.getDen() > 0) && (frac1.getDen() * frac2.getNum() > 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 
 	if((frac2.getNum() > 0) && (frac1.getDen() < 0) && (frac1.getDen() * frac2.getNum() > 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac2.getNum() < 0) && (frac1.getDen() < 0) && (frac1.getDen() * frac2.getNum() < 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	
 	
 	if((frac1.getDen() > 0) && (frac2.getDen() > 0) && (b < 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getDen() < 0) && (frac2.getDen() > 0) && (b > 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 
 
 	if((frac1.getDen() > 0) && (frac2.getDen() < 0) && (b > 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getDen() < 0) && (frac2.getDen() < 0) && (b < 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	
 	
 	if((frac1.getNum()*frac2.getDen() > 0) && (frac2.getNum()*frac1.getDen() > 0) && (a < 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	if((frac1.getNum()*frac2.getDen() < 0) && (frac2.getNum()*frac1.getDen() < 0) && (a > 0)) {
-		cout << "Overflow in fraction addition." << endl << endl;
-		throw exception();
+		std::cout << "Overflow in fraction addition." << std::endl << std::endl;
+		throw std::exception();
 	}
 	
 	return Frac(a,b);
