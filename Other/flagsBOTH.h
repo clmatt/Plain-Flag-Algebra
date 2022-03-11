@@ -3425,13 +3425,11 @@ Equation operator*(const Equation &eq1, const Equation &eq2) {
 	//Distributive
 	Equation eq = multiply(eq1.getVariable(0), eq2.getVariable(0), zeros);
 
-	//#pragma omp parallel for collapse(2) schedule(dynamic)
 	for(int i = 0; i < eq1.getNumVariables(); ++i) {
 		for(int j = 0; j < eq2.getNumVariables(); ++j) {
 			std::cout << "In multiply (" << i << ", " << j << ") out of (" << eq1.getNumVariables() << ", " << eq2.getNumVariables() << ")." << std::endl;
 			if((i != 0) || (j != 0)) {
 				Equation toAdd = multiply(eq1.getVariable(i), eq2.getVariable(j), zeros);
-				//#pragma omp critical
 				eq = eq + toAdd;
 			}
 		}
@@ -4342,6 +4340,17 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 		}
 	}
 	
+	std::cout << "Calculating A and setting up Mosek." << std::endl << std::endl;
+	
+	mosek::fusion::Model::t M = new mosek::fusion::Model("sdp"); auto _M = monty::finally([&]() { M->dispose(); });
+   M->setSolverParam("numThreads", 0);
+	auto x = M->variable();
+	auto y = M->variable((int)known.size(), mosek::fusion::Domain::greaterThan(0));
+	std::vector<mosek::fusion::Constraint::t> constraints;
+	std::vector< mosek::fusion::Variable::t > MosekM;
+	std::vector< std::vector< std::vector< std::vector< Frac > > > > A;
+	A.resize(allGraphs.size());
+	
 	//Stupid C++ doesn't have has for int[2]
 	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
 	std::vector< std::vector< std::unordered_map<std::pair<int,int>,Frac,boost::hash<std::pair<int,int> > > > > newA;
@@ -4360,6 +4369,8 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 		for(int j = 0; j < (int)v[i].size(); ++j) {
 			f.insert(std::pair<std::string, int>(v[i][j].getCanonLabel(),j));
 		}	
+		
+		std::vector< std::vector < std::vector <Frac> > > partialA((int)allGraphs.size(), std::vector< std::vector<Frac> > ((int)v[i].size(), std::vector<Frac>((int)v[i].size(), Frac(0,1))));
 		
 		int sizeOfFlag = v[i][0].getSizeOfFlag();
 		
@@ -4440,7 +4451,9 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 					int d = std::max(G1Index,G2Index);
 					
 					#pragma omp critical
-					{					
+					{
+						partialA[b][c][d] = partialA[b][c][d] + e;
+						
 						auto it = newA[b][i].find({c,d});
 						
 						if( it == newA[b][i].end() ) {
@@ -4456,13 +4469,20 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 				} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
 			}
 		}
+		
+		auto MosekMTemp = M->variable("M"+std::to_string(i), mosek::fusion::Domain::inPSDCone( v[i].size() ));
+		MosekM.push_back(MosekMTemp);
+		
+		for(int j = 0; j < (int)allGraphs.size(); ++j) {
+			A[j].push_back(partialA[j]);
+		}
 	}
 	std::cout << std::endl;
 
 	std::cout << "Writing to file." << std::endl;
 
 	//Make my own mosek output
-	std::ofstream mosekFile("sdp.cbf");
+	std::ofstream mosekFile("test.cbf");
 	
 	mosekFile << "VER\n3\n\n";
 	
@@ -4515,6 +4535,10 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	int BCOORDcounter = 0;
 	
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		if(B[i].getNum() != 0) {
+			++BCOORDcounter;
+		}
+	
 		constraintMult.push_back(B[i].getDen());
 		
 		for(int j = 0; j < v.size(); ++j) {
@@ -4606,37 +4630,139 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	std::cout << "Writing BCOORD." << std::endl;
 	
 	mosekFile << "BCOORD\n";
-	mosekFile << allGraphs.size() << "\n";
-	
-	if(maximize) {
-		for(int i = 0; i < allGraphs.size(); ++i) {
-			mosekFile << i << " " << -constraintMult[i] + B[i].getNum() * (constraintMult[i]/B[i].getDen()) << "\n";
-		}
-	}
-	
-	else {
-		for(int i = 0; i < allGraphs.size(); ++i) {
+	mosekFile << BCOORDcounter << "\n";
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		if(B[i].getNum() != 0) {
 			mosekFile << i << " " << -B[i].getNum() * (constraintMult[i]/B[i].getDen()) << "\n";
 		}
 	}
 	
 	//Flush Buffer
 	mosekFile << std::endl;
-	
-	std::ofstream multFile("multiplication.txt");
-	multFile << mult << "\n";
-	for(int i = 0; i < allGraphs.size(); ++i) {
-		multFile << constraintMult[i] << "\n";
-	}
-	
-	multFile << std::endl;
 	std::cout << std::endl;
 	
-	return;
+	//This is definitely not the fastest way
+	//Could remove elements using a set
+	std::vector<int> constraintsSigma;
+	
+	#pragma omp parallel for schedule(dynamic)
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		std::cout << "Making everything integer, iteration " << i << " out of " << allGraphs.size() << std::endl;
+		long long int mymult = 1;
+		
+		for(int j = 0; j < (int)v.size(); ++j) {
+			for(int k = 0; k < v[j].size(); ++k) {
+				for(int l = k; l < v[j].size(); ++l) {
+					mymult = lcm(mymult,A[i][j][k][l].getDen());
+				}
+			}
+		}
+		
+		for(int j = 0; j < known.size(); ++j) {
+			mymult = lcm(mymult,C[i][j].getDen());
+		}
+		
+		mymult = lcm(mymult,B[i].getDen());
+		
+		double multD = (double)mymult;
+		
+		std::vector<mosek::fusion::Matrix::t> MosekA;
+		
+		for(int j = 0; j < (int)v.size(); ++j) {
+			std::vector<std::vector<double> > intA; //Stupid Mosek requires matrices to have floats
+			intA.resize(v[j].size());
+			
+			for(int k = 0; k < v[j].size(); ++k) {
+				intA[k].resize(v[j].size());
+				for(int l = 0; l < v[j].size(); ++l) {
+					intA[k][l] = round((A[i][j][k][l].getNum() * multD)/A[i][j][k][l].getDen());
+				}
+			}
+			
+			MosekA.push_back(mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(intA)));
+		}
+		
+		double intB;
+		
+		if(maximize) {
+			intB = multD - (B[i].getNum()*multD)/B[i].getDen();
+		}
+		
+		else {
+			intB = (B[i].getNum()*multD)/B[i].getDen();
+		}
+		
+		std::vector<double> intC;
+		intC.resize(known.size());
+		
+		for(int j = 0; j < known.size(); ++j) {
+			intC[j] = (round)((C[i][j].getNum()*multD)/C[i][j].getDen());
+		}
+		
+		auto MosekC = monty::new_array_ptr<double>(intC);
+		
+		#pragma omp critical
+		{
+			auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(multD,x),mosek::fusion::Expr::dot(MosekC,y));
+			
+			for(int j = 0; j < (int)v.size(); ++j) {
+				forConstraint = mosek::fusion::Expr::add(forConstraint,mosek::fusion::Expr::dot(MosekA[j],MosekM[j]));
+			}
+			
+			auto c = M->constraint(forConstraint, mosek::fusion::Domain::lessThan(intB)); 
+			constraints.push_back(c);
+			constraintsSigma.push_back(i);
+		}
+	}
+	
+	std::cout << std::endl;
+
+	
+	double multD = (double)mult;
+	
+	std::vector<double> C1Int;
+	
+	for(int i = 0; i < (int)known.size(); ++i) {
+		C1Int.push_back((round)((C1[i].getNum()*multD)/C1[i].getDen()));
+	}
+	
+	auto MosekC1 = monty::new_array_ptr(C1Int);
+	
+	//M->setSolverParam("intpntTolStepSize", 0.);
+   //M->setSolverParam("intpntSolveForm", "dual");
+   
+
+   M->setSolverParam("intpntCoTolDfeas", 0.);
+
+
+
+	M->objective(mosek::fusion::ObjectiveSense::Maximize, mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(x,multD), mosek::fusion::Expr::dot(MosekC1,y)));
+	M->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
+	M->writeTask("sdp.ptf");
+	M->writeTask("sdp.cbf"); // Use for debugging
+	//M->writeTask("data.task.gz"); //Use if using Mosek Console
+   M->solve();
+   std::cout << std::endl;
+   
+   std::cout << "Divide those objective values by: " << multD << std::endl << std::endl;
+   
+   std::cout << "Print all non-zero (> 1E-5) dual values: " << std::endl;
+   for(int i = 0; i < constraints.size(); ++i) {
+   	if((*constraints[i]->dual())[0] > 1E-5) {
+   		std::cout << "Graph " << i << " has a dual value of " << (*constraints[i]->dual())[0] << std::endl;
+   	}
+   }
+   std::cout << std::endl;
+	
+   
+   if(maximize) {
+   	std::cout << "The objective function is: " << 1.-M->dualObjValue()/multD << std::endl << std::endl;
+   }
+   
+   else {
+   	std::cout << "The objective function is: " << M->dualObjValue()/multD << std::endl << std::endl;
+   }
 }
-
-
-
 
 
 
