@@ -41,136 +41,170 @@ extern "C" {
 int main() {
 	//omp_set_num_threads(1); //Use for debugging
 	auto start=std::chrono::high_resolution_clock::now();
-		
-	//R(5,5) <= 47
-	std::vector<Graph> f;
-	std::vector<Graph> zeros;
-	std::vector<Equation> known;
-	std::vector<Edge> edges;
-	const int numColors = 3;
 	
-	//zeros
-	edges = {{0,1,1}};
-	zeros.push_back(Graph(edges,3,numColors));
+	//Change this	
+	const int n = 7;
+	std::vector<std::vector<int> > num(14, std::vector<int>(14,0));
 	
-	edges = {{0,1,2}};
-	zeros.push_back(Graph(edges,3,numColors));
 	
-	edges = {{0,1,1},{1,2,2}};
-	zeros.push_back(Graph(edges,3,numColors));
+	/*num[6][6] = 2; //n = 5
+	num[7][6] = 2;
+	num[7][7] = 4;
+	num[8][6] = 1;
+	num[8][7] = 3;
+	num[8][8] = 8;
+	num[9][6] = 1;
+	num[9][7] = 3;
+	num[9][8] = 8;
+	num[9][9] = 16;*/
 	
-	//K5
-	edges.clear();
-	for(int i = 0; i < 4; ++i) {
-		for(int j = i+1; j < 5; ++j) {
-			edges.push_back({i,j,1});
+	/*num[7][7] = 2; //n = 6
+	num[8][7] = 1;
+	num[8][8] = 4;
+	num[9][7] = 1;
+	num[9][8] = 3;
+	num[9][9] = 8;
+	num[10][7] = 1;
+	num[10][8] = 3;
+	num[10][9] = 7;
+	num[10][10] = 16;*/
+	
+	num[8][8] = 2; //n = 7
+	num[9][8] = 1;
+	num[9][9] = 4;
+	num[10][8] = 1;
+	num[10][9] = 3;
+	num[10][10] = 8;
+	num[11][8] = 1;
+	num[11][9] = 2;
+	num[11][10] = 6;
+	num[11][11] = 16;
+	num[12][8] = 1;
+	num[12][9] = 2;
+	num[12][10] = 6;
+	num[12][11] = 14;
+	num[12][12] = 32;
+	num[13][8] = 1;
+	num[13][9] = 1;
+	num[13][10] = 3;
+	num[13][11] = 9;
+	num[13][12] = 25;
+	num[13][13] = 64;
+	
+	/*num[9][9] = 2; //n = 8
+	num[10][9] = 1;
+	num[10][10] = 4;
+	num[9][11] = 1;
+	num[10][11] = 3;
+	num[11][11] = 8;
+	num[12][9] = 1;
+	num[12][10] = 2;
+	num[12][11] = 6;
+	num[12][12] = 16;*/
+	
+	std::vector<Graph> allGraphs = generate(n,2);
+	std::vector<Graph> potentialFractalizers;
+	
+	std::cout << "Starting number of graphs: " << allGraphs.size() << std::endl;
+	
+	//Remove all graphs with too many edges (could just use complement)
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		if(allGraphs[i].getCanonLabel() < allGraphs[i].complement().getCanonLabel()) {
+			allGraphs.erase(allGraphs.begin() +i);
+			--i;
 		}
 	}
-	zeros.push_back(Graph(edges,5,numColors));
 	
-	//K5
-	edges.clear();
-	for(int i = 0; i < 4; ++i) {
-		for(int j = i+1; j < 5; ++j) {
-			edges.push_back({i,j,2});
+	std::cout << "After checking that they have few enough edges: " << allGraphs.size() << std::endl;
+	
+	//Remove all graphs with twins
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		if(allGraphs[i].containsTwins()) {
+			allGraphs.erase(allGraphs.begin() + i);
+			--i;
+		}		
+	}
+	
+	std::cout << "After removing all graphs with twins: " << allGraphs.size() << std::endl;
+	
+	//Remove all graphs which aren't connected
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		if(!allGraphs[i].connected()) {
+			allGraphs.erase(allGraphs.begin()+i);
+			--i;
 		}
 	}
-	zeros.push_back(Graph(edges,5,numColors));
 	
-	//f-Maximize number of edges
-	f.push_back(Graph({{0,1,2}},2,numColors));
+	std::cout << "After removing all graphs who are not connected: " << allGraphs.size() << std::endl;
 	
-	//Make known
-	//CHANGE if running on more vertices
-	for(int i = 2; i <= 7; ++i) {
-		Graph Kempty({{}},i,numColors);
-		Kempty.setCoefficient(Frac(myPow(47,i-1),1));
-		Equation knownEmpty({Kempty},zeros,Frac(1,1),0);
-		known.push_back(knownEmpty);
+	//Remove all graphs whose complements aren't connected
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		if(!allGraphs[i].complement().connected()) {
+			allGraphs.erase(allGraphs.begin()+i);
+			--i;
+		}
 	}
 	
-	//Edge density bounds based on R(4,5)
-	Graph K21({{0,1,1}},2,numColors);
-	Equation known1({K21},zeros,Frac(24,47),1);
-	known.push_back(known1);
+	std::cout << "After removing all graphs whose complements are not connected: " << allGraphs.size() << std::endl;
 	
-	K21.setCoefficient(Frac(-1,1));
-	Equation known2({K21},zeros,Frac(-22,47),1);
-	known.push_back(known2);
-	
-	Graph K21f({{0,1,1}},2,numColors);
-	K21f.setFlag({0});
+	for(int i = n+1; i <= 13; ++i) { //CHANGE THIS
+		std::cout << std::endl;
+		for(int j = 0; j < allGraphs.size(); ++j) {
+			std::cout << "(" << i << ", " << j << ") out of (13, " << allGraphs.size() << ")" << std::endl;
+			std::vector<Graph> S = {allGraphs[j]};
+			bool check = true;
+			
+			
+			for(int k = n+1; k <= i; ++k) {
+				S = expandGraphs(S,{});
+				
+				//Needs enough subgraphs
+				for(int l = 0; l < S.size(); ++l) {
+					int temp = numSubgraphs(allGraphs[j], S[l]);
+					
+					if(temp < num[i][k]) {
+						S.erase(S.begin() +l);
+						--l;
+					}
+					
+					if((temp > num[i][k]) && (k == i)) {
+						l = S.size();
+						allGraphs.erase(allGraphs.begin() + j);
+						--j;
+						check = false;
+					}
+				}
+			}
+			
+			if(check) {
+				for(int k = 0; k < S.size(); ++k) {			
 
-	std::vector<Graph> vOne; //Identically equal to one when we have a single flag
-	vOne.push_back(Graph({{}},2,numColors));
-	vOne[0].setFlag({0});
-	vOne.push_back(Graph({{0,1,1}},2,numColors));
-	vOne[1].setFlag({0});
-	vOne.push_back(Graph({{0,1,2}},2,numColors));
-	vOne[2].setFlag({0});
+					std::pair<int,int> noTwins;
+					noTwins.first = -1;
+					noTwins.second = -1;
+				
+					std::pair<int,int> twins = S[k].findTwins();
+					while(twins != noTwins) {
+						S[k].removeVertex(twins.first);
+						twins = S[k].findTwins();
+					}
+				
+					if(S[k].getN() != n)  {						
+						k = S.size();
+						allGraphs.erase(allGraphs.begin() + j);
+						--j;
+					}
+				}
+			}
+		}
+	}
 	
-	K21f.setCoefficient(Frac(47,1));
+	std::cout << "Total number of potential fractalizers = " << allGraphs.size() << std::endl << std::endl;
+	
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		allGraphs[i].printEdges();
+	}
 
-	//Degree 22
-	std::vector<Graph> deg22Vec = {K21f};
-	for(int i = 0; i < vOne.size(); ++i) {
-		vOne[i].setCoefficient(Frac(-22,1));
-		deg22Vec.push_back(vOne[i]);
-	}
-	Equation deg22(deg22Vec,zeros,Frac(0,1),0);
-	
-	//Degree 23
-	std::vector<Graph> deg23Vec = {K21f};
-	for(int i = 0; i < vOne.size(); ++i) {
-		vOne[i].setCoefficient(Frac(-23,1));
-		deg23Vec.push_back(vOne[i]);
-	}
-	Equation deg23(deg23Vec,zeros,Frac(0,1),0);
-	
-	//Degree 24
-	std::vector<Graph> deg24Vec = {K21f};
-	for(int i = 0; i < vOne.size(); ++i) {
-		vOne[i].setCoefficient(Frac(-24,1));
-		deg24Vec.push_back(vOne[i]);
-	}
-	Equation deg24(deg24Vec,zeros,Frac(0,1),0);
-	
-	Equation known3 = deg22*deg22*deg23*deg23*deg24*deg24;
-	known3.averageAll();
-	known.push_back(known3);
-	
-	Equation known4 = deg22*deg22*deg23*deg23*deg24;
-	known4.averageAll();
-	known.push_back(known4);
-	
-	Equation known5 = deg22*deg22*deg23*deg24*deg24;
-	known5.averageAll();
-	known.push_back(known5);
-	
-	Equation known6 = deg22*deg23*deg23*deg24*deg24;
-	known6.averageAll();
-	known.push_back(known6);
-	
-	Equation known7 = deg22*deg22*deg23*deg24;
-	known7.averageAll();
-	known.push_back(known7);
-	
-	Equation known8 = deg22*deg23*deg23*deg24;
-	known8.averageAll();
-	known.push_back(known8);
-	
-	Equation known9 = deg22*deg23*deg24*deg24;
-	known9.averageAll();
-	known.push_back(known9);
-	
-	Equation known10 = deg22*deg23*deg24;
-	known10.averageAll();
-	known.push_back(known10);
-	
-	
-	plainFlagAlgebra(f,7,zeros,known);
-	
-	
 	auto end=std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 	std::cout << "Running time in seconds: " << duration.count() << std::endl << std::endl;

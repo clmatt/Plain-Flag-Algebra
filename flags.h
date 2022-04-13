@@ -958,7 +958,151 @@ class Graph {
 			coefficient = coefficient*Frac(num,den);
 			
 			canonRelabel();
-		}	
+		}
+		
+		//-----------------
+		//-----Is twin-----
+		//-----------------
+
+		bool isTwin(const int u, const int v) const{
+			if(sizeOfFlag != 0) {
+				std::cout << "In isTwin, size of flag must be 0." << std::endl << std::endl;
+				throw std::exception();	
+			}
+			
+			for(int i = 0; i < n; ++i) {
+				if((i != u) && (i != v)) {
+					if(adjMat[i][u] != adjMat[i][v]) {
+						return false;
+					}
+				}
+			}
+			
+			return true;
+		}
+
+		//------------------------
+		//-----Contains Twins-----
+		//------------------------
+
+		bool containsTwins() const{
+			if(sizeOfFlag != 0) {
+				std::cout << "In isTwin, size of flag must be 0." << std::endl << std::endl;
+				throw std::exception();	
+			}
+			
+			for(int i = 0; i < n-1; ++i) {
+				for(int j = i+1; j < n; ++j) {
+					if(isTwin(i,j)) {
+						return true;
+					}
+				}
+			}
+			
+			return false;
+		}
+
+
+		//-----------------------------
+		//-----Find a set of twins-----
+		//-----------------------------
+
+		//Return (-1,-1) if no twins
+		std::pair<int,int> findTwins() const{
+			if(sizeOfFlag != 0) {
+				std::cout << "In isTwin, size of flag must be 0." << std::endl << std::endl;
+				throw std::exception();	
+			}
+			
+			std::pair<int,int> output;
+			
+			for(int i = 0; i < n-1; ++i) {
+				for(int j = i+1; j < n; ++j) {
+					if(isTwin(i,j)) {
+						output.first = i;
+						output.second = j;
+						return output;
+					}
+				}
+			}
+			
+			output.first = -1;
+			output.second = -1;
+			
+			return output;
+		}
+		
+		//--------------------
+		//-----Complement-----
+		//--------------------
+
+		Graph complement() const{
+			if(numColors != 2) {
+				std::cout << "Can only take a graph complement if there are two colors." << std::endl << std::endl;
+				throw std::exception();
+			}
+			
+			if(sizeOfFlag != 0) {
+				std::cout << "In complement, size of flag must be 0." << std::endl << std::endl;
+				throw std::exception();	
+			}
+			
+			std::vector<Edge> newEdges;
+			
+			for(int i = 0; i < n-1; ++i) {
+				for(int j = i+1; j < n; ++j) {
+					if(adjMat[i][j] == 0) {
+						newEdges.push_back({i,j,1});
+					}
+				}
+			}
+			
+			Graph output(newEdges,n,2);
+			
+			return output;
+		}
+
+
+		//-------------------
+		//-----Connected-----
+		//-------------------
+
+		//Assumes for more than two colors it is colorblind for >0
+		//Not the fastest, but good enough for now
+		bool connected() const{
+			if(sizeOfFlag != 0) {
+				std::cout << "In isTwin, size of flag must be 0." << std::endl << std::endl;
+				throw std::exception();	
+			}
+			
+			std::vector<bool> component(n, false);
+			std::vector<bool> newComponent(n, false);
+			
+			newComponent[0] = true;
+			bool cont = true;
+			
+			while(component != newComponent) {
+				component = newComponent;
+				
+				for(int i = 0; i < n; ++i) {
+					if(component[i]) {
+						for(int j = 0; j < n; ++j) {
+							if(adjMat[i][j] != 0) {
+								newComponent[j] = true;
+							}
+						}
+					}  
+				}	
+			}
+			
+			for(int i = 0; i < n; ++i) {
+				if(!component[i]) {
+					return false;
+				}
+			}
+			
+			return true;
+		}
 };
 
 //------------------------------------
@@ -2037,6 +2181,7 @@ bool subgraph(const Graph &HWithFlag, const Graph &GWithFlag) {
 //Need all flag vertices to be first and in order
 //Doesn't check for duplicates in input (does in output) so if needed check that ahead of time
 //TODO add version which preserves coefficients (shouldn't be too bad)
+//TODO replace with set
 std::vector<Graph> expandGraphs(const std::vector<Graph> &input, const std::vector<Graph> &zeros) {
 	int size = input.size();
 	
@@ -2204,7 +2349,7 @@ std::vector<Graph> expandGraphs(const std::vector<Graph> &input, const std::vect
 //-------------------------
 
 //Generates all graphs of size n
-std::vector<Graph> generate(const int n, const int numColors, const std::vector<Graph> &zeros) {
+std::vector<Graph> generate(const int n, const int numColors, const std::vector<Graph> &zeros = {}) {
 	if(numColors < 2) {
 		std::cout << "You need at least two colors in generate." << std::endl << std::endl;
 		throw std::exception();
@@ -4535,7 +4680,7 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
 		std::cout << "In writing FCOORD iteration " << i + 1  << " out of " << allGraphs.size() << std::endl;
 		for(int j = 0; j < (int)v.size(); ++j) {
-			//Probably faster to use auto for loop, but easier to debug this way
+			//TODO Probably faster to use auto for loop, but easier to debug this way
 			for(int k = 0; k < (int)v[j].size(); ++k) {
 				for(int l = k; l < (int)v[j].size(); ++l) {
 					auto it = newA[i][j].find({k,l});
@@ -4630,6 +4775,70 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	}
 	
 	multFile << std::endl;
+	std::cout << std::endl;
+	
+	std::ofstream CSDPfile("CSDP.txt");
+	
+	CSDPfile << allGraphs.size() << "\n";
+	
+	CSDPfile << 1+v.size() << "\n";
+	
+	CSDPfile << 1+known.size() << " ";
+	for(int i = 0; i < v.size(); ++i) {
+		CSDPfile << v[i].size() << " ";
+	}
+	CSDPfile << "\n";
+	
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		if(maximize) {
+			CSDPfile << -constraintMult[i] + B[i].getNum() * (constraintMult[i]/B[i].getDen()) << " ";
+		}
+	
+		else {
+			CSDPfile << B[i].getNum() * (constraintMult[i]/B[i].getDen()) << " ";
+		}
+	}
+	CSDPfile << "\n";
+	
+	CSDPfile << "0 1 1 1 " << mult << "\n";
+	
+	for(int i = 0; i < known.size(); ++i) {
+		CSDPfile << "0 1 " << i+2 << " " << i+2 << " " << -known[i].getAns().getNum() * (mult/known[i].getAns().getDen()) << "\n";
+	}
+	
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		std::cout << "In writing to CSDP, iteration " << i << " out of " << allGraphs.size() << std::endl;
+	
+		CSDPfile << i+1 << " 1 1 1 " << constraintMult[i] << "\n";
+		for(int j = 0; j < known.size(); ++j) {
+			for(int k = 0; k < known[j].getNumVariables(); ++k) {
+				if(isomorphic(known[j].getVariable(k),allGraphs[i])) {
+					CSDPfile << i+1 << " 1 " << j+1 << " " << j+1 << known[j].getVariable(k).getCoefficient().getNum() * (constraintMult[i] / known[j].getVariable(k).getCoefficient().getDen()) << "\n";
+				}
+			}
+		}
+		
+		for(int j = 0; j < v.size(); ++j) {
+			for(int k = 0; k < v[j].size(); ++k) {
+				for(int l = k; l < v[j].size(); ++l) {
+					auto it = newA[i][j].find({k,l});
+					
+					if(it != newA[i][j].end()) {
+						if(k == l) {
+					//Maybe divide by 2?
+							CSDPfile << i+1 << " " << j+2 << " " << k+1 << " " << l+1 << " " << it->second.getNum() * (constraintMult[i] / (it->second.getDen())) << "\n";
+						}
+						
+						else {
+							CSDPfile << i+1 << " " << j+2 << " " << k+1 << " " << l+1 << " " << it->second.getNum() * (constraintMult[i] / (2.*it->second.getDen())) << "\n";
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	CSDPfile << std::endl;
 	std::cout << std::endl;
 	
 	return;
