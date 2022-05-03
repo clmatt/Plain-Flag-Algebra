@@ -303,3 +303,51 @@ long long int factorial(int n) {
 }
 
 
+//---------------------
+//-----Multinomial-----
+//---------------------
+
+long long int multinomial(const int n, const std::vector<int> &input) {
+	if(n < 0) {
+		std::cout << "In multinomial n >= 0. " << std::endl << std::endl;
+		throw std::exception();
+	}
+	
+	if(input.size() == 0) {
+		std::cout << "In multinomial, input.size() must be > 0." << std::endl << std::endl;
+		throw std::exception();
+	}
+	
+	int tot = 0;
+	for(int i = 0; i < input.size(); ++i) {
+		if(input[i] < 0) {
+			std::cout << "In multinomial, everything in vector must be >= 0." << std::endl << std::endl;
+			throw std::exception();
+		}
+	
+		tot = tot + input[i];
+	}
+	
+	if(tot != n) {
+		std::cout << "In multinomial, input must sum to n." << std::endl << std::endl;
+		throw std::exception(); 
+	}
+	
+	long long int output = 1;
+	long long int sum = input[0];
+	
+	for(int i = 1; i < input.size(); ++i) {
+		sum += input[i];
+		output = output*choose(sum,input[i]);
+		
+		if (output < 0) {
+			std::cout << "Overflow in multinomial." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+	
+	
+	
+	return output;
+}
+
