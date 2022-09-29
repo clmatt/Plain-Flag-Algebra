@@ -39,19 +39,34 @@ extern "C" {
 
 
 int main() {
-	omp_set_num_threads(1); //Use for debugging
 	auto start=std::chrono::high_resolution_clock::now();
 	
 	std::vector<Graph> f;
 	std::vector<Graph> zeros;
 	std::vector<Equation> known;
 	
-	f.push_back(Graph({{0,1,1},{1,2,1},{0,2,1}},3,2));
-	f.push_back(Graph({{}},3,2));
+	Graph K4({{0,1,1},{0,2,1},{0,3,1},{1,2,1},{1,3,1},{2,3,1}},4,2);
+	Graph G3({{0,1,1},{1,2,1},{0,2,1},{2,3,1},{3,0,1}},4,2);
+	G3.setCoefficient(Frac(1,2));
+	Graph G2({{0,1,1},{1,2,1},{2,3,1},{3,0,1}},4,2);
+	G2.setCoefficient(Frac(1,3));
+	Graph G1({{0,1,1},{1,2,1},{0,2,1},{2,3,1}},4,2);
+	G1.setCoefficient(Frac(1,6));
+	Graph P4({{0,1,1},{1,2,1},{2,3,1}},4,2);
+	P4.setCoefficient(Frac(1,12));
+	Graph E({{0,1,1}},2,2);
 	
-	//plainFlagAlgebraApprox(f,7,1,zeros,known,false);
-	plainFlagAlgebra(f,5,zeros,known,false);
-
+	Equation mainEQ({K4,G3,G2,G1,P4});
+	Equation Eeq({E});
+	
+	Equation ans = mainEQ + (-1)*Eeq*Eeq*Eeq;
+	
+	for(int i = 0; i < ans.getNumVariables(); ++i) {
+		f.push_back(ans.getVariable(i));
+	}
+	
+	plainFlagAlgebra(f,7,zeros,known,false);
+	
 	auto end=std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 	std::cout << "Running time in seconds: " << duration.count() << std::endl << std::endl;
