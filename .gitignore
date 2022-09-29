@@ -5,3 +5,6 @@ nauty27r2
 *.g6
 mosek
 Ramsey
+*.bas
+*.cbf
+*.sol
