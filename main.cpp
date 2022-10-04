@@ -39,6 +39,7 @@ extern "C" {
 
 
 int main() {
+	omp_set_num_threads(1);
 	auto start=std::chrono::high_resolution_clock::now();
 	
 	std::vector<Graph> f;

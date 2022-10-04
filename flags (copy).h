@@ -4570,10 +4570,10 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 		
 		int sizeOfFlag = v[i][0].getSizeOfFlag();
 		
-		//#pragma omp parallel
+		#pragma omp parallel
 		{
 			
-			//#pragma omp for nowait schedule(dynamic) 
+			#pragma omp for nowait schedule(dynamic) 
 			for(int index2 = 0; index2 < (int)allGraphsWithFlags[i].size(); ++index2) {
 				Graph G = allGraphsWithFlags[i][index2];
 				
@@ -4650,7 +4650,7 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 					int c = std::min(G1Index,G2Index);
 					int d = std::max(G1Index,G2Index);
 					
-					//#pragma omp critical
+					#pragma omp critical
 					{					
 						auto it = newA[b][i].find({c,d});
 						
