@@ -2436,7 +2436,6 @@ std::vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 	return output;
 }
 
-
 //----------------------------
 //-----Generate all Flags-----
 //----------------------------
@@ -2485,7 +2484,7 @@ std::vector<Graph> generateFlags(const int n, const int numColors, const std::ve
 //--------------------
 
 //Use in plain flag algebra
-std::vector< std::vector<Graph> > generateVOLD(const int n, const int numColors, const std::vector<Graph> &zeros) {
+std::vector< std::vector<Graph> > generateV(const int n, const int numColors, const std::vector<Graph> &zeros) {
 	std::vector< std::vector< Graph > > output;
 
 	for(int i = n/2; i <= n-1; ++i) {
@@ -2521,51 +2520,6 @@ std::vector< std::vector<Graph> > generateVOLD(const int n, const int numColors,
 	return output;
 }
 
-std::vector< std::vector<Graph> > generateV(const int n, const int numColors, const std::vector<Graph> &zeros) {
-	std::vector< std::vector< Graph > > output;
-
-	for(int i = n/2; i <= n-1; ++i) {
-		int sizeOfFlag = 2*i-n;
-		
-		if(sizeOfFlag > 0) {
-			std::vector<Graph> flags = generate(sizeOfFlag, numColors, zeros);
-			
-			std::vector<int> setFlagVec(sizeOfFlag);
-			for(int j = 0; j < sizeOfFlag; ++j) {
-				setFlagVec[j] = j;
-			}
-			
-			for(int j = 0; j < (int)flags.size(); ++j) {
-				flags[j].setFlag(setFlagVec);
-			}
-			
-			#pragma omp parallel 
-			{
-				std::vector < std::vector <Graph> > privateOutput;
-				
-				#pragma omp for nowait schedule(static) ordered
-				for(int j = 0; j < (int)flags.size(); ++j) {
-					std::cout << "In generate v (" << i << ", " << j << ") out of (" << n-1 << ", " << flags.size() << ")" << std::endl;
-					std::vector<Graph> expanded = {flags[j]};
-				
-					while((expanded[0].getN()*2 - sizeOfFlag) != n) {
-						expanded = expandGraphs(expanded,zeros);
-					}
-					
-					privateOutput.push_back(expanded);
-				}
-				
-				#pragma omp for schedule(static) ordered
-    			for(int i=0; i<omp_get_num_threads(); i++) {
-     			   #pragma omp ordered
-       			 output.insert(output.end(), privateOutput.begin(), privateOutput.end());
-    			}
-			}
-		}
-	}
-	
-	return output;
-}
 
 //----------------------------------------
 //-----Generate All Graphs With Flags-----
@@ -2581,19 +2535,7 @@ std::vector< std::vector<Graph> > generateAllGraphsWithFlags(const int n, const 
 		int sizeOfFlag = 2*i-n;
 		
 		if(sizeOfFlag > 0) {
-			std::vector<Graph> nonFlags = generate(sizeOfFlag, numColors, zeros);
-			
-			std::vector<int> setFlagVec;
-			for(int j = 0; j < sizeOfFlag; ++j) {
-				setFlagVec.push_back(j);
-			}
-			
-			std::vector<Graph> flags = nonFlags;
-			
-			for(int j = 0; j < (int)flags.size(); ++j) {
-				flags[j].setFlag(setFlagVec);
-			}
-			
+			std::vector<Graph> flags = generateFlags(sizeOfFlag, numColors, zeros);
 			for(int j = 0; j < (int)flags.size(); ++j) {
 				fFlag[flags[j].getCanonLabel()] = index;
 				++index;
@@ -2617,7 +2559,7 @@ std::vector< std::vector<Graph> > generateAllGraphsWithFlags(const int n, const 
 				
 				#pragma omp for nowait schedule(dynamic)
 				for(int j = 0; j < (int)allGraphs.size(); ++j) {
-					std::cout << "In generateALLGraphsWithFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << std::endl;
+					std::cout << "In generateALLGraphsWIthFlags, iteration (" << i << ", " << j << ") out of (" << n-1 << ", " << allGraphs.size() << ")" << std::endl;
 					std::unordered_map<std::string,int> fGraph;
 					int den = choose(n, sizeOfFlag);
 				
@@ -2627,11 +2569,10 @@ std::vector< std::vector<Graph> > generateAllGraphsWithFlags(const int n, const 
 					}
 					
 					do {
-						//do {
+						do {
 							Graph G = allGraphs[j];
 							G.setFlag(X);
 							Graph flag = G.getFlag();
-							flag.removeFlag();
 							
 							if(fGraph.find(G.getCanonLabel()) == fGraph.end()) {
 								fGraph[G.getCanonLabel()] = index2[fFlag[flag.getCanonLabel()]];
@@ -2644,7 +2585,7 @@ std::vector< std::vector<Graph> > generateAllGraphsWithFlags(const int n, const 
 								privateOutput[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].setCoefficient(privateOutput[fFlag[flag.getCanonLabel()]][fGraph[G.getCanonLabel()]].getCoefficient()+Frac(1,den));
 							}
 							
-						//} while(next_permutation(X.begin(), X.end()));
+						} while(next_permutation(X.begin(), X.end()));
 					} while(nextSubset(X,n,sizeOfFlag));
 				}
 				

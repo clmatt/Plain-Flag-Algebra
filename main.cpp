@@ -46,7 +46,7 @@ int main() {
 	std::vector<Graph> zeros;
 	std::vector<Equation> known;
 	
-	Graph K4({{0,1,1},{0,2,1},{0,3,1},{1,2,1},{1,3,1},{2,3,1}},4,2);
+	/*Graph K4({{0,1,1},{0,2,1},{0,3,1},{1,2,1},{1,3,1},{2,3,1}},4,2);
 	Graph G3({{0,1,1},{1,2,1},{0,2,1},{2,3,1},{3,0,1}},4,2);
 	G3.setCoefficient(Frac(1,2));
 	Graph G2({{0,1,1},{1,2,1},{2,3,1},{3,0,1}},4,2);
@@ -64,9 +64,15 @@ int main() {
 	
 	for(int i = 0; i < ans.getNumVariables(); ++i) {
 		f.push_back(ans.getVariable(i));
-	}
+	}*/
 	
-	plainFlagAlgebra(f,7,zeros,known,false);
+	Graph K3({{0,1,1},{0,2,1},{1,2,1}},3,2);
+	Graph K3c({},3,2);
+	
+	f = {K3,K3c};
+	
+	//Max = true
+	plainFlagAlgebra(f,4,zeros,known,false);
 	
 	auto end=std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
