@@ -3494,6 +3494,7 @@ Equation multiply(const Graph &G1, const Graph &H1, const std::vector<Graph> &ze
 	std::unordered_set<std::string> variablesSet;
 
 	//Create all possible variables
+	#pragma omp parallel for
 	for(int i = 0; i < myPow(c,(nG - sizeOfFlag)*(nH-sizeOfFlag)); ++i) { //c-ary mask
 		//Convert i to c-ary number
 		std::vector<int> ary;
@@ -3562,10 +3563,13 @@ Equation multiply(const Graph &G1, const Graph &H1, const std::vector<Graph> &ze
 		}
 		
 		Graph GH(edges, nG+nH-sizeOfFlag, c,flag);
-
-		if(variablesSet.count(GH.getCanonLabel()) == 0) {
-			variablesSet.insert(GH.getCanonLabel());
-			variables.push_back(GH);
+		
+		#pragma omp critical
+		{
+			if(variablesSet.count(GH.getCanonLabel()) == 0) {
+				variablesSet.insert(GH.getCanonLabel());
+				variables.push_back(GH);
+			}
 		}
 	}
 
@@ -3758,18 +3762,24 @@ Equation resize(const Equation &eq, const std::vector<Graph> &generated) {
 	
 	std::vector<Graph> resized;
 	Equation output({},zeros,eq.getAns(),eq.getType());
-
+	
+	
 	for(int i = 0; i < eq.getNumVariables(); ++i) {
 		resized.clear();
 		
+		#pragma omp parallel for
 		for(int j = 0; j < int(generated.size()); ++j) {
 			Graph H = generated[j];
 			int num = numSubgraphs(eq.getVariable(i),generated[j]);
 			int den = choose(generated[j].getN(), eq.getVariable(i).getN());
 			
+			
 			if(num != 0) {
-				H.setCoefficient(Frac(num,den)*eq.getVariable(i).getCoefficient());
-				resized.push_back(H);
+				#pragma omp critical 
+				{
+					H.setCoefficient(Frac(num,den)*eq.getVariable(i).getCoefficient());
+					resized.push_back(H);
+				}
 			}
 		}
 		
