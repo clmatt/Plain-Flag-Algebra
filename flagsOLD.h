@@ -4612,8 +4612,16 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	std::cout << std::endl;
 	
 	for(int i = 0; i < v.size(); ++i) {
-		v[i][0].printEdges();
-		v[i][0].printFlag();
+		for(int j  = 0; j < v[j].size(); ++j) {
+			v[i][j].printEdges();
+			v[i][j].printFlag();
+		}
+	}
+	
+	std::cout << std::endl << std::endl;
+	
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		allGraphs[i].printEdges();
 	}
 	
 	//return;
