@@ -40,7 +40,7 @@ extern "C" {
 
 int main() {
 	auto start=std::chrono::high_resolution_clock::now();
-	
+	//omp_set_num_threads(1);	
 	//R(4,6) <= 40
 	std::vector<Graph> f;
 	std::vector<Graph> zeros;
@@ -62,7 +62,7 @@ int main() {
 	edges.clear();
 	for(int i = 0; i < 3; ++i) {
 		for(int j = i+1; j < 4; ++j) {
-			edges.push_back({i,j,1});
+			edges.push_back({i,j,2});
 		}
 	}
 	zeros.push_back(Graph(edges,4,numColors));
@@ -71,7 +71,7 @@ int main() {
 	edges.clear();
 	for(int i = 0; i < 5; ++i) {
 		for(int j = i+1; j < 6; ++j) {
-			edges.push_back({i,j,2});
+			edges.push_back({i,j,1});
 		}
 	}
 	zeros.push_back(Graph(edges,6,numColors));
@@ -145,7 +145,7 @@ int main() {
 	Equation known6 = deg22*deg23*deg24*deg24;
 	known6.averageAll();
 	known.push_back(known6);
-	
+	/*
 	Equation known7 = deg22*deg23*deg24*deg22*deg23;
 	known7.averageAll();
 	known.push_back(known7);
@@ -156,10 +156,10 @@ int main() {
 	
 	Equation known9 = deg22*deg23*deg24*deg23*deg23;
 	known9.averageAll();
-	known.push_back(known9);
+	known.push_back(known9);*/
 
 	
-	fastPlainFlagAlgebra(f,6,zeros,known,false);
+	fastPlainFlagAlgebra(f,7,zeros,known,false);
 	
 	
 	auto end=std::chrono::high_resolution_clock::now();

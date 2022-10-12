@@ -2252,7 +2252,8 @@ std::vector<Graph> expandGraphs(const std::vector<Graph> &input, const std::vect
 	}
 
 	std::vector<Graph> output;
-
+	
+	#pragma omp parallel for
 	for(auto G: input) {
 		std::vector<Edge> GEdges = flagEdges;
 		std::vector<int> permanentZeroDegree(n+1,0); //Value 0 for 0,1,...,sizeOfFlag
@@ -2336,10 +2337,13 @@ std::vector<Graph> expandGraphs(const std::vector<Graph> &input, const std::vect
 			 				j = zeros.size();
 			 			}
 			 		}
-				 				
-				 	if(cont && (canonLabels.count(Gv.getCanonLabel()) == 0)) {
-						output.push_back(Gv);
-				 		canonLabels.insert(Gv.getCanonLabel());
+				 	
+				 	#pragma omp critical
+				 	{			
+					 	if(cont && (canonLabels.count(Gv.getCanonLabel()) == 0)) {
+							output.push_back(Gv);
+					 		canonLabels.insert(Gv.getCanonLabel());
+					 	}
 				 	}	
 			 	}
 		 	}
@@ -4476,7 +4480,7 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	
 	//Resize known
 	std::cout << "Resizing known." << std::endl;
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int i = 0; i < knownSize; ++i) {
 		std::cout << i+1 << " out of " << knownSize << std::endl;
 		known[i] = resize(known[i],allGraphs);
@@ -5139,7 +5143,7 @@ void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Gra
 	
 	//Resize known
 	std::cout << "Resizing known." << std::endl;
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int i = 0; i < knownSize; ++i) {
 		std::cout << i+1 << " out of " << knownSize << std::endl;
 		known[i] = resize(known[i],allGraphs);
@@ -5752,7 +5756,7 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	
 	//Resize known
 	std::cout << "Resizing known." << std::endl;
-	#pragma omp parallel for
+	//#pragma omp parallel for
 	for(int i = 0; i < knownSize; ++i) {
 		std::cout << i+1 << " out of " << knownSize << std::endl;
 		known[i] = resize(known[i],allGraphs);
