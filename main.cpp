@@ -145,7 +145,7 @@ int main() {
 	Equation known6 = deg22*deg23*deg24*deg24;
 	known6.averageAll();
 	known.push_back(known6);
-	/*
+	
 	Equation known7 = deg22*deg23*deg24*deg22*deg23;
 	known7.averageAll();
 	known.push_back(known7);
@@ -156,10 +156,10 @@ int main() {
 	
 	Equation known9 = deg22*deg23*deg24*deg23*deg23;
 	known9.averageAll();
-	known.push_back(known9);*/
+	known.push_back(known9);
 
 	
-	fastPlainFlagAlgebra(f,7,zeros,known,false);
+	fastPlainFlagAlgebra(f,8,zeros,known,false);
 	
 	
 	auto end=std::chrono::high_resolution_clock::now();
