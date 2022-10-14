@@ -2300,14 +2300,14 @@ std::vector<Graph> expandGraphs(const std::vector<Graph> &input, const std::vect
 				
 			Graph Gv(edges,n+1,numColors,GvFlag);
 																	
-					
+			bool cont = true;
 			//Removes zeros
-			 for(int j = 0; j < (int)zeros.size(); ++j) {
-			 	if(subgraph(zeros[j],Gv)) {
+			for(int j = 0; j < (int)zeros.size(); ++j) {
+				if(subgraph(zeros[j],Gv)) {
 			 		cont = false;
 			 		j = zeros.size();
 			 	}
-				}
+			}
 				 	
 			#pragma omp critical
 			{			
@@ -3785,25 +3785,6 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 			throw std::exception();
 		}
 	}
-	
-	//Make every equation in known type 1 (<=)
-	/*for(int i = 0; i < knownSize; ++i) {
-		if(known[i].getType() != 1) {
-			std::vector<Graph> variablesTemp;
-			
-			for(int j = 0; j < known[i].getNumVariables(); ++j) {
-				Graph graphTemp = known[i].getVariable(j);
-				graphTemp.setCoefficient(-graphTemp.getCoefficient());
-				variablesTemp.push_back(graphTemp);
-			}
-			
-			Equation knownTemp(variablesTemp,zeros,-known[i].getAns(),1);
-			
-			known[i].setType(1);
-			known.insert(known.begin()+i, knownTemp);
-			++knownSize;
-		}
-	}*/
 
 	int fN = f[0].getN();
 	
@@ -4014,10 +3995,6 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 					reordering[G.getFlagVertex(j)] = j;
 				}
 				int index = sizeOfFlag;
-				
-				if(sizeOfFlag != G.getSizeOfFlag()) {
-					std::cout << "AHHHHHHHHHHHH" << std::endl;
-				}
 				
 				for(int j = 0; j < n; ++j) {
 					if(!G.isFlag(j)) {
@@ -4347,7 +4324,12 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	return;
 }
 
-//Prints to plainFlagAlgerba1.txt & plainFlagAlgebra2.txt necessary files for python SDP code 
+//---------------------------------
+//-----Fast Plain Flag Algebra-----
+//---------------------------------
+
+//Faster than original version - fewer variables - but at the cost of a worse objective function
+//Prints to either Mosek files or CSDP files
 //f can be thought of as a linear combo of all graphs that we want to max/min
 //Rather than taking a v this function takes the number of vertices to compute on (n)
 //If using maximize, use 1-answer
@@ -4706,17 +4688,6 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 		}
 	}
 	std::cout << std::endl;
-	
-	for(int i = 0; i < allGraphs.size(); ++i) {
-		allGraphs[i].printEdges();
-	}
-	
-	/*for(int i = 0; i < secondIndexMap.size(); ++i) {
-		v[i][0].printEdges();
-		v[i][0].printFlag();
-	}*/
-	
-	//return;
 
 	std::cout << "Writing to file." << std::endl;
 
@@ -4891,7 +4862,7 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	
 	//Flush Buffer
 	mosekFile << std::endl;
-	/*
+	
 	std::ofstream multFile("multiplication.txt");
 	multFile << mult << "\n";
 	for(int i = 0; i < allGraphs.size(); ++i) {
@@ -4964,7 +4935,7 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	
 	CSDPfile << std::endl;
 	std::cout << std::endl;
-	*/
+	
 	std::cout << "Divide answers by " << mult << std::endl <<std::endl;
 	
 	return;
@@ -4972,33 +4943,18 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 }
 
 
+//----------------------------------------
+//-----Approximate Plain Flag Algebra-----
+//----------------------------------------
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+//Based on a linear programming approach to approximating copositive programming
+//VERY BAD
+//Prints Mosek solvable files (no CSDP b/c not a PSD)
+//f can be thought of as a linear combo of all graphs that we want to max/min
+//Rather than taking a v this function takes the number of vertices to compute on (n)
+//If using maximize, use 1-answer
 void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Graph> &zeros, std::vector<Equation> &known, bool maximize = true) {
 	std::cout << "Starting plainFlagAlgebra." << std::endl;
-	
-	//The way the python script is setup we need at least one known, this just says that edge density is <= 1
-	//if(known.size() == 0) {
-		//Graph K2({{}},2,f[0].getNumColors());
-		//Equation knownTemp({K2},zeros,Frac(1,1),1);
-		//known.push_back(knownTemp);
-	//}
 	
 	int fSize = f.size();
 	int zerosSize = zeros.size();
@@ -5021,25 +4977,6 @@ void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Gra
 			throw std::exception();
 		}
 	}
-	
-	//Make every equation in known type 1 (<=)
-	/*for(int i = 0; i < knownSize; ++i) {
-		if(known[i].getType() != 1) {
-			std::vector<Graph> variablesTemp;
-			
-			for(int j = 0; j < known[i].getNumVariables(); ++j) {
-				Graph graphTemp = known[i].getVariable(j);
-				graphTemp.setCoefficient(-graphTemp.getCoefficient());
-				variablesTemp.push_back(graphTemp);
-			}
-			
-			Equation knownTemp(variablesTemp,zeros,-known[i].getAns(),1);
-			
-			known[i].setType(1);
-			known.insert(known.begin()+i, knownTemp);
-			++knownSize;
-		}
-	}*/
 
 	int fN = f[0].getN();
 	
