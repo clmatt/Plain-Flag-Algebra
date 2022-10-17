@@ -4484,8 +4484,6 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	std::cout << std::endl;
 
 	std::vector<Frac> B; //Gives numbers to be printed
-	std::vector< std::vector<Frac> > C; //From Known
-	std::vector<Frac> C1;
 	
 	Frac zeroFrac(0,1);
 	//Calculating B
@@ -4495,30 +4493,6 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	#pragma omp parallel for
 	for(int i = 0; i < fSize; ++i) {
 		B[secondIndexMap.at(f[i].getCanonLabel())] = f[i].getCoefficient();
-	}
-	
-	
-	//First has 0 for ==, 1 for <=
-	//Next entry is bound
-	//Finally, it's the std::vector of coefficients in known (after it's been resized)
-	
-	//Calculating C
-	std::cout << "Calculating C." << std::endl << std::endl;
-	C.resize(allGraphs.size());
-	C1.resize(knownSize,zeroFrac);
-	
-	#pragma omp parallel for
-	for(int i = 0; i < allGraphs.size(); ++i) {
-		C[i].resize(knownSize,zeroFrac);
-	}
-	
-	//#pragma omp parallel for
-	for(int i = 0; i < knownSize; ++i) {
-		C1[i] = known[i].getAns();
-		
-		for(int j = 0; j < known[i].getNumVariables(); ++j) {
-			C[secondIndexMap.at(known[i].getVariable(j).getCanonLabel())][i] = known[i].getVariable(j).getCoefficient();
-		}
 	}
 	
 	//Stupid C++ doesn't have hash for int[2]
@@ -4863,7 +4837,7 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	//Flush Buffer
 	mosekFile << std::endl;
 	
-	std::ofstream multFile("multiplication.txt");
+	/*std::ofstream multFile("multiplication.txt");
 	multFile << mult << "\n";
 	for(int i = 0; i < allGraphs.size(); ++i) {
 		multFile << constraintMult[i] << "\n";
@@ -4938,7 +4912,7 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	
 	std::cout << "Divide answers by " << mult << std::endl <<std::endl;
 	
-	return;
+	return;*/
 }
 
 
@@ -5101,8 +5075,6 @@ void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Gra
 	std::cout << std::endl;
 
 	std::vector<Frac> B; //Gives numbers to be printed
-	std::vector< std::vector<Frac> > C; //From Known
-	std::vector<Frac> C1;
 	
 	Frac zeroFrac(0,1);
 	//Calculating B
@@ -5118,37 +5090,7 @@ void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Gra
 				j = (int)allGraphs.size();
 			}
 		}
-	}
 	
-	
-	//First has 0 for ==, 1 for <=
-	//Next entry is bound
-	//Finally, it's the std::vector of coefficients in known (after it's been resized)
-	
-	//Calculating C
-	std::cout << "Calculating C." << std::endl << std::endl;
-	C.resize(allGraphs.size());
-	C1.resize(knownSize,zeroFrac);
-	
-	#pragma omp parallel for
-	for(int i = 0; i < allGraphs.size(); ++i) {
-		C[i].resize(knownSize,zeroFrac);
-	}
-	
-	//Note I'm changing the order of indices of C from when I had the Python Script
-	#pragma omp parallel for
-	for(int i = 0; i < knownSize; ++i) {
-		C1[i] = known[i].getAns();
-		
-		for(int j = 0; j < known[i].getNumVariables(); ++j) {
-			for(int k = 0; k < (int)allGraphs.size(); ++k) {
-				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
-					C[k][i] = known[i].getVariable(j).getCoefficient();
-					k = (int)allGraphs.size();
-				}
-			}
-		}
-	}
 	
 	//Stupid C++ doesn't have hash for int[2]
 	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
@@ -5714,36 +5656,6 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 		}
 	}
 	
-	
-	//First has 0 for ==, 1 for <=
-	//Next entry is bound
-	//Finally, it's the std::vector of coefficients in known (after it's been resized)
-	
-	//Calculating C
-	std::cout << "Calculating C." << std::endl << std::endl;
-	C.resize(allGraphs.size());
-	C1.resize(knownSize,zeroFrac);
-	
-	#pragma omp parallel for
-	for(int i = 0; i < allGraphs.size(); ++i) {
-		C[i].resize(knownSize,zeroFrac);
-	}
-	
-	//Note I'm changing the order of indices of C from when I had the Python Script
-	#pragma omp parallel for
-	for(int i = 0; i < knownSize; ++i) {
-		C1[i] = known[i].getAns();
-		
-		for(int j = 0; j < known[i].getNumVariables(); ++j) {
-			for(int k = 0; k < (int)allGraphs.size(); ++k) {
-				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
-					C[k][i] = known[i].getVariable(j).getCoefficient();
-					k = (int)allGraphs.size();
-				}
-			}
-		}
-	}
-	
 	//Stupid C++ doesn't have hash for int[2]
 	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
 	std::vector< std::vector< std::unordered_map<std::pair<int,int>,Frac,boost::hash<std::pair<int,int> > > > > newA;
@@ -5904,8 +5816,8 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	mosek::fusion::Model::t OLP = new mosek::fusion::Model("OLP"); auto _OLP = monty::finally([&]() { OLP->dispose(); }); //Set up this one first then copy it
 	
 	auto x = OLP->variable(); //Bounded?
-	auto yLessThan = OLP->variable((int)known.size(), mosek::fusion::Domain::greaterThan(0));
-	auto yEqualTo = OLP->variable((int)known.size());
+	auto y1 = OLP->variable((int)knownLess.size(), mosek::fusion::Domain::greaterThan(0)); //Less than
+	auto y2 = OLP->variable((int)knownEq.size());
 	std::vector<mosek::fusion::Constraint::t> constraints;
 	std::vector < std::vector<mosek::fusion::Variable::t> > MosekM; //Matrix variables
 	
@@ -5922,6 +5834,9 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	
 	//All constraints from normal part
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		MosekC1;
+		MosekC2;
+	
 		auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(mult[i],x),mosek::fusion::Expr::dot(MosekC,y));
 		
 		for(int j = 0; j < v.size(); ++j) {
