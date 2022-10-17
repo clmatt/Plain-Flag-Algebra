@@ -25,8 +25,9 @@
 //My headers
 #include "general.h"
 #include "fractions.h"
+#include "simplex.h"
 #include "flags.h"
-#include "copositive.h"
+
 
 
 //Nauty
@@ -77,12 +78,10 @@ int main() {
 	std::vector< std::vector<double> > vtxs = {{1,0,0},{0,1,0},{0,0,1}};
 	Simplex test(vtxs);
 	
-	std::cout << test.longestEdge().first << " " << test.longestEdge().second;
-	
 	
 	
 	//Max = true
-	//fastPlainFlagAlgebra(f,3,zeros,known,false);
+	excitingFlagAlgebra(f,3,zeros,known,false);
 	
 	auto end=std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);

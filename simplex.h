@@ -1,5 +1,3 @@
-//Code necessary for running algorithm from an adaptive linear approximation algorithm for copostive programs
-
 //-----------------------
 //-----------------------
 //-----Simplex Class-----
@@ -105,3 +103,32 @@ class Simplex {
 		}	
 		
 };
+
+
+//--------------------------
+//-----Standard Simplex-----
+//--------------------------
+
+Simplex standardSimplex(int n) {
+	std::vector< std::vector<double> > vertices;
+	vertices.resize(n);
+	
+	for(int i = 0; i < n; ++i) {
+		vertices[i].resize(n);
+		
+		for(int j = 0; j < n; ++j) {
+			if(i != j) {
+				vertices[i][j] = 0;
+			}
+			
+			else {
+				vertices[i][j] = 1;
+			}
+		}
+	}
+	
+	return Simplex(vertices);
+}
+
+
+

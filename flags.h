@@ -4939,7 +4939,6 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	std::cout << "Divide answers by " << mult << std::endl <<std::endl;
 	
 	return;
-	return;
 }
 
 
@@ -5541,3 +5540,413 @@ void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Gra
 }
 
 
+
+//------------------------------
+//----Exciting Flag Algebra-----
+//------------------------------
+
+//Same as flag algebra but solves the copositive version instead of psd
+void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, std::vector<Equation> &known, bool maximize = true) {
+	std::cout << "Starting plainFlagAlgebra." << std::endl;
+	
+	int fSize = f.size();
+	int zerosSize = zeros.size();
+	int knownSize = known.size();
+		
+	if(n <= 1) {
+		std::cout << "Plain flag algebra method not set up for graphs with fewer than two vertices." << std::endl << std::endl;
+		throw std::exception();
+	}
+
+	if(fSize == 0) {
+		std::cout << "Need at least one graph in f in plainFlagAlgebra." << std::endl << std::endl;
+		throw std::exception();
+	}
+	
+	//Check if every equation in known has at least one variable
+	for(int i = 0; i < knownSize; ++i) {
+		if(known[i].getNumVariables() == 0) {
+			std::cout << "Equations in known must have at least one graph in plainFlagAlgebra." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+
+	int fN = f[0].getN();
+	
+	//Graphs in f can't have flags
+	for(int i = 0; i < fSize; ++i) {
+		if(f[i].getFlag().getN() != 0) {
+			std::cout << "All graphs in f in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+
+	//Graphs in known can't have flags
+	//Maybe fix?
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			if(known[i].getVariable(j).getFlag().getN() != 0) {
+				std::cout << "All graphs in known in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+				throw std::exception();
+			}
+		}
+	}
+	
+	//Make sure everything has correct number of colors
+	int numColors = f[0].getNumColors();
+	
+	for(int i = 1; i < fSize; ++i) {
+		if(f[i].getNumColors() != numColors) {
+			std::cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+	
+	for(int i = 0; i < zerosSize; ++i) {
+		if(zeros[i].getNumColors() != numColors) {
+			std::cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+	
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			if(known[i].getVariable(j).getNumColors() != numColors) {
+				std::cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << std::endl << std::endl;
+				throw std::exception();
+			}
+		}
+	}
+	
+	//Not sure if strictly necessary, but it would probably give trash bounds otherwise
+	if(fN > n) {
+		std::cout << "Make n large enough so it has vertices at least as many vertices when multiplied by itself as n." << std::endl << std::endl;
+		throw std::exception();
+	}
+	
+	std::cout << std::endl;
+	
+	Equation fEq(f,zeros,Frac(1,1),0); //Type doesn't matter
+	std::vector<Edge> edges {};
+	Graph H(edges,1,numColors);
+	Equation eq1({H},zeros,Frac(1,1),0);
+	Equation eq2({H},zeros,Frac(1,1),0);
+	
+	std::cout << "Generating graphs to be used in resize." << std::endl;
+	std::vector<Graph> allGraphs = generate(n,numColors,zeros);
+	
+	std::cout << std::endl << "Resizing f." << std::endl;
+	Equation fEqResized = resize(fEq,allGraphs);
+	f.clear();
+	for(int i = 0; i < fEqResized.getNumVariables(); ++i) {
+		f.push_back(fEqResized.getVariable(i));
+	}
+	std::cout << std::endl;
+	
+	fSize = f.size();
+	
+	//Resize known
+	std::cout << "Resizing known." << std::endl;
+	//#pragma omp parallel for
+	for(int i = 0; i < knownSize; ++i) {
+		std::cout << i+1 << " out of " << knownSize << std::endl;
+		known[i] = resize(known[i],allGraphs);
+	}
+	std::cout << std::endl;
+
+	std::vector<Equation> knownEq;
+	std::vector<Equation> knownLess;
+	
+	for(int i = 0; i < knownSize; ++i) {
+		if(known[i].getType() == 1) {
+			knownLess.push_back(known[i]);
+		}
+		
+		else {
+			knownEq.push_back(known[i]);
+		}	
+	}
+	
+	std::ofstream myFile;
+	myFile.open("Duals.txt");
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		myFile << "Label: " << i+1 << std::endl;
+		allGraphs[i].printAdjMatToFile(myFile);
+		myFile << std::endl;
+	}
+	
+	//Used to give indices of A
+	//Rather than multiplying we look at all graphs and work backwards to get coefficients
+	//This works well as we have already generated all graphs of size n and multiplication basically just has us partially doing that every time so it saves time on generation
+	//The only slow down could come from looking up indices but std::unordered_maps are SO fast it doesn't matter
+	std::unordered_map<std::string, int> allGraphsMap;
+					
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		allGraphsMap.insert(std::pair<std::string, int>(allGraphs[i].getCanonLabel(),i));
+	}
+	
+	//All graphs of size n with flags such that parity issues work out
+	std::cout << "Generating v." << std::endl;
+	std::vector < std::vector < Graph > > v = generateV(n,numColors,zeros);
+	std::cout << std::endl;
+	std::cout << "Generating allGraphsWithFlags." << std::endl;
+	std::vector < std::vector < Graph > > allGraphsWithFlags = generateAllGraphsWithFlags(n,numColors,zeros);
+	std::cout << std::endl;
+
+	std::vector<Frac> B; //Gives numbers to be printed
+	std::vector< std::vector<Frac> > C; //From Known
+	std::vector<Frac> C1;
+	
+	Frac zeroFrac(0,1);
+	//Calculating B
+	std::cout << "Calculating B." << std::endl << std::endl;
+	B.resize(allGraphs.size(),zeroFrac);
+	
+	//TODO use map
+	#pragma omp parallel for
+	for(int i = 0; i < fSize; ++i) {
+		for(int j = 0; j < (int)allGraphs.size(); ++j) {
+			if(isomorphic(f[i],allGraphs[j])) {
+				B[j] = f[i].getCoefficient();
+				j = (int)allGraphs.size();
+			}
+		}
+	}
+	
+	
+	//First has 0 for ==, 1 for <=
+	//Next entry is bound
+	//Finally, it's the std::vector of coefficients in known (after it's been resized)
+	
+	//Calculating C
+	std::cout << "Calculating C." << std::endl << std::endl;
+	C.resize(allGraphs.size());
+	C1.resize(knownSize,zeroFrac);
+	
+	#pragma omp parallel for
+	for(int i = 0; i < allGraphs.size(); ++i) {
+		C[i].resize(knownSize,zeroFrac);
+	}
+	
+	//Note I'm changing the order of indices of C from when I had the Python Script
+	#pragma omp parallel for
+	for(int i = 0; i < knownSize; ++i) {
+		C1[i] = known[i].getAns();
+		
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			for(int k = 0; k < (int)allGraphs.size(); ++k) {
+				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
+					C[k][i] = known[i].getVariable(j).getCoefficient();
+					k = (int)allGraphs.size();
+				}
+			}
+		}
+	}
+	
+	//Stupid C++ doesn't have hash for int[2]
+	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
+	std::vector< std::vector< std::unordered_map<std::pair<int,int>,Frac,boost::hash<std::pair<int,int> > > > > newA;
+	newA.resize(allGraphs.size());
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		newA[i].resize(v.size()); 
+	}
+	
+	int FCOORDcounter = 0;
+	
+	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
+		std::cout << "In A, iteration " << i+1 << " out of " << v.size() << std::endl;  
+		
+		//Create hash map for third and fourth indices of A
+		std::unordered_map<std::string, int> f;
+		for(int j = 0; j < (int)v[i].size(); ++j) {
+			f.insert(std::pair<std::string, int>(v[i][j].getCanonLabel(),j));
+		}	
+		
+		int sizeOfFlag = v[i][0].getSizeOfFlag();
+		
+		#pragma omp parallel
+		{
+			
+			#pragma omp for nowait schedule(dynamic) 
+			for(int index2 = 0; index2 < (int)allGraphsWithFlags[i].size(); ++index2) {
+				Graph G = allGraphsWithFlags[i][index2];
+				
+				//Make sure all flag vertices in G are first
+				//TODO make a function of this
+				std::vector<int> reordering(n);
+				
+				for(int j = 0; j < sizeOfFlag; ++j) {
+					reordering[G.getFlagVertex(j)] = j;
+				}
+				int index = sizeOfFlag;
+				
+				for(int j = 0; j < n; ++j) {
+					if(!G.isFlag(j)) {
+						reordering[j] = index;
+						++index;
+					}
+				}
+				
+				Frac coeff = G.getCoefficient();
+				G = G.restriction(reordering);
+				G.setCoefficient(coeff);
+				
+				Graph Gcopy = G;
+				Gcopy.removeFlag();
+			
+				int b = allGraphsMap[Gcopy.getCanonLabel()];	
+				Frac e = G.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
+				
+				std::vector<int> X((n-sizeOfFlag)/2 - 1); //X is zero indexed but it should actually be sizeOfFlag+1 indexed
+				//Wlog first non-flag vertex in X
+				for(int j = 0; j < (n-sizeOfFlag)/2 - 1; ++j) {
+					X[j] = j;
+				}
+				
+				do {
+					std::vector<int> restriction1(n,-1);
+					std::vector<int> restriction2(n,-1);
+					
+					for(int j = 0; j < sizeOfFlag; ++j) {
+						restriction1[j] = j;
+						restriction2[j] = j;
+					}
+					
+					int counter1 = sizeOfFlag+1;
+					int counter2 = sizeOfFlag;
+					int Xcounter = 0;
+					
+					//Know flag vertices of G are first
+					restriction1[sizeOfFlag] = sizeOfFlag;
+					for(int j = sizeOfFlag + 1; j < n; ++j) {
+						if((X.size() != 0) && (X[Xcounter] == (j - sizeOfFlag - 1))) {
+							++Xcounter;
+							restriction1[j] = counter1;
+							++counter1; 
+						}
+						
+						else {
+							restriction2[j] = counter2;
+							++counter2;
+						}
+					}
+					
+					Graph G1 = G.restriction(restriction1);
+					Graph G2 = G.restriction(restriction2);
+					
+					int G1Index = f[G1.getCanonLabel()];
+					int G2Index = f[G2.getCanonLabel()];
+					
+					int c = std::min(G1Index,G2Index);
+					int d = std::max(G1Index,G2Index);
+					
+					#pragma omp critical
+					{					
+						auto it = newA[b][i].find({c,d});
+						
+						if( it == newA[b][i].end() ) {
+							newA[b][i].insert({{c,d},e});
+							++FCOORDcounter;
+						}
+						
+						else {
+							it->second = it->second + e; 
+						}	
+					}
+				
+				} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
+			}
+		}
+	}
+	std::cout << std::endl;
+	
+	std::cout << "Making Integer." << std::endl;
+	
+	long long int mult = 1;
+	for(int i = 0; i < (int)known.size(); ++i) {
+		if(known[i].getAns().getNum() != 0) {
+			mult = lcm(mult,known[i].getAns().getDen());
+		}
+	} 
+	
+	std::vector<long long int> constraintMult;
+	int BCOORDcounter = 0;
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		constraintMult.push_back(B[i].getDen());
+		
+		for(int j = 0; j < v.size(); ++j) {
+			for(auto k : newA[i][j]) {
+				constraintMult[i] = lcm(constraintMult[i],k.second.getDen());
+			}
+		}
+		
+		for(int j = 0; j < (int)known.size(); ++j) {
+			for(int k = 0; k < known[j].getNumVariables(); ++k) {
+				constraintMult[i] = lcm(constraintMult[i], known[j].getVariable(k).getCoefficient().getDen());
+			}
+		}
+	}
+	
+	//Could use queue, but may be nice to access middle
+	//Line 1
+	std::vector< std::vector <Simplex> > complexes;
+	
+	complexes.resize(v.size()); 
+	
+	for(int i = 0; i < v.size(); ++i) {
+		complexes[i] = {standardSimplex(v[i].size())};
+	}
+	
+	
+	//set up inner and outer LPs
+	mosek::fusion::Model::t OLP = new mosek::fusion::Model("OLP"); auto _OLP = monty::finally([&]() { OLP->dispose(); }); //Set up this one first then copy it
+	
+	auto x = OLP->variable(); //Bounded?
+	auto yLessThan = OLP->variable((int)known.size(), mosek::fusion::Domain::greaterThan(0));
+	auto yEqualTo = OLP->variable((int)known.size());
+	std::vector<mosek::fusion::Constraint::t> constraints;
+	std::vector < std::vector<mosek::fusion::Variable::t> > MosekM; //Matrix variables
+	
+	MosekM.resize(allGraphs.size());
+	constraints.resize(allGraphs.size());
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		MosekM[i].resize(v.size());
+		
+		for(int j = 0; j < (int)v.size(); ++j) {
+			auto tempVar = OLP->variable( monty::new_array_ptr<int,1>({ static_cast<int>(v[j].size()), static_cast<int>(v[j].size()) }) );
+		}
+	}
+	
+	//All constraints from normal part
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(mult[i],x),mosek::fusion::Expr::dot(MosekC,y));
+		
+		for(int j = 0; j < v.size(); ++j) {
+			std::vector<int> firstIndex;
+			std::vector<int> secondIndex;
+			std::vector<double> values;
+		
+			for(auto k : newA[i][j]) {
+				firstIndex.push_back(k.first.first);
+				secondIndex.push_back(k.first.second);
+				values.push_back((k.second.getNum()*constraintMult[i])/k.second.getDen());
+			}
+			
+			auto partOfA = mosek::fusion::Matrix::sparse(v[j].size(),v[j].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
+			
+			forConstraint = mosek::fusion::Expr::add( forConstraint, mosek::fusion::Expr::mul(partOfA,MosekM[i][j]));
+		}
+		//Do something
+	}
+
+	//Constraints on 
+	
+	
+	
+	std::cout << "Divide answers by " << mult << std::endl <<std::endl;
+	
+	return;
+}
