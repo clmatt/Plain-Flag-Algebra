@@ -5090,6 +5090,7 @@ void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Gra
 				j = (int)allGraphs.size();
 			}
 		}
+	}
 	
 	
 	//Stupid C++ doesn't have hash for int[2]
@@ -5637,8 +5638,6 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	std::cout << std::endl;
 
 	std::vector<Frac> B; //Gives numbers to be printed
-	std::vector< std::vector<Frac> > C; //From Known
-	std::vector<Frac> C1;
 	
 	Frac zeroFrac(0,1);
 	//Calculating B
@@ -5802,9 +5801,8 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	}
 	
 	//Could use queue, but may be nice to access middle
-	//Line 1
+	//TODO create set of vertices so we know if we are doubling up on constraints
 	std::vector< std::vector <Simplex> > complexes;
-	
 	complexes.resize(v.size()); 
 	
 	for(int i = 0; i < v.size(); ++i) {
@@ -5819,26 +5817,71 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	auto y1 = OLP->variable((int)knownLess.size(), mosek::fusion::Domain::greaterThan(0)); //Less than
 	auto y2 = OLP->variable((int)knownEq.size());
 	std::vector<mosek::fusion::Constraint::t> constraints;
-	std::vector < std::vector<mosek::fusion::Variable::t> > MosekM; //Matrix variables
+	std::vector <mosek::fusion::Variable::t>  MosekM; //Matrix variables
 	
-	MosekM.resize(allGraphs.size());
+	MosekM.resize(v.size());
 	constraints.resize(allGraphs.size());
 	
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		MosekM[i].resize(v.size());
 		
-		for(int j = 0; j < (int)v.size(); ++j) {
-			auto tempVar = OLP->variable( monty::new_array_ptr<int,1>({ static_cast<int>(v[j].size()), static_cast<int>(v[j].size()) }) );
+	for(int i = 0; i < (int)v.size(); ++i) {
+		MosekM[i] = OLP->variable( monty::new_array_ptr<int,1>({ static_cast<int>(v[i].size()), static_cast<int>(v[i].size()) }) );
+	}
+	
+	//Generate C1,C2
+	//NOT scaled yet
+	std::vector< std::vector<Frac> > C1;
+	std::vector< std::vector<Frac> > C2;
+	
+	C1.resize(knownLess.size());
+	C2.resize(knownEq.size());
+	
+	for(int i = 0; i < (int)knownLess.size(); ++i) {
+		C1[i].resize(allGraphs.size(),Frac(0,1));
+		
+		for(int j = 0; j < knownLess[i].getNumVariables(); ++j) {
+			C1[i][allGraphsMap.at(knownLess[i].getVariable(j).getCanonLabel())] = knownLess[i].getVariable(j).getCoefficient();
+		}
+	}
+	
+	for(int i = 0; i < (int)knownEq.size(); ++i) {
+		C2[i].resize(allGraphs.size(),Frac(0,1));
+		
+		for(int j = 0; j < knownEq[i].getNumVariables(); ++j) {
+			C2[i][allGraphsMap.at(knownEq[i].getVariable(j).getCanonLabel())] = knownEq[i].getVariable(j).getCoefficient();
 		}
 	}
 	
 	//All constraints from normal part
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		MosekC1;
-		MosekC2;
-	
-		auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(mult[i],x),mosek::fusion::Expr::dot(MosekC,y));
+		//Scale C1,C2
+		std::vector< std::vector<double> > scaledC1;
+		std::vector< std::vector<double> > scaledC2;
+
+		scaledC1.resize(knownLess.size());
+		scaledC2.resize(knownEq.size());
 		
+		for(int j = 0; j < (int)knownLess.size(); ++j) {
+			scaledC1[j].resize(knownLess[j].getNumVariables());
+			
+			for(int k = 0; k < knownLess[j].getNumVariables(); ++k) {
+				scaledC1[j][k] = (C1[j][k].getNum()*constraintMult[i])/C1[j][k].getDen();
+			}
+		}
+		
+		for(int j = 0; j < (int)knownEq.size(); ++j) {
+			scaledC2[j].resize(knownEq[j].getNumVariables());
+			
+			for(int k = 0; k < knownEq[j].getNumVariables(); ++k) {
+				scaledC2[j][k] = (C2[j][k].getNum()*constraintMult[i])/C2[j][k].getDen();
+			}
+		}
+		
+		auto MosekC1 = mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(scaledC1));
+		auto MosekC2 = mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(scaledC2));
+		
+	
+		auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(constraintMult[i],x), mosek::fusion::Expr::dot(MosekC1,y1)), mosek::fusion::Expr::dot(MosekC2,y2));
+	
 		for(int j = 0; j < v.size(); ++j) {
 			std::vector<int> firstIndex;
 			std::vector<int> secondIndex;
@@ -5852,16 +5895,120 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 			
 			auto partOfA = mosek::fusion::Matrix::sparse(v[j].size(),v[j].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
 			
-			forConstraint = mosek::fusion::Expr::add( forConstraint, mosek::fusion::Expr::mul(partOfA,MosekM[i][j]));
+			forConstraint = mosek::fusion::Expr::add(forConstraint, mosek::fusion::Expr::dot(partOfA,MosekM[j]));
 		}
-		//Do something
+		if(maximize) {
+			constraints[i] = OLP->constraint(forConstraint, mosek::fusion::Domain::lessThan(-constraintMult[i] + (B[i].getNum()*constraintMult[i])/B[i].getDen()));
+		}
+		
+		else { 
+			constraints[i] = OLP->constraint(forConstraint, mosek::fusion::Domain::lessThan((B[i].getNum()*constraintMult[i])/B[i].getDen()));
+		}
 	}
 
-	//Constraints on 
+	//Diagonal >= 0
+	for(int i = 0; i < (int)v.size(); ++i) {
+		for(int j = 0; j < (int)v[i].size(); ++j) {
+			std::vector<int> firstIndex;
+			std::vector<int> secondIndex;
+			std::vector<double> values;
+			firstIndex.push_back(j);
+			secondIndex.push_back(j);
+			values.push_back(1.);
+			
+			auto myMatrix = mosek::fusion::Matrix::sparse(v[i].size(),v[i].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
+		
+			OLP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.));
+		}
+	}
 	
 	
+	//Symmetric
+	for(int i = 0; i < (int)v.size(); ++i) {
+		OLP->constraint( mosek::fusion::Expr::sub(mosek::fusion::Expr::transpose(MosekM[i]), MosekM[i]), mosek::fusion::Domain::equalsTo(0.));
+	} 
 	
-	std::cout << "Divide answers by " << mult << std::endl <<std::endl;
+	//Objective Function
+	//Scale C1,C2
+	std::vector<double> alpha1;
+	std::vector<double> alpha2;
+
+	alpha1.resize(knownLess.size());
+	alpha2.resize(knownEq.size());
+		
+	for(int i = 0; i < (int)knownLess.size(); ++i) {
+		alpha1[i] = (knownLess[i].getAns().getNum()*mult)/(knownLess[i].getAns().getDen());
+	}
 	
+	for(int i = 0; i < (int)knownEq.size(); ++i) {
+		alpha2[i] = (knownEq[i].getAns().getNum()*mult)/(knownEq[i].getAns().getDen());
+	}
+		
+	auto MosekAlpha1 = monty::new_array_ptr(alpha1);
+	auto MosekAlpha2 = monty::new_array_ptr(alpha2);
+	
+	OLP->objective( mosek::fusion::ObjectiveSense::Maximize, mosek::fusion::Expr::sub( mosek::fusion::Expr::sub( mosek::fusion::Expr::mul(mult,x), mosek::fusion::Expr::dot(MosekAlpha1,y1)), mosek::fusion::Expr::dot(MosekAlpha2,y2)));
+	
+	mosek::fusion::Model::t ILP = new mosek::fusion::Model("ILP"); auto _ILP = monty::finally([&]() { OLP->dispose(); }); //Copy ILP and then add some more constraints
+	
+	ILP = OLP->clone();
+	
+	//Positive for ILP
+	for(int i = 0; i < (int)v.size(); ++i) {
+		for(int j = 0; j < (int)v[i].size(); ++j) {
+			for(int k = j+1; k < (int)v[i].size(); ++k) {
+				std::cout << "TEST";
+				std::vector<int> firstIndex;
+				std::vector<int> secondIndex;
+				std::vector<double> values;
+				firstIndex.push_back(j);
+				secondIndex.push_back(k);
+				values.push_back(1.);
+				
+				auto myMatrix = mosek::fusion::Matrix::sparse(v[i].size(),v[i].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
+			
+				ILP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.));
+			}
+		}
+	}
+	
+	OLP->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
+	OLP->writeTask("OLP.ptf");
+	ILP->setLogHandler([ = ](const std::string & msg) { std::cout << msg << std::flush; } );
+	ILP->writeTask("ILP.ptf");
+	
+	OLP->solve();
+	ILP->solve();
+	
+	std::cout << std::endl;
+	
+	double OLPobj;
+	double ILPobj;
+	
+	if(maximize) {
+   	OLPobj = 1.-OLP->dualObjValue()/mult;
+   	ILPobj = 1.-ILP->dualObjValue()/mult;
+   }
+
+   else {
+   	OLPobj = OLP->dualObjValue()/mult;
+   	ILPobj = ILP->dualObjValue()/mult;
+   }
+	
+	while( (OLPobj - ILPobj)/(1.+abs(OLPobj) + abs(ILPobj)) > epsilon {
+		
+	}
+	
+	if(maximize) {
+   	std::cout << "The outer objective function is: " << 1.-OLP->dualObjValue()/mult << std::endl << std::endl;
+   	std::cout << "The inner objective function is: " << 1.-ILP->dualObjValue()/mult << std::endl << std::endl;
+   }
+
+   else {
+   	std::cout << "The outer objective function is: " << OLP->dualObjValue()/mult << std::endl << std::endl;
+   	std::cout << "The inner objective function is: " << ILP->dualObjValue()/mult << std::endl << std::endl;
+   }
+   
 	return;
+
 }
