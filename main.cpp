@@ -71,17 +71,12 @@ int main() {
 	
 	Graph K3c({{}},3,2);
 	Graph K3({{0,1,1},{1,2,1},{0,2,1}},3,2);
+	//Graph P4({{0,1,1},{1,2,1},{2,3,1}},4,2);
 	
-	//zeros = {K3};
 	f = {K3,K3c};
 	
-	std::vector< std::vector<double> > vtxs = {{1,0,0},{0,1,0},{0,0,1}};
-	Simplex test(vtxs);
-	
-	
-	
 	//Max = true
-	excitingFlagAlgebra(f,3,zeros,known,false);
+	excitingFlagAlgebra(f,5,zeros,known,false);
 	
 	auto end=std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);

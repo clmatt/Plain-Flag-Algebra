@@ -351,3 +351,16 @@ long long int multinomial(const int n, const std::vector<int> &input) {
 	return output;
 }
 
+
+//--------------------------
+//-----Hash for Vectors-----
+//--------------------------
+
+//Who knows why C++ doesn't have built in hash for vectors
+//Stolen for stackoverflow
+template <typename Container> // we can make this generic for any container [1]
+struct containerHash {
+    std::size_t operator()(Container const& c) const {
+        return boost::hash_range(c.begin(), c.end());
+    }
+};
