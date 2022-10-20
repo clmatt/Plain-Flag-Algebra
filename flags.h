@@ -6047,10 +6047,10 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 			std::vector<double> mapInput = vertices1[longestEdge.first];
 			mapInput.insert( mapInput.end(), vertices1[longestEdge.second].begin(), vertices1[longestEdge.second].end());
 			
-			//edgeConstraint[i][edgeConstraintMap[i].at(mapInput)]->remove();
-			//edgeConstraint[i].erase(edgeConstraint[i].begin() + edgeConstraintMap[i].at(mapInput));
+			edgeConstraint[i][edgeConstraintMap[i].at(mapInput)]->remove();
+			edgeConstraint[i].erase(edgeConstraint[i].begin() + edgeConstraintMap[i].at(mapInput));
 			
-			/*for(int j = 0; j < (int)vertices1.size(); ++j) {
+			for(int j = 0; j < (int)vertices1.size(); ++j) {
 				mapInput = vertices1[j];
 				mapInput.insert(mapInput.end(), newVertex.begin(), newVertex.end());
 				edgeConstraintMap[i][mapInput] = edgeConstraint[i].size();
@@ -6062,7 +6062,7 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 				auto MosekOldVertex = monty::new_array_ptr(vertices1[j]);
 				
 				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekOldVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.)));
-			}*/
+			}
 			
 			vertices1[longestEdge.first] = newVertex;
 			vertices2[longestEdge.second] = newVertex;
