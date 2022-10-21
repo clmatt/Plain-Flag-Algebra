@@ -40,7 +40,7 @@ class Simplex {
 		//-----Get Dimension-----
 		//-----------------------
 		
-		int getDim() {
+		int getDim() const{
 			return (int)vertices.size();
 		}
 		
@@ -49,7 +49,7 @@ class Simplex {
 		//-----Get Vertices-----
 		//----------------------
 		
-		std::vector< std::vector<double> > getVertices() {
+		std::vector< std::vector<double> > getVertices() const{
 			return vertices;
 		}
 		
@@ -58,7 +58,7 @@ class Simplex {
 		//-----Get Vertex-----
 		//--------------------
 				
-		std::vector<double> getVertex(int i) {
+		std::vector<double> getVertex(int i) const{
 			if((i < 0) || (i >= n)) {
 				std::cout << "Vertex out of range in getVertex." << std::endl << std::endl;
 				throw std::exception();
@@ -72,7 +72,7 @@ class Simplex {
 		//-----Get Coordinate-----
 		//------------------------
 		
-		double getCoordinate(int i, int j) {
+		double getCoordinate(int i, int j) const{
 			if((i < 0) || (i >= n) || (j < 0) || (j >= n)) {
 				std::cout << "Vertex out of range in getCoordinate." << std::endl << std::endl;
 				throw std::exception();
@@ -88,7 +88,7 @@ class Simplex {
 		
 		//Uses l1 norm for ease of computation and b/c it suffices for algorithm
 		//Used in Copositive program solver
-		std::pair<int, int> longestEdge() {
+		std::pair<int, int> longestEdge() const{
 			double length = 0.;
 			std::pair<int, int> output;
 			
@@ -156,7 +156,7 @@ class SimplicialComplex {
 		
 		//Need to specify NUMCOLORS, because it's possible that it differs
 		//from actual number of colors
-		SimplicialComplex(const std::vector<Simplex> SIMPLICES) {
+		SimplicialComplex(const std::vector<Simplex> &SIMPLICES) {
 			simplices = SIMPLICES;
 		
 			if(simplices.size() > 0) {
@@ -187,25 +187,30 @@ class SimplicialComplex {
 					for(int j = 0; j < n; ++j) {
 						for(int k = j+1; k < n; ++k) {
 							//Concatenate two endpoint of edges
-							std::vector<double> edge = simplices[i].getVertex(j);
-							edge.insert(edge.end(), simplices[i].getVertex(k).begin(), simplices[i].getVertex(k).end());
+							std::vector<double> temp1 = simplices[i].getVertex(j);
+							std::vector<double> temp2 = simplices[i].getVertex(k);
+							std::vector<double> myEdge = temp1;
 							
-							if(edgesMap.find(edge) == edgesMap.end()) {
-								edgesMap[edge] = {{i,j,k}};
+							myEdge.insert(myEdge.end(), temp2.begin(), temp2.end());
+							
+							if(edgesMap.find(myEdge) == edgesMap.end()) {
+								edgesMap[myEdge] = {{i,j,k}};
 							}
+							
 							else {
-								edgesMap[edge].push_back({i,j,k});
+								edgesMap[myEdge].push_back({i,j,k});
 							}
 							
 							//Include both ways to encode edges
-							edge = simplices[i].getVertex(k);
-							edge.insert(edge.end(), simplices[i].getVertex(j).begin(), simplices[i].getVertex(j).end());
+							myEdge = temp2;
+							myEdge.insert(myEdge.end(), temp1.begin(), temp1.end());
 							
-							if(edgesMap.find(edge) == edgesMap.end()) {
-								edgesMap[edge] = {{i,k,j}};
+							if(edgesMap.find(myEdge) == edgesMap.end()) {
+								edgesMap[myEdge] = {{i,k,j}};
 							}
+							
 							else {
-								edgesMap[edge].push_back({i,k,j});
+								edgesMap[myEdge].push_back({i,k,j});
 							}
 						}
 					}
@@ -214,11 +219,20 @@ class SimplicialComplex {
 		}
 		
 		
+		//-----------------------
+		//-----Get Simplices-----
+		//-----------------------
+		
+		std::vector<Simplex> getSimplices() const{
+			return simplices;
+		}
+		
+		
 		//---------------------
 		//-----Get Simplex-----
 		//---------------------
 		
-		Simplex getSimplex(int i) {
+		Simplex getSimplex(int i) const{
 			if((i < 0) || (i > simplices.size())) {
 				std::cout << "In getSimplex, index is out of range." << std::endl << std::endl;
 				throw std::exception();
@@ -246,7 +260,7 @@ class SimplicialComplex {
 		//-----Get Dimension-----
 		//-----------------------
 		
-		int getDim() {
+		int getDim() const{
 			return n;
 		}
 		
@@ -255,7 +269,7 @@ class SimplicialComplex {
 		//-----Get Vertices Map-----
 		//--------------------------
 		
-		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > getVerticesMap() {
+		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > getVerticesMap() const{
 			return verticesMap;
 		}
 		
@@ -264,53 +278,8 @@ class SimplicialComplex {
 		//-----Get Edges Map-----
 		//--------------------------
 		
-		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > getEdgesMap() {
+		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > getEdgesMap() const{
 			return edgesMap;
-		}
-		
-		
-		//-------------------
-		//-----Subdivide-----
-		//-------------------
-		
-		//Returns the vertices which with the new vertex are in a new edge - used for copositive approximation
-		std::unordered_set< std::vector<double>, containerHash<std::vector<double> > > subdivide(const std::vector<double> &edge) {
-			std::unordered_set< std::vector<double>, containerHash<std::vector<double> > > output;
-		
-			if(edgesMap.find(edge) == edgesMap.end()) {
-				std::cout << "In subdivide in simplicial complex, the edge you are subdividing must exist." << std::endl << std::endl;
-				throw std::exception();
-			}
-			
-			std::vector<double> newVertex(n);
-			for(int i = 0; i < n; ++i) {
-				newVertex[i] = (edge[i] + edge[i+n])/2.;
-			}
-			
-			std::vector< std::vector<int> > indices = edgesMap.at(edge);
-			
-			for(int i = 0; i < (int)indices.size(); ++i) {
-				std::vector< std::vector<double> > vertices1 = simplices[indices[i][0]].getVertices();
-				std::vector< std::vector<double> > vertices2 = simplices[indices[i][0]].getVertices();
-				
-				vertices1[indices[i][1]] = newVertex;
-				vertices2[indices[i][2]] = newVertex;
-				
-				simplices.push_back(Simplex(vertices1));
-				simplices.push_back(Simplex(vertices2));
-			}
-			
-			for(int i = 0; i < (int)indices.size(); ++i) {
-				for(int j = 0; j < n; ++j) {
-					output.insert(simplices[indices[i][0]].getVertex(j));
-				}
-			}
-			
-			for(int i = 0; i < (int)indices.size(); ++i) {
-				simplices.erase(simplices.begin() + indices[i][0]-i); //Okay because we push_back and b/c indices[i][0] is ordered
-			}
-			
-			return output;
 		}
 		
 		
@@ -319,19 +288,19 @@ class SimplicialComplex {
 		//----------------------
 		
 		//L1 norm
-		std::vector<double> longestEdge() {
+		std::vector<double> longestEdge() const{
 			std::vector<double> output;
 			double length = 0.;
 		
-			for (auto edge : edgesMap) {
+			for(auto myEdge : edgesMap) {
 				double tempLength = 0.;
 				
-				for(int i = 0; i < n; ++n) {
-					tempLength += abs(edge.first[i] - edge.first[i+n]);
+				for(int i = 0; i < n; ++i) {
+					tempLength += abs(myEdge.first[i] - myEdge.first[i+n]);
 				}
 				
 				if(tempLength > length) {
-					output = edge.first;
+					output = myEdge.first;
 					length = tempLength;
 				}
 			}
@@ -340,6 +309,55 @@ class SimplicialComplex {
 		}
 		
 };
+
+
+//-------------------
+//-----Subdivide-----
+//-------------------
+		
+//Output is vertices which with the new vertex are in a new edge - used for copositive approximation
+//Maybe not the fastest b/c need to recompute maps, but I don't think this is a bottleneck
+SimplicialComplex subdivide(const SimplicialComplex &delta, const std::vector<double> &myEdge, std::unordered_set< std::vector<double>, containerHash<std::vector<double> > > &output) {	
+	std::vector<Simplex> newSimplices = delta.getSimplices();
+	auto edgesMap = delta.getEdgesMap();
+	int n = delta.getDim();
+
+	if(edgesMap.find(myEdge) == edgesMap.end()) {
+		std::cout << "In subdivide in simplicial complex, the edge you are subdividing must exist." << std::endl << std::endl;
+		throw std::exception();
+	}
+			
+	std::vector<double> newVertex(n);
+	
+	for(int i = 0; i < n; ++i) {
+		newVertex[i] = (myEdge[i] + myEdge[i+n])/2.;
+	}
+			
+	std::vector< std::vector<int> > indices = edgesMap.at(myEdge);
+			
+	for(int i = 0; i < (int)indices.size(); ++i) {
+		std::vector< std::vector<double> > vertices1 = newSimplices[indices[i][0]].getVertices();
+		std::vector< std::vector<double> > vertices2 = newSimplices[indices[i][0]].getVertices();
+				
+		vertices1[indices[i][1]] = newVertex;
+		vertices2[indices[i][2]] = newVertex;
+				
+		newSimplices.push_back(Simplex(vertices1));
+		newSimplices.push_back(Simplex(vertices2));
+	}
+			
+	for(int i = 0; i < (int)indices.size(); ++i) {
+		for(int j = 0; j < n; ++j) {
+			output.insert(newSimplices[indices[i][0]].getVertex(j));
+		}
+	}
+			
+	for(int i = 0; i < (int)indices.size(); ++i) {
+		newSimplices.erase(newSimplices.begin() + indices[i][0] - i); //Okay because we push_back and b/c indices[i][0] is ordered
+	}
+	
+	return SimplicialComplex(newSimplices);	
+}
 
 
 

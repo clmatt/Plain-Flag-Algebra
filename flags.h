@@ -5801,12 +5801,11 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	}
 	
 	//Could use queue, but may be nice to access middle
-	//TODO create set of vertices so we know if we are doubling up on constraints
-	std::vector< std::deque <Simplex> > complexes;
-	complexes.resize(v.size()); 
+	std::vector< SimplicialComplex > complexes; 
 	
 	for(int i = 0; i < v.size(); ++i) {
-		complexes[i].push_back(standardSimplex(v[i].size()));;
+		SimplicialComplex temp({standardSimplex(v[i].size())});
+		complexes.push_back(temp);
 	}
 	
 	
@@ -5955,7 +5954,8 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	ILP = OLP->clone();
 	
 	std::vector< std::vector< mosek::fusion::Constraint::t> > edgeConstraint(v.size());
-	std::vector< std::unordered_map< std::vector<double>, int, containerHash<std::vector<double> > > > edgeConstraintMap(v.size()); //Concatentate vector so you don't need a pair of vectors
+	std::vector< std::vector< std::vector<double> > > edgeConstraintMapInv(v.size()); //Only has one of edges
+	
 	
 	//Positive for ILP
 	for(int i = 0; i < (int)v.size(); ++i) {
@@ -5970,18 +5970,14 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 				
 				auto myMatrix = mosek::fusion::Matrix::sparse(v[i].size(),v[i].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
 				
+				std::vector<double> mapInput(2*v[i].size(),0.);
+				
+				mapInput[j] = 1.;
+				mapInput[k+v[i].size()] = 1.;
+
+				edgeConstraintMapInv[i].push_back(mapInput);
+				
 				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.)));
-				
-				std::vector<double> mapInput1(2*v[i].size(),0.);
-				std::vector<double> mapInput2(2*v[i].size(),0.);
-				
-				mapInput1[j] = 1.;
-				mapInput1[k+v[i].size()] = 1.;
-				mapInput2[k] = 1.;
-				mapInput2[j+v[i].size()] = 1.;
-				
-				edgeConstraintMap[i][mapInput1] = edgeConstraint[i].size()-1;
-				edgeConstraintMap[i][mapInput2] = edgeConstraint[i].size()-1;
 			}
 		}
 	}
@@ -6020,18 +6016,66 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 			std::cout << iterations << " " << ILPobj << " " << OLPobj << " " << (OLP->dualObjValue() - ILP->dualObjValue())/(1.+abs(OLP->dualObjValue()) + abs(ILP->dualObjValue())) << std::endl;
 		}
 		++iterations;
-	
-		for(int i = 0; i < (int)v.size(); ++i) {
-			Simplex delta = complexes[i].front();
-			complexes[i].pop_front();
+		std::vector<double> longestEdge;
+		int index;	
 		
-			std::vector< std::vector<double> > vertices1 = delta.getVertices();
-			std::vector< std::vector<double> > vertices2 = vertices1;
-			std::pair<int, int> longestEdge = delta.longestEdge();
+		
+		for(int i = 0; i < (int)v.size(); ++i) {
+			int n = complexes[i].getDim(); // = v[i].size()
+			
+			if((iterations % 2) == 0) {
+				double dual = 1000.;
+			
+				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
+				
+					if(abs((*(edgeConstraint[i][j])->level())[0]) < 1E-14) {		
+						if((*(edgeConstraint[i][j])->dual())[0] < dual) {
+							dual = (*(edgeConstraint[i][j])->dual())[0];
+							longestEdge = edgeConstraintMapInv[i][j];
+							index = j;
+						}	
+					}
+				}
+			}
+			
+			if((iterations % 2) == 1) {
+				double length = -1.;
+				
+				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
+					double tempLength = 0.;
+				
+					if(abs((*(edgeConstraint[i][j])->level())[0]) < 1E-14) {	
+						for(int k = 0; k < n; ++k) {
+							tempLength += abs(edgeConstraintMapInv[i][j][k] - edgeConstraintMapInv[i][j][k+n]);
+						}
+						
+						if(tempLength > length) {
+							length = tempLength;
+							longestEdge = edgeConstraintMapInv[i][j];
+							index = j;
+						}	
+					}
+				}
+			}
+			
+			if(longestEdge.size() == 0) {
+				std::cout << "Longest Edge has a problem." << std::endl << std::endl;
+				throw std::exception();
+			}
+			
+			
+			//std::vector<double> longestEdge = complexes[i].longestEdge();
 			
 			std::vector<double> newVertex;
-			for(int j = 0; j < (int)vertices1.size(); ++j) {
-				newVertex.push_back((vertices1[longestEdge.first][j] + vertices1[longestEdge.second][j])/2.);
+			std::vector<double> longestEdgeInv(2*v[i].size());
+			
+			for(int j = 0; j < v[i].size(); ++j) {
+				newVertex.push_back((longestEdge[j] + longestEdge[j+v[i].size()])/2.);
+			}
+			
+			for(int j = 0; j < v[i].size(); ++j) {
+				longestEdgeInv[j] = longestEdge[j+v[i].size()];
+				longestEdgeInv[j+v[i].size()] = longestEdge[j];
 			}
 			
 			auto MosekNewVertex = monty::new_array_ptr(newVertex);
@@ -6042,40 +6086,37 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 			//Vertex and Edge Constraint
 			ILP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
 			
+			std::unordered_set< std::vector<double>, containerHash<std::vector<double> > > verticesSet;
+			complexes[i] = subdivide(complexes[i], longestEdge, verticesSet);
+			
 			//Remove Old Constraint from Mosek
-			//Could also remove from map
-			std::vector<double> mapInput = vertices1[longestEdge.first];
-			mapInput.insert( mapInput.end(), vertices1[longestEdge.second].begin(), vertices1[longestEdge.second].end());
 			
-			edgeConstraint[i][edgeConstraintMap[i].at(mapInput)]->remove();
-			edgeConstraint[i].erase(edgeConstraint[i].begin() + edgeConstraintMap[i].at(mapInput));
+			/*for(int j = 0; j < (int)edgeConstraintMapInv[i].size(); ++j) {
+				if((edgeConstraintMapInv[i][j] == longestEdge) || (edgeConstraintMapInv[i][j] == longestEdgeInv)) {
+					index = j;
+					j = (int)edgeConstraintMapInv[i].size();
+				}
+			}*/
+
+			edgeConstraint[i][index]->remove();
+			edgeConstraint[i].erase(edgeConstraint[i].begin() + index);
+			edgeConstraintMapInv[i].erase(edgeConstraintMapInv[i].begin() + index);
 			
-			for(int j = 0; j < (int)vertices1.size(); ++j) {
-				mapInput = vertices1[j];
+			for (auto myVertex : verticesSet) {
+				std::vector<double> mapInput = myVertex;
 				mapInput.insert(mapInput.end(), newVertex.begin(), newVertex.end());
-				edgeConstraintMap[i][mapInput] = edgeConstraint[i].size();
 				
-				mapInput = newVertex;
-				mapInput.insert(mapInput.end(), vertices1[j].begin(), vertices1[j].end());
-				edgeConstraintMap[i][mapInput] = edgeConstraint[i].size();
+				edgeConstraintMapInv[i].push_back(mapInput);
 				
-				auto MosekOldVertex = monty::new_array_ptr(vertices1[j]);
+				auto MosekVertex = monty::new_array_ptr(myVertex);
 				
-				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekOldVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.)));
+				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.)));
+				
 			}
-			
-			vertices1[longestEdge.first] = newVertex;
-			vertices2[longestEdge.second] = newVertex;
-			
-			complexes[i].push_back(Simplex(vertices1));
-			complexes[i].push_back(Simplex(vertices2));
 		}
 		
-		//ILP->solve();
+		ILP->solve();
 		OLP->solve();		
-		
-		//ILP->writeTask("ILP.ptf");
-		//OLP->writeTask("OLP.ptf");
 			
 		if(maximize) {
 			OLPobj = 1.-OLP->dualObjValue()/mult;
