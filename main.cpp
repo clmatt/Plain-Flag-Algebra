@@ -76,10 +76,10 @@ int main() {
 	Graph C5({{0,1,1},{1,2,1},{2,3,1},{3,4,1},{4,0,1}},5,2);
 	
 	//f = {K3,K3c};
-	f = {C5};
+	f = {P4};
 	
 	//Max = true
-	excitingFlagAlgebra(f,5,zeros,known,true);
+	fastExcitingFlagAlgebra(f,5,zeros,known,true);
 	
 	auto end=std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);

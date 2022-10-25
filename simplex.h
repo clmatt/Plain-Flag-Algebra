@@ -11,6 +11,7 @@ class Simplex {
 		
 		int n = -1; //dimension - assume n points in n dimension (simplicial dimension is n-1)
 		std::vector< std::vector <double> > vertices; //List of vertices
+		std::unordered_set< std::vector<double>, vectorHash< double > > vertexSet;
 
 	public:
 		
@@ -31,6 +32,10 @@ class Simplex {
 			}
 			
 			vertices = VERTICES;
+			
+			for(int i = 0; i < n; ++i) {
+				vertexSet.insert(vertices[i]); 
+			}
 			
 			//TODO check if valid - need a linear algebra solver - don't need yet however
 		}
@@ -82,12 +87,41 @@ class Simplex {
 		}
 		
 		
+		//------------------------
+		//-----Get Vertex Set-----
+		//------------------------
+		
+		std::unordered_set< std::vector<double>, vectorHash< double > > getVertexSet() {
+			return vertexSet;
+		}
+		
+		
+		//-----------------------
+		//-----Contains Edge-----
+		//-----------------------
+		
+		bool containsEdge(const std::vector<double> myEdge) {
+			std::vector<double> vertex1(myEdge.begin(), myEdge.begin()+n);
+			std::vector<double> vertex2(myEdge.begin()+n, myEdge.begin()+2*n);
+			
+			if(vertex1 == vertex2) {
+				return false;
+			}
+			
+			if((vertexSet.find(vertex1) != vertexSet.end()) && (vertexSet.find(vertex2) != vertexSet.end())) {
+				return true;
+			}
+			
+			return false;
+		}
+		
+		
 		//----------------------
 		//-----Longest Edge-----
 		//----------------------
 		
 		//Uses l1 norm for ease of computation and b/c it suffices for algorithm
-		//Used in Copositive program solver
+		//Can be used in Copositive program solver
 		std::pair<int, int> longestEdge() const{
 			double length = 0.;
 			std::pair<int, int> output;
@@ -143,8 +177,6 @@ class SimplicialComplex {
 	private:
 		
 		std::vector<Simplex> simplices; //List of simplices
-		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > verticesMap; //Maps to which simplices contain the vertex
-		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > edgesMap; //Concatenate two vertices so I don't have to deal with pairs for the has function
 		//Could make a simplex edge struct, but that seems like overkill
 		int n;
 
@@ -166,53 +198,6 @@ class SimplicialComplex {
 					if(simplices[i].getDim() != n) {
 						std::cout << "In simplicial complex, all simplices must be same dimension." << std::endl << std::endl;
 						throw std::exception();
-					}
-				}
-				
-				//Add to vertices set
-				for(int i = 0; i < (int)simplices.size(); ++i) {
-					for(int j = 0; j < n; ++j) {
-						if(verticesMap.find(simplices[i].getVertex(j)) == verticesMap.end()) {
-							verticesMap[simplices[i].getVertex(j)] = {{i,j}};
-						}
-					
-						else {
-							verticesMap[simplices[i].getVertex(j)].push_back({i,j});
-						}
-					}
-				}
-				
-				//Add to edges set
-				for(int i = 0; i < (int)simplices.size(); ++i) {
-					for(int j = 0; j < n; ++j) {
-						for(int k = j+1; k < n; ++k) {
-							//Concatenate two endpoint of edges
-							std::vector<double> temp1 = simplices[i].getVertex(j);
-							std::vector<double> temp2 = simplices[i].getVertex(k);
-							std::vector<double> myEdge = temp1;
-							
-							myEdge.insert(myEdge.end(), temp2.begin(), temp2.end());
-							
-							if(edgesMap.find(myEdge) == edgesMap.end()) {
-								edgesMap[myEdge] = {{i,j,k}};
-							}
-							
-							else {
-								edgesMap[myEdge].push_back({i,j,k});
-							}
-							
-							//Include both ways to encode edges
-							myEdge = temp2;
-							myEdge.insert(myEdge.end(), temp1.begin(), temp1.end());
-							
-							if(edgesMap.find(myEdge) == edgesMap.end()) {
-								edgesMap[myEdge] = {{i,k,j}};
-							}
-							
-							else {
-								edgesMap[myEdge].push_back({i,k,j});
-							}
-						}
 					}
 				}
 			}
@@ -265,99 +250,135 @@ class SimplicialComplex {
 		}
 		
 		
-		//--------------------------
-		//-----Get Vertices Map-----
-		//--------------------------
-		
-		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > getVerticesMap() const{
-			return verticesMap;
-		}
-		
-		
-		//--------------------------
-		//-----Get Edges Map-----
-		//--------------------------
-		
-		std::unordered_map< std::vector<double>, std::vector< std::vector<int> >, containerHash< std::vector<double> > > getEdgesMap() const{
-			return edgesMap;
-		}
-		
-		
 		//----------------------
 		//-----Longest Edge-----
 		//----------------------
 		
 		//L1 norm
-		std::vector<double> longestEdge() const{
-			std::vector<double> output;
-			double length = 0.;
-		
-			for(auto myEdge : edgesMap) {
-				double tempLength = 0.;
-				
-				for(int i = 0; i < n; ++i) {
-					tempLength += abs(myEdge.first[i] - myEdge.first[i+n]);
-				}
-				
-				if(tempLength > length) {
-					output = myEdge.first;
-					length = tempLength;
+		std::vector<double> longestEdge() {
+			std::vector<double> output(2*n);
+			double length = -1.;
+			
+			
+			for(int i = 0; i < simplices.size(); ++i) {
+				for(int j = 0; j < n; ++j) {
+					for(int k = j+1; k < n; ++k) {
+						double tempLength = 0.;
+					
+						for(int l = 0; l < n; ++l) {
+							tempLength += abs(simplices[i].getCoordinate(j,l) - simplices[i].getCoordinate(k,l));
+						}
+						
+						if(tempLength > length) {
+							length = tempLength;
+							for(int l = 0; l < n; ++l) {
+								output[l] = simplices[i].getCoordinate(j,l);
+								output[l+k] = simplices[i].getCoordinate(k,l);
+							}
+						}
+					}
 				}
 			}
 			
 			return output;
 		}
 		
+		
+		//-------------------
+		//-----Subdivide-----
+		//-------------------
+				
+		//Output is edges in subdivided simplex - used in copositive 
+		//Maybe not the fastest b/c need to recompute maps, but I don't think this is a bottleneck
+		void subdivide(const std::vector<double> &myEdge, std::unordered_set< std::vector<double>, vectorHash< double > > &output) {	
+
+			std::vector<int> indices; //Gives which simplices the edge is in
+			
+			for(int i = 0; i < simplices.size(); ++i) {
+				if(simplices[i].containsEdge(myEdge)) {
+					indices.push_back(i);
+				}
+			}
+
+			if(indices.size() == 0) {
+				std::cout << "In subdivide in simplicial complex, the edge you are subdividing must exist." << std::endl << std::endl;
+				throw std::exception();
+			}
+					
+			std::vector<double> newVertex(n);
+			
+			for(int i = 0; i < n; ++i) {
+				newVertex[i] = (myEdge[i] + myEdge[i+n])/2.;
+			}
+			
+			std::vector<double> subdivided1(2*n);
+			std::vector<double> subdivided2(2*n);
+			
+			for(int i = 0; i < n; ++i) {
+				subdivided1[i] = newVertex[i];
+				subdivided2[i] = newVertex[i];
+				
+				subdivided1[i+n] = myEdge[i];
+				subdivided2[i+n] = myEdge[i+n];
+			}
+			
+			output.insert(subdivided1);
+			output.insert(subdivided2);
+			
+			//Also do inverses
+			for(int i = 0; i < n; ++i) {
+				subdivided1[i+n] = newVertex[i];
+				subdivided2[i+n] = newVertex[i];
+				
+				subdivided1[i] = myEdge[i];
+				subdivided2[i] = myEdge[i+n];
+			}
+			
+			//More than we need, but this is easier to compute		
+			for(int i = 0; i < (int)indices.size(); ++i) {
+				std::vector< std::vector<double> > vertices = simplices[indices[i]].getVertices();
+				int index1 = -1;
+				int index2 = -1;
+				
+				for(int j = 0; j < n; ++j) {
+					for(int k = j+1; k < n; ++k) {
+						std::vector<double> temp = vertices[j];
+						temp.insert(temp.end(), vertices[k].begin(), vertices[k].end());
+						
+						std::vector<double> tempInv = vertices[k];
+						tempInv.insert(tempInv.end(), vertices[j].begin(), vertices[j].end());
+						
+						if((temp != myEdge) && (tempInv != myEdge)) {
+							output.insert(temp);
+						}
+						
+						else{ 
+							index1 = j;
+							index2 = k;
+						}
+					}
+				}
+				
+				std::vector< std::vector<double> > vertices1 = vertices;
+				std::vector< std::vector<double> > vertices2 = vertices;		
+						
+				vertices1[index1] = newVertex;
+				vertices2[index2] = newVertex;
+						
+				simplices.push_back(Simplex(vertices1));
+				simplices.push_back(Simplex(vertices2));
+			}
+					
+			for(int i = 0; i < (int)indices.size(); ++i) {
+				simplices.erase(simplices.begin() + indices[i] - i); //Okay because we push_back and b/c indices[i][0] is ordered
+			}
+			
+			
+		}
 };
 
 
-//-------------------
-//-----Subdivide-----
-//-------------------
-		
-//Output is vertices which with the new vertex are in a new edge - used for copositive approximation
-//Maybe not the fastest b/c need to recompute maps, but I don't think this is a bottleneck
-SimplicialComplex subdivide(const SimplicialComplex &delta, const std::vector<double> &myEdge, std::unordered_set< std::vector<double>, containerHash<std::vector<double> > > &output) {	
-	std::vector<Simplex> newSimplices = delta.getSimplices();
-	auto edgesMap = delta.getEdgesMap();
-	int n = delta.getDim();
 
-	if(edgesMap.find(myEdge) == edgesMap.end()) {
-		std::cout << "In subdivide in simplicial complex, the edge you are subdividing must exist." << std::endl << std::endl;
-		throw std::exception();
-	}
-			
-	std::vector<double> newVertex(n);
-	
-	for(int i = 0; i < n; ++i) {
-		newVertex[i] = (myEdge[i] + myEdge[i+n])/2.;
-	}
-			
-	std::vector< std::vector<int> > indices = edgesMap.at(myEdge);
-			
-	for(int i = 0; i < (int)indices.size(); ++i) {
-		std::vector< std::vector<double> > vertices1 = newSimplices[indices[i][0]].getVertices();
-		std::vector< std::vector<double> > vertices2 = newSimplices[indices[i][0]].getVertices();
-				
-		vertices1[indices[i][1]] = newVertex;
-		vertices2[indices[i][2]] = newVertex;
-				
-		newSimplices.push_back(Simplex(vertices1));
-		newSimplices.push_back(Simplex(vertices2));
-	}
-			
-	for(int i = 0; i < (int)indices.size(); ++i) {
-		for(int j = 0; j < n; ++j) {
-			output.insert(newSimplices[indices[i][0]].getVertex(j));
-		}
-	}
-			
-	for(int i = 0; i < (int)indices.size(); ++i) {
-		newSimplices.erase(newSimplices.begin() + indices[i][0] - i); //Okay because we push_back and b/c indices[i][0] is ordered
-	}
-	
-	return SimplicialComplex(newSimplices);	
-}
 
 
 

@@ -358,9 +358,53 @@ long long int multinomial(const int n, const std::vector<int> &input) {
 
 //Who knows why C++ doesn't have built in hash for vectors
 //Stolen for stackoverflow
-template <typename Container> // we can make this generic for any container [1]
-struct containerHash {
-    std::size_t operator()(Container const& c) const {
-        return boost::hash_range(c.begin(), c.end());
+#include <limits>
+#include <cstdint>
+
+template<typename T>
+T xorshift(const T& n,int i){
+  return n^(n>>i);
+}
+
+// a hash function with another name as to not confuse with std::hash
+uint32_t distribute(const uint32_t& n){
+  uint32_t p = 0x55555555ul; // pattern of alternating 0 and 1
+  uint32_t c = 3423571495ul; // random uneven integer constant; 
+  return c*xorshift(p*xorshift(n,16),16);
+}
+
+// a hash function with another name as to not confuse with std::hash
+uint64_t distribute(const uint64_t& n){
+  uint64_t p = 0x5555555555555555ull; // pattern of alternating 0 and 1
+  uint64_t c = 17316035218449499591ull;// random uneven integer constant; 
+  return c*xorshift(p*xorshift(n,32),32);
+}
+
+// if c++20 rotl is not available:
+template <typename T,typename S>
+typename std::enable_if<std::is_unsigned<T>::value,T>::type
+constexpr rotl(const T n, const S i){
+  const T m = (std::numeric_limits<T>::digits-1);
+  const T c = i&m;
+  return (n<<c)|(n>>((T(0)-c)&m)); // this is usually recognized by the compiler to mean rotation, also c++20 now gives us rotl directly
+}
+
+// call this function with the old seed and the new key to be hashed and combined into the new seed value, respectively the final hash
+template <class T>
+inline size_t hash_combine(std::size_t& seed, const T& v)
+{
+    return rotl(seed,std::numeric_limits<size_t>::digits/3) ^ distribute(std::hash<T>{}(v));
+}
+
+template <typename T> // we can make this generic for any container [1]
+struct vectorHash {
+    std::size_t operator()(const std::vector<T> &vec) const {
+        std::size_t seed = vec.size();
+        for(auto& i : vec) {
+			 seed = hash_combine(seed, i);
+		  }
+		  return seed;
     }
 };
+
+
