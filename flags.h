@@ -2426,12 +2426,120 @@ std::vector<Graph> addAllFlags(const Graph &G, const Graph &flag) {
 	return output;
 }
 
+
 //---------------------------------
 //-----Generate First Index Map-----
 //---------------------------------
 
 //Generate map for first index in A used in plain flag algebra
 std::unordered_map<std::string, int> firstIndex(const int n, const int numColors, const std::vector<Graph> &zeros) {
+	std::unordered_map<std::string, int> output;
+	int index = 0;
+	
+	for(int i = n/2; i <= n-1; ++i) {
+		std::cout << "In firstIndex, iteration " << i << " out of " << n-1 << std::endl;
+		int sizeOfFlag = 2*i-n;
+		
+		if(sizeOfFlag > 0) {
+			std::vector<Graph> allGraphs = generate(sizeOfFlag, numColors, zeros);
+			
+			//Set flag arbitrarily
+			std::vector<int> flag(sizeOfFlag);
+			for(int j = 0; j < sizeOfFlag; ++j) {
+				flag[j] = j;
+			}
+			
+			for(auto G: allGraphs) {
+				G.setFlag(flag);
+				output.insert(make_pair(G.getCanonLabel(),index));
+				++index;	
+			}
+		}
+	}
+	
+	//output.insert(std::make_pair("\n",0));
+	
+	return output;
+}
+
+
+//---------------------------------
+//-----Generate Last Index Map-----
+//---------------------------------
+
+//Generate map for last two indices in A used in plain flag algebra
+//Doesn't need to contain any info about the first index  (even though it is implicitly there)
+std::unordered_map<std::string, int> lastIndex(const int n, const int numColors, const std::vector<Graph> &zeros) {
+	std::unordered_map<std::string, int> output;
+	std::unordered_map<std::string, int> flags1 = firstIndex(n, numColors, zeros); //Need to make sure we consider the same flags as in firstIndex, as there is a choice, really just need this as a set of the domain
+	std::unordered_map<std::string, int> flags2; //Need to say which flag we are on
+
+	for(int i = n/2; i < n; ++i) {
+		std::cout << "In lastIndex, iteration " << i << " out of " << n-1 << std::endl;
+		int sizeOfFlag = 2*i-n;
+		
+		if(sizeOfFlag > 0) {
+			std::vector<Graph> allGraphs = generate(i, numColors,zeros);
+			
+			for(auto G : allGraphs) {
+				std::vector<int> sigma(sizeOfFlag);
+				
+				for(int j = 0; j < sizeOfFlag; ++j) {
+					sigma[j] = j;
+				}
+				
+				do {			
+					bool cont = true;
+				
+					do {
+						Graph Gcopy = G;
+					
+						Gcopy.setFlag(sigma); //Annoying b/c it calls Nauty twice (3x?)
+						Graph G1 = Gcopy.getFlag();
+						
+	
+						if(flags1.find(G1.getCanonLabel()) != flags1.end()) { //Make sure same flags as index1
+							std::string tempStr = Gcopy.getCanonLabel();
+							cont = false;
+							
+							//Different graphs may have same label
+							//But all graphs with same flag with have different label
+							if(output.find(tempStr) == output.end()) {
+								if(flags2.find(G1.getCanonLabel()) == flags2.end()) {
+									output.insert(make_pair(tempStr,0));
+									flags2.insert(make_pair(G1.getCanonLabel(),1));
+								}
+							
+								else {
+									output.insert(make_pair(tempStr,flags2.at(G1.getCanonLabel())));
+									flags2.at(G1.getCanonLabel()) = flags2.at(G1.getCanonLabel()) + 1;
+								}
+							}
+						}
+					} while(next_permutation(sigma.begin(), sigma.end()));
+					
+					if(cont) {
+						std::cout << "Something went wrong in lastIndex or firstIndex." << std::endl << std::endl;
+						throw std::exception();
+					}
+					
+					sort(sigma.begin(),sigma.end());
+					
+				} while(nextSubset(sigma,i,sizeOfFlag));
+			}
+		}
+	}
+	
+	return output;
+}
+
+
+//---------------------------------
+//-----Generate First Index Map-----
+//---------------------------------
+
+//Generate map for first index in A used in fast plain flag algebra
+std::unordered_map<std::string, int> fastFirstIndex(const int n, const int numColors, const std::vector<Graph> &zeros) {
 	std::unordered_map<std::string, int> output;
 	int index = 0;
 	
@@ -2459,10 +2567,10 @@ std::unordered_map<std::string, int> firstIndex(const int n, const int numColors
 //-----Generate Last Index Map-----
 //---------------------------------
 
-//Generate map for last two indices in A used in plain flag algebra
+//Generate map for last two indices in A used in fast plain flag algebra
 //Doesn't need to contain any info about the first index  (even though it is implicitly there)
 //String = add universal vtx, with different colored edges to parts
-std::unordered_map<std::string, int> lastIndex(const int n, const int numColors, const std::vector<Graph> &zeros) {
+std::unordered_map<std::string, int> fastLastIndex(const int n, const int numColors, const std::vector<Graph> &zeros) {
 	std::unordered_map<std::string, int> output;
 	std::unordered_map<std::string, int> flags; //Need to say which flag we are on
 
@@ -2489,6 +2597,7 @@ std::unordered_map<std::string, int> lastIndex(const int n, const int numColors,
 					
 					Graph G1 = G.restriction(restriction1);
 					
+					//Add new edge which is connected in new color to flag
 					std::vector<Edge> newEdges = G.getEdges();
 					
 					for(int j = 0; j < sizeOfFlag; ++j) {
@@ -2499,6 +2608,8 @@ std::unordered_map<std::string, int> lastIndex(const int n, const int numColors,
 					
 					std::string tempStr = newGraph.getCanonLabel();
 					
+					//Different graphs may have same label
+					//But all graphs with same flag with have different label
 					if(output.find(tempStr) == output.end()) {
 						if(flags.find(G1.getCanonLabel()) == flags.end()) {
 							output.insert(make_pair(tempStr,0));
@@ -3904,188 +4015,206 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	//Rather than multiplying we look at all graphs and work backwards to get coefficients
 	//This works well as we have already generated all graphs of size n and multiplication basically just has us partially doing that every time so it saves time on generation
 	//The only slow down could come from looking up indices but std::unordered_maps are SO fast it doesn't matter
-	std::unordered_map<std::string, int> allGraphsMap;
-					
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		allGraphsMap.insert(std::pair<std::string, int>(allGraphs[i].getCanonLabel(),i));
-	}
 	
-	//All graphs of size n with flags such that parity issues work out
-	std::cout << "Generating v." << std::endl;
-	std::vector < std::vector < Graph > > v = generateV(n,numColors,zeros);
+	std::cout << "Generating first index map." << std::endl;
+	std::unordered_map<std::string, int> firstIndexMap = firstIndex(n,numColors,zeros);
 	std::cout << std::endl;
-	std::cout << "Generating allGraphsWithFlags." << std::endl;
-	std::vector < std::vector < Graph > > allGraphsWithFlags = generateAllGraphsWithFlags(n,numColors,zeros);
+	
+	std::cout << "Generating second index map." << std::endl;
+	std::unordered_map<std::string, int> secondIndexMap;
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		secondIndexMap.insert(std::pair<std::string, int>(allGraphs[i].getCanonLabel(),i));
+	}
+	std::cout << std::endl;
+	
+	std::cout << "Generating last index map." << std::endl;
+	std::unordered_map<std::string, int> lastIndexMap = lastIndex(n,numColors,zeros);
 	std::cout << std::endl;
 
 	std::vector<Frac> B; //Gives numbers to be printed
-	std::vector< std::vector<Frac> > C; //From Known
-	std::vector<Frac> C1;
 	
 	Frac zeroFrac(0,1);
 	//Calculating B
 	std::cout << "Calculating B." << std::endl << std::endl;
 	B.resize(allGraphs.size(),zeroFrac);
-	
-	//TODO use map
+
 	#pragma omp parallel for
 	for(int i = 0; i < fSize; ++i) {
-		for(int j = 0; j < (int)allGraphs.size(); ++j) {
-			if(isomorphic(f[i],allGraphs[j])) {
-				B[j] = f[i].getCoefficient();
-				j = (int)allGraphs.size();
-			}
-		}
+		B[secondIndexMap.at(f[i].getCanonLabel())] = f[i].getCoefficient();
 	}
-	
-	
-	//First has 0 for ==, 1 for <=
-	//Next entry is bound
-	//Finally, it's the std::vector of coefficients in known (after it's been resized)
-	
-	//Calculating C
-	std::cout << "Calculating C." << std::endl << std::endl;
-	C.resize(allGraphs.size());
-	C1.resize(knownSize,zeroFrac);
-	
-	#pragma omp parallel for
-	for(int i = 0; i < allGraphs.size(); ++i) {
-		C[i].resize(knownSize,zeroFrac);
-	}
-	
-	//Note I'm changing the order of indices of C from when I had the Python Script
-	#pragma omp parallel for
-	for(int i = 0; i < knownSize; ++i) {
-		C1[i] = known[i].getAns();
-		
-		for(int j = 0; j < known[i].getNumVariables(); ++j) {
-			for(int k = 0; k < (int)allGraphs.size(); ++k) {
-				if(isomorphic(known[i].getVariable(j),allGraphs[k])) {
-					C[k][i] = known[i].getVariable(j).getCoefficient();
-					k = (int)allGraphs.size();
-				}
-			}
-		}
-	}
-	
+
 	//Stupid C++ doesn't have hash for int[2]
+	//Use this because otherwise we use an absurd amount of memory - only small loss in speed b/c unordered
 	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
 	std::vector< std::vector< std::unordered_map<std::pair<int,int>,Frac,boost::hash<std::pair<int,int> > > > > newA;
 	newA.resize(allGraphs.size());
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		newA[i].resize(v.size()); 
+		newA[i].resize(secondIndexMap.size()); 
 	}
-	
+
 	int FCOORDcounter = 0;
 	
-	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
-		std::cout << "In A, iteration " << i+1 << " out of " << v.size() << std::endl;  
-		
-		//Create hash map for third and fourth indices of A
-		std::unordered_map<std::string, int> f;
-		for(int j = 0; j < (int)v[i].size(); ++j) {
-			f.insert(std::pair<std::string, int>(v[i][j].getCanonLabel(),j));
-		}	
-		
-		int sizeOfFlag = v[i][0].getSizeOfFlag();
-		
-		#pragma omp parallel
-		{
+	std::vector<int> dim(firstIndexMap.size(),0); 
+	std::vector< std::unordered_set<std::string> > dimSet(firstIndexMap.size());
+	
+	#pragma omp parallel
+	{
+		#pragma omp for nowait schedule(dynamic) 
+		for(int i = 0; i < allGraphs.size(); ++i) {
+			Graph G = allGraphs[i];
+			std::cout << "While generating A, iteration " << i+1 << " out of " << allGraphs.size() << std::endl;
 			
-			#pragma omp for nowait schedule(dynamic) 
-			for(int index2 = 0; index2 < (int)allGraphsWithFlags[i].size(); ++index2) {
-				Graph G = allGraphsWithFlags[i][index2];
-				
-				//Make sure all flag vertices in G are first
-				//TODO make a function of this
-				std::vector<int> reordering(n);
-				
-				for(int j = 0; j < sizeOfFlag; ++j) {
-					reordering[G.getFlagVertex(j)] = j;
-				}
-				int index = sizeOfFlag;
-				
-				for(int j = 0; j < n; ++j) {
-					if(!G.isFlag(j)) {
-						reordering[j] = index;
-						++index;
-					}
-				}
-				
-				Frac coeff = G.getCoefficient();
-				G = G.restriction(reordering);
-				G.setCoefficient(coeff);
-				
-				Graph Gcopy = G;
-				Gcopy.removeFlag();
+			int b = secondIndexMap.at(G.getCanonLabel()); //Throws exception if out of range!
 			
-				int b = allGraphsMap[Gcopy.getCanonLabel()];	
-				Frac e = G.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
+			for(int j = n/2; j <= n-1; ++j) {
 				
-				std::vector<int> X((n-sizeOfFlag)/2 - 1); //X is zero indexed but it should actually be sizeOfFlag+1 indexed
-				//Wlog first non-flag vertex in X
-				for(int j = 0; j < (n-sizeOfFlag)/2 - 1; ++j) {
-					X[j] = j;
-				}
+				int sizeOfFlag = 2*j-n;
 				
-				do {
-					std::vector<int> restriction1(n,-1);
-					std::vector<int> restriction2(n,-1);
-					
-					for(int j = 0; j < sizeOfFlag; ++j) {
-						restriction1[j] = j;
-						restriction2[j] = j;
+				if(sizeOfFlag > 0) {
+					std::vector<int> X(sizeOfFlag); //flag
+					for(int k = 0; k < sizeOfFlag; ++k) {
+						X[k] = k;
 					}
 					
-					int counter1 = sizeOfFlag+1;
-					int counter2 = sizeOfFlag;
-					int Xcounter = 0;
+					Frac e = Frac(1,choose(n,j)*choose(j,sizeOfFlag)*factorial(sizeOfFlag));	
 					
-					//Know flag vertices of G are first
-					restriction1[sizeOfFlag] = sizeOfFlag;
-					for(int j = sizeOfFlag + 1; j < n; ++j) {
-						if((X.size() != 0) && (X[Xcounter] == (j - sizeOfFlag - 1))) {
-							++Xcounter;
-							restriction1[j] = counter1;
-							++counter1; 
-						}
+					do { //Next Subset
+						do { //Next Permutation
+							Graph Gcopy = G;
+							Gcopy.setFlag(X);
+							Graph G1 = Gcopy.getFlag();
 						
-						else {
-							restriction2[j] = counter2;
-							++counter2;
-						}
-					}
+							if(firstIndexMap.find(G1.getCanonLabel()) != firstIndexMap.end()) { //Make sure this is actually a flag we are considering 
+							
+								std::vector<int> Y(j - sizeOfFlag); //Every that isn't the flag
+								for(int k = 0; k < j- sizeOfFlag; ++k) {
+									Y[k] = k;
+								}
+							
+								do { //Y subset
+									//Need to adjust Y to be on [n] not [n-sizeOfFlag]
+									std::vector<int> realY(j - sizeOfFlag);
+									std::vector<int> adjusted(n-sizeOfFlag); //List of all non-flag vertices
+									int tempIndex = 0;
+									for(int k = 0; k < n; ++k) {
+										bool isFlag = false;
+										
+										for(int l = 0; l < sizeOfFlag; ++l) {
+											if(X[l] == k) {
+												isFlag = true;
+												l = sizeOfFlag;
+											}
+										}
+										
+										if(!isFlag) {
+											adjusted[tempIndex] = k;
+											++tempIndex;
+										}
+									}
+									
+									for(int k = 0; k < j - sizeOfFlag; ++k) {
+										realY[k] = adjusted[Y[k]];
+									}
+								
+									std::vector<int> restriction3(n,-1);
+									std::vector<int> restriction3c(n,-1);
+									
+									for(int k = 0; k < sizeOfFlag; ++k) {
+										restriction3[X[k]] = k;
+									}
+									
+									for(int k = 0; k < j - sizeOfFlag; ++k) {
+										restriction3[realY[k]] = k+sizeOfFlag;
+									}
+									
+									int tempIndex3 = sizeOfFlag;
+									
+									for(int k = 0; k < sizeOfFlag; ++k) {
+										restriction3c[X[k]] = k;
+									}
+									
+									//Probably not the fastest way to do this
+									for(int k = 0; k < n; ++k) {
+										bool inY = false;
+										for(int l = 0; l < j - sizeOfFlag; ++l) {
+											if(realY[l] == k) {
+												inY = true;
+												l = j - sizeOfFlag;
+											}
+										}
+										
+										if(!inY) {												
+											bool inFlag = false;
+											for(int l = 0; l < sizeOfFlag; ++l) {
+												if(X[l] == k) {
+													inFlag = true;
+													l = sizeOfFlag;
+												}
+											}
+											
+											if(!inFlag) {
+												restriction3c[k] = tempIndex3; //Double Check
+												++tempIndex3; 
+											}
+										}
+									}
+
+									Graph G3 = G.restriction(restriction3); //Labels a reminant of an old way of doing it, could probably come up with better name now, but I'm too lazy
+									Graph G3c = G.restriction(restriction3c);			
+									
+									//Could move this
+									std::vector<int> flag(sizeOfFlag);
+									for(int k = 0; k < sizeOfFlag; ++k) {
+										flag[k] = k;
+									}
+									
+									G3.setFlag(flag);
+									G3c.setFlag(flag);
+									
+									std::string lastIndexString1 = G3.getCanonLabel();
+									std::string lastIndexString2 = G3c.getCanonLabel();				
+									
+									int a = firstIndexMap.at(G1.getCanonLabel());
+							
+									int index1 = lastIndexMap.at(lastIndexString1);
+									int index2 = lastIndexMap.at(lastIndexString2);
+									int c = std::min(index1,index2);
+									int d = std::max(index1,index2);
+									
+									#pragma omp critical
+									{					
+										auto it = newA[i][a].find({c,d});
+										
+										if( it == newA[i][a].end() ) {
+											newA[i][a].insert({{c,d},e});
+											++FCOORDcounter;
+										}
+										
+										else {
+											it->second = it->second + e; 
+										}	
+										
+										if(dimSet[a].find(lastIndexString1) == dimSet[a].end()) {
+											++dim[a];
+											dimSet[a].insert(lastIndexString1);
+										}
+										
+										if(dimSet[a].find(lastIndexString2) == dimSet[a].end()) {
+											++dim[a];
+											dimSet[a].insert(lastIndexString2);
+										}
+									}
+									
+								} while(nextSubset(Y,n-sizeOfFlag,j-sizeOfFlag));
+							}
+						} while(next_permutation(X.begin(), X.end()));
+					} while(nextSubset(X,n,sizeOfFlag));
 					
-					Graph G1 = G.restriction(restriction1);
-					Graph G2 = G.restriction(restriction2);
-					
-					int G1Index = f[G1.getCanonLabel()];
-					int G2Index = f[G2.getCanonLabel()];
-					
-					int c = std::min(G1Index,G2Index);
-					int d = std::max(G1Index,G2Index);
-					
-					#pragma omp critical
-					{					
-						auto it = newA[b][i].find({c,d});
-						
-						if( it == newA[b][i].end() ) {
-							newA[b][i].insert({{c,d},e});
-							++FCOORDcounter;
-						}
-						
-						else {
-							it->second = it->second + e; 
-						}	
-					}
-				
-				} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
+				}	
 			}
 		}
 	}
 	std::cout << std::endl;
-	
-	//return;
 
 	std::cout << "Writing to file." << std::endl;
 
@@ -4096,9 +4225,9 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	
 	mosekFile << "OBJSENSE\nMAX\n\n";
 	
-	mosekFile << "PSDVAR\n" << v.size() << "\n";
-	for(int i = 0; i < v.size(); ++i) {
-		mosekFile << v[i].size() << "\n";
+	mosekFile << "PSDVAR\n" << firstIndexMap.size() << "\n";
+	for(int i = 0; i < firstIndexMap.size(); ++i) {
+		mosekFile << dim[i] << "\n";
 	} 
 	mosekFile << "\n";
 	
@@ -4146,10 +4275,14 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	std::vector<long long int> constraintMult;
 	int BCOORDcounter = 0;
 	
+	
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
 		constraintMult.push_back(B[i].getDen());
-		
-		for(int j = 0; j < v.size(); ++j) {
+	}
+	
+	#pragma omp parallel for
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {	
+		for(int j = 0; j < firstIndexMap.size(); ++j) {
 			for(auto k : newA[i][j]) {
 				constraintMult[i] = lcm(constraintMult[i],k.second.getDen());
 			}
@@ -4166,10 +4299,10 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	mosekFile << FCOORDcounter << "\n";
 	for(int i = 0; i < (int)allGraphs.size(); ++i) {
 		std::cout << "In writing FCOORD iteration " << i + 1  << " out of " << allGraphs.size() << std::endl;
-		for(int j = 0; j < (int)v.size(); ++j) {
+		for(int j = 0; j < (int)firstIndexMap.size(); ++j) {
 			//TODO Probably faster to use auto for loop, but easier to debug this way
-			for(int k = 0; k < (int)v[j].size(); ++k) {
-				for(int l = k; l < (int)v[j].size(); ++l) {
+			for(int k = 0; k < (int)dim[j]; ++k) {
+				for(int l = k; l < (int)dim[j]; ++l) {
 					auto it = newA[i][j].find({k,l});
 				
 					if(it != newA[i][j].end()) {	
@@ -4254,8 +4387,8 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	
 	//Flush Buffer
 	mosekFile << std::endl;
-	/*
-	std::ofstream multFile("multiplication.txt");
+	
+	/*std::ofstream multFile("multiplication.txt");
 	multFile << mult << "\n";
 	for(int i = 0; i < allGraphs.size(); ++i) {
 		multFile << constraintMult[i] << "\n";
@@ -4268,11 +4401,11 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	
 	CSDPfile << allGraphs.size() << "\n";
 	
-	CSDPfile << 2+v.size() << "\n";
+	CSDPfile << 2+firstIndexMap.size() << "\n";
 	
 	CSDPfile << "-" << (1+known.size()) << " ";
-	for(int i = 0; i < v.size(); ++i) {
-		CSDPfile << v[i].size() << " ";
+	for(int i = 0; i < firstIndexMap.size(); ++i) {
+		CSDPfile << dim[i] << " ";
 	}
 	CSDPfile << "\n";
 	
@@ -4305,9 +4438,9 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 			}
 		}
 		
-		for(int j = 0; j < v.size(); ++j) {
-			for(int k = 0; k < v[j].size(); ++k) {
-				for(int l = k; l < v[j].size(); ++l) {
+		for(int j = 0; j < firstIndexMap.size(); ++j) {
+			for(int k = 0; k < dim[j]; ++k) {
+				for(int l = k; l < dim[j]; ++l) {
 					auto it = newA[i][j].find({k,l});
 					
 					if(it != newA[i][j].end()) {
@@ -4326,8 +4459,8 @@ void plainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, s
 	}
 	
 	CSDPfile << std::endl;
-	std::cout << std::endl;
-	*/
+	std::cout << std::endl;*/
+	
 	std::cout << "Divide answers by " << mult << std::endl <<std::endl;
 	
 	return;
@@ -4478,7 +4611,7 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	//The only slow down could come from looking up indices but std::unordered_maps are SO fast it doesn't matter
 	
 	std::cout << "Generating first index map." << std::endl;
-	std::unordered_map<std::string, int> firstIndexMap = firstIndex(n,numColors,zeros);
+	std::unordered_map<std::string, int> firstIndexMap = fastFirstIndex(n,numColors,zeros);
 	std::cout << std::endl;
 	
 	std::cout << "Generating second index map." << std::endl;
@@ -4489,7 +4622,7 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	std::cout << std::endl;
 	
 	std::cout << "Generating last index map." << std::endl;
-	std::unordered_map<std::string, int> lastIndexMap = lastIndex(n,numColors,zeros);
+	std::unordered_map<std::string, int> lastIndexMap = fastLastIndex(n,numColors,zeros);
 	std::cout << std::endl;
 
 	std::vector<Frac> B; //Gives numbers to be printed
@@ -4939,11 +5072,11 @@ void fastPlainFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zero
 	}
 	
 	CSDPfile << std::endl;
-	std::cout << std::endl;
+	std::cout << std::endl;*/
 	
 	std::cout << "Divide answers by " << mult << std::endl <<std::endl;
 	
-	return;*/
+	return;
 }
 
 
@@ -5521,696 +5654,6 @@ void plainFlagAlgebraApprox(std::vector<Graph> &f, int n, int r, std::vector<Gra
 
 //Same as flag algebra but solves the copositive version instead of psd
 void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, std::vector<Equation> &known, bool maximize = true, double epsilon = 1E-6) {
-	std::cout << "Starting excitingFlagAlgebra." << std::endl;
-	
-	int fSize = f.size();
-	int zerosSize = zeros.size();
-	int knownSize = known.size();
-		
-	if(n <= 1) {
-		std::cout << "Plain flag algebra method not set up for graphs with fewer than two vertices." << std::endl << std::endl;
-		throw std::exception();
-	}
-
-	if(fSize == 0) {
-		std::cout << "Need at least one graph in f in plainFlagAlgebra." << std::endl << std::endl;
-		throw std::exception();
-	}
-	
-	//Check if every equation in known has at least one variable
-	for(int i = 0; i < knownSize; ++i) {
-		if(known[i].getNumVariables() == 0) {
-			std::cout << "Equations in known must have at least one graph in plainFlagAlgebra." << std::endl << std::endl;
-			throw std::exception();
-		}
-	}
-
-	int fN = f[0].getN();
-	
-	//Graphs in f can't have flags
-	for(int i = 0; i < fSize; ++i) {
-		if(f[i].getFlag().getN() != 0) {
-			std::cout << "All graphs in f in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
-			throw std::exception();
-		}
-	}
-
-	//Graphs in known can't have flags
-	//Maybe fix?
-	for(int i = 0; i < knownSize; ++i) {
-		for(int j = 0; j < known[i].getNumVariables(); ++j) {
-			if(known[i].getVariable(j).getFlag().getN() != 0) {
-				std::cout << "All graphs in known in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
-				throw std::exception();
-			}
-		}
-	}
-	
-	//Make sure everything has correct number of colors
-	int numColors = f[0].getNumColors();
-	
-	for(int i = 1; i < fSize; ++i) {
-		if(f[i].getNumColors() != numColors) {
-			std::cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << std::endl << std::endl;
-			throw std::exception();
-		}
-	}
-	
-	for(int i = 0; i < zerosSize; ++i) {
-		if(zeros[i].getNumColors() != numColors) {
-			std::cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << std::endl << std::endl;
-			throw std::exception();
-		}
-	}
-	
-	for(int i = 0; i < knownSize; ++i) {
-		for(int j = 0; j < known[i].getNumVariables(); ++j) {
-			if(known[i].getVariable(j).getNumColors() != numColors) {
-				std::cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << std::endl << std::endl;
-				throw std::exception();
-			}
-		}
-	}
-	
-	//Not sure if strictly necessary, but it would probably give trash bounds otherwise
-	if(fN > n) {
-		std::cout << "Make n large enough so it has vertices at least as many vertices when multiplied by itself as n." << std::endl << std::endl;
-		throw std::exception();
-	}
-	
-	std::cout << std::endl;
-	
-	Equation fEq(f,zeros,Frac(1,1),0); //Type doesn't matter
-	std::vector<Edge> edges {};
-	Graph H(edges,1,numColors);
-	Equation eq1({H},zeros,Frac(1,1),0);
-	Equation eq2({H},zeros,Frac(1,1),0);
-	
-	std::cout << "Generating graphs to be used in resize." << std::endl;
-	std::vector<Graph> allGraphs = generate(n,numColors,zeros);
-	
-	std::cout << std::endl << "Resizing f." << std::endl;
-	Equation fEqResized = resize(fEq,allGraphs);
-	f.clear();
-	for(int i = 0; i < fEqResized.getNumVariables(); ++i) {
-		f.push_back(fEqResized.getVariable(i));
-	}
-	std::cout << std::endl;
-	
-	fSize = f.size();
-	
-	//Resize known
-	std::cout << "Resizing known." << std::endl;
-	//#pragma omp parallel for
-	for(int i = 0; i < knownSize; ++i) {
-		std::cout << i+1 << " out of " << knownSize << std::endl;
-		known[i] = resize(known[i],allGraphs);
-	}
-	std::cout << std::endl;
-
-	std::vector<Equation> knownEq;
-	std::vector<Equation> knownLess;
-	
-	for(int i = 0; i < knownSize; ++i) {
-		if(known[i].getType() == 1) {
-			knownLess.push_back(known[i]);
-		}
-		
-		else {
-			knownEq.push_back(known[i]);
-		}	
-	}
-	
-	std::ofstream myFile;
-	myFile.open("Duals.txt");
-	
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		myFile << "Label: " << i+1 << std::endl;
-		allGraphs[i].printAdjMatToFile(myFile);
-		myFile << std::endl;
-	}
-	
-	//Used to give indices of A
-	//Rather than multiplying we look at all graphs and work backwards to get coefficients
-	//This works well as we have already generated all graphs of size n and multiplication basically just has us partially doing that every time so it saves time on generation
-	//The only slow down could come from looking up indices but std::unordered_maps are SO fast it doesn't matter
-	std::unordered_map<std::string, int> allGraphsMap;
-					
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		allGraphsMap.insert(std::pair<std::string, int>(allGraphs[i].getCanonLabel(),i));
-	}
-	
-	//All graphs of size n with flags such that parity issues work out
-	std::cout << "Generating v." << std::endl;
-	std::vector < std::vector < Graph > > v = generateV(n,numColors,zeros);
-	std::cout << std::endl;
-	std::cout << "Generating allGraphsWithFlags." << std::endl;
-	std::vector < std::vector < Graph > > allGraphsWithFlags = generateAllGraphsWithFlags(n,numColors,zeros);
-	std::cout << std::endl;
-
-	std::vector<Frac> B; //Gives numbers to be printed
-	
-	Frac zeroFrac(0,1);
-	//Calculating B
-	std::cout << "Calculating B." << std::endl << std::endl;
-	B.resize(allGraphs.size(),zeroFrac);
-	
-	//TODO use map
-	#pragma omp parallel for
-	for(int i = 0; i < fSize; ++i) {
-		for(int j = 0; j < (int)allGraphs.size(); ++j) {
-			if(isomorphic(f[i],allGraphs[j])) {
-				B[j] = f[i].getCoefficient();
-				j = (int)allGraphs.size();
-			}
-		}
-	}
-	
-	//Stupid C++ doesn't have hash for int[2]
-	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
-	std::vector< std::vector< std::unordered_map<std::pair<int,int>,Frac,boost::hash<std::pair<int,int> > > > > newA;
-	newA.resize(allGraphs.size());
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		newA[i].resize(v.size()); 
-	}
-	
-	int FCOORDcounter = 0;
-	
-	for(int i = 0; i < (int)v.size(); ++i) { //i is first index of A
-		std::cout << "In A, iteration " << i+1 << " out of " << v.size() << std::endl;  
-		
-		//Create hash map for third and fourth indices of A
-		std::unordered_map<std::string, int> f;
-		for(int j = 0; j < (int)v[i].size(); ++j) {
-			f.insert(std::pair<std::string, int>(v[i][j].getCanonLabel(),j));
-		}	
-		
-		int sizeOfFlag = v[i][0].getSizeOfFlag();
-		
-		#pragma omp parallel
-		{
-			
-			#pragma omp for nowait schedule(dynamic) 
-			for(int index2 = 0; index2 < (int)allGraphsWithFlags[i].size(); ++index2) {
-				Graph G = allGraphsWithFlags[i][index2];
-				
-				//Make sure all flag vertices in G are first
-				//TODO make a function of this
-				std::vector<int> reordering(n);
-				
-				for(int j = 0; j < sizeOfFlag; ++j) {
-					reordering[G.getFlagVertex(j)] = j;
-				}
-				int index = sizeOfFlag;
-				
-				for(int j = 0; j < n; ++j) {
-					if(!G.isFlag(j)) {
-						reordering[j] = index;
-						++index;
-					}
-				}
-				
-				Frac coeff = G.getCoefficient();
-				G = G.restriction(reordering);
-				G.setCoefficient(coeff);
-				
-				Graph Gcopy = G;
-				Gcopy.removeFlag();
-			
-				int b = allGraphsMap[Gcopy.getCanonLabel()];	
-				Frac e = G.getCoefficient() * Frac(1,choose(n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
-				
-				std::vector<int> X((n-sizeOfFlag)/2 - 1); //X is zero indexed but it should actually be sizeOfFlag+1 indexed
-				//Wlog first non-flag vertex in X
-				for(int j = 0; j < (n-sizeOfFlag)/2 - 1; ++j) {
-					X[j] = j;
-				}
-				
-				do {
-					std::vector<int> restriction1(n,-1);
-					std::vector<int> restriction2(n,-1);
-					
-					for(int j = 0; j < sizeOfFlag; ++j) {
-						restriction1[j] = j;
-						restriction2[j] = j;
-					}
-					
-					int counter1 = sizeOfFlag+1;
-					int counter2 = sizeOfFlag;
-					int Xcounter = 0;
-					
-					//Know flag vertices of G are first
-					restriction1[sizeOfFlag] = sizeOfFlag;
-					for(int j = sizeOfFlag + 1; j < n; ++j) {
-						if((X.size() != 0) && (X[Xcounter] == (j - sizeOfFlag - 1))) {
-							++Xcounter;
-							restriction1[j] = counter1;
-							++counter1; 
-						}
-						
-						else {
-							restriction2[j] = counter2;
-							++counter2;
-						}
-					}
-					
-					Graph G1 = G.restriction(restriction1);
-					Graph G2 = G.restriction(restriction2);
-					
-					int G1Index = f[G1.getCanonLabel()];
-					int G2Index = f[G2.getCanonLabel()];
-					
-					int c = std::min(G1Index,G2Index);
-					int d = std::max(G1Index,G2Index);
-					
-					#pragma omp critical
-					{					
-						auto it = newA[b][i].find({c,d});
-						
-						if( it == newA[b][i].end() ) {
-							newA[b][i].insert({{c,d},e});
-							++FCOORDcounter;
-						}
-						
-						else {
-							it->second = it->second + e; 
-						}	
-					}
-				
-				} while(nextSubset(X,n-sizeOfFlag-1,(n-sizeOfFlag)/2 - 1));
-			}
-		}
-	}
-	std::cout << std::endl;
-	
-	std::cout << "Making Integer." << std::endl;
-	
-	long long int mult = 1;
-	for(int i = 0; i < (int)known.size(); ++i) {
-		if(known[i].getAns().getNum() != 0) {
-			mult = lcm(mult,known[i].getAns().getDen());
-		}
-	} 
-	
-	std::vector<long long int> constraintMult;
-	int BCOORDcounter = 0;
-	
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		constraintMult.push_back(B[i].getDen());
-		
-		for(int j = 0; j < v.size(); ++j) {
-			for(auto k : newA[i][j]) {
-				constraintMult[i] = lcm(constraintMult[i],k.second.getDen());
-			}
-		}
-		
-		for(int j = 0; j < (int)known.size(); ++j) {
-			for(int k = 0; k < known[j].getNumVariables(); ++k) {
-				constraintMult[i] = lcm(constraintMult[i], known[j].getVariable(k).getCoefficient().getDen());
-			}
-		}
-	}
-	
-	//Could use queue, but may be nice to access middle
-	std::vector< SimplicialComplex > complexes; 
-	
-	for(int i = 0; i < v.size(); ++i) {
-		SimplicialComplex temp({standardSimplex(v[i].size())});
-		complexes.push_back(temp);
-	}
-	
-	
-	//set up inner and outer LPs
-	mosek::fusion::Model::t OLP = new mosek::fusion::Model("OLP"); auto _OLP = monty::finally([&]() { OLP->dispose(); }); //Set up this one first then copy it
-	
-	auto x = OLP->variable(); //Bounded?
-	auto y1 = OLP->variable((int)knownLess.size(), mosek::fusion::Domain::greaterThan(0)); //Less than
-	auto y2 = OLP->variable((int)knownEq.size());
-	std::vector<mosek::fusion::Constraint::t> constraints;
-	std::vector <mosek::fusion::Variable::t>  MosekM; //Matrix variables
-	
-	MosekM.resize(v.size());
-	constraints.resize(allGraphs.size());
-	
-		
-	for(int i = 0; i < (int)v.size(); ++i) {
-		MosekM[i] = OLP->variable( monty::new_array_ptr<int,1>({ static_cast<int>(v[i].size()), static_cast<int>(v[i].size()) }) );
-	}
-	
-	//Generate C1,C2
-	//NOT scaled yet
-	std::vector< std::vector<Frac> > C1;
-	std::vector< std::vector<Frac> > C2;
-	
-	C1.resize(knownLess.size());
-	C2.resize(knownEq.size());
-	
-	for(int i = 0; i < (int)knownLess.size(); ++i) {
-		C1[i].resize(allGraphs.size(),Frac(0,1));
-		
-		for(int j = 0; j < knownLess[i].getNumVariables(); ++j) {
-			C1[i][allGraphsMap.at(knownLess[i].getVariable(j).getCanonLabel())] = knownLess[i].getVariable(j).getCoefficient();
-		}
-	}
-	
-	for(int i = 0; i < (int)knownEq.size(); ++i) {
-		C2[i].resize(allGraphs.size(),Frac(0,1));
-		
-		for(int j = 0; j < knownEq[i].getNumVariables(); ++j) {
-			C2[i][allGraphsMap.at(knownEq[i].getVariable(j).getCanonLabel())] = knownEq[i].getVariable(j).getCoefficient();
-		}
-	}
-	
-	//All constraints from normal part
-	for(int i = 0; i < (int)allGraphs.size(); ++i) {
-		//Scale C1,C2
-		std::vector< std::vector<double> > scaledC1;
-		std::vector< std::vector<double> > scaledC2;
-
-		scaledC1.resize(knownLess.size());
-		scaledC2.resize(knownEq.size());
-		
-		for(int j = 0; j < (int)knownLess.size(); ++j) {
-			scaledC1[j].resize(knownLess[j].getNumVariables());
-			
-			for(int k = 0; k < knownLess[j].getNumVariables(); ++k) {
-				scaledC1[j][k] = (C1[j][k].getNum()*constraintMult[i])/C1[j][k].getDen();
-			}
-		}
-		
-		for(int j = 0; j < (int)knownEq.size(); ++j) {
-			scaledC2[j].resize(knownEq[j].getNumVariables());
-			
-			for(int k = 0; k < knownEq[j].getNumVariables(); ++k) {
-				scaledC2[j][k] = (C2[j][k].getNum()*constraintMult[i])/C2[j][k].getDen();
-			}
-		}
-		
-		auto MosekC1 = mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(scaledC1));
-		auto MosekC2 = mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(scaledC2));
-		
-	
-		auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(constraintMult[i],x), mosek::fusion::Expr::dot(MosekC1,y1)), mosek::fusion::Expr::dot(MosekC2,y2));
-	
-		for(int j = 0; j < v.size(); ++j) {
-			std::vector<int> firstIndex;
-			std::vector<int> secondIndex;
-			std::vector<double> values;
-		
-			for(auto k : newA[i][j]) {
-				firstIndex.push_back(k.first.first);
-				secondIndex.push_back(k.first.second);
-				values.push_back((k.second.getNum()*constraintMult[i])/k.second.getDen());
-			}
-			
-			auto partOfA = mosek::fusion::Matrix::sparse(v[j].size(),v[j].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
-			
-			forConstraint = mosek::fusion::Expr::add(forConstraint, mosek::fusion::Expr::dot(partOfA,MosekM[j]));
-		}
-		
-		if(maximize) {
-			constraints[i] = OLP->constraint(forConstraint, mosek::fusion::Domain::lessThan(constraintMult[i] - (B[i].getNum()*constraintMult[i])/B[i].getDen()));
-		}
-		
-		else { 
-			constraints[i] = OLP->constraint(forConstraint, mosek::fusion::Domain::lessThan((B[i].getNum()*constraintMult[i])/B[i].getDen()));
-		}
-	}
-
-	//Diagonal >= 0
-	for(int i = 0; i < (int)v.size(); ++i) {
-		for(int j = 0; j < (int)v[i].size(); ++j) {
-			std::vector<int> firstIndex;
-			std::vector<int> secondIndex;
-			std::vector<double> values;
-			firstIndex.push_back(j);
-			secondIndex.push_back(j);
-			values.push_back(1.);
-			
-			auto myMatrix = mosek::fusion::Matrix::sparse(v[i].size(),v[i].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
-		
-			OLP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.));
-		}
-	}
-	
-	
-	//Symmetric
-	for(int i = 0; i < (int)v.size(); ++i) {
-		OLP->constraint( mosek::fusion::Expr::sub(mosek::fusion::Expr::transpose(MosekM[i]), MosekM[i]), mosek::fusion::Domain::equalsTo(0.));
-	}
-	
-	//Objective Function
-	//Scale C1,C2
-	std::vector<double> alpha1;
-	std::vector<double> alpha2;
-
-	alpha1.resize(knownLess.size());
-	alpha2.resize(knownEq.size());
-		
-	for(int i = 0; i < (int)knownLess.size(); ++i) {
-		alpha1[i] = (knownLess[i].getAns().getNum()*mult)/(knownLess[i].getAns().getDen());
-	}
-	
-	for(int i = 0; i < (int)knownEq.size(); ++i) {
-		alpha2[i] = (knownEq[i].getAns().getNum()*mult)/(knownEq[i].getAns().getDen());
-	}
-		
-	auto MosekAlpha1 = monty::new_array_ptr(alpha1);
-	auto MosekAlpha2 = monty::new_array_ptr(alpha2);
-	
-	OLP->objective( mosek::fusion::ObjectiveSense::Maximize, mosek::fusion::Expr::sub( mosek::fusion::Expr::sub( mosek::fusion::Expr::mul(mult,x), mosek::fusion::Expr::dot(MosekAlpha1,y1)), mosek::fusion::Expr::dot(MosekAlpha2,y2)));
-	
-	mosek::fusion::Model::t ILP = new mosek::fusion::Model("ILP"); auto _ILP = monty::finally([&]() { OLP->dispose(); }); //Copy ILP and then add some more constraints
-	
-	ILP = OLP->clone();
-	
-	std::vector< std::vector< mosek::fusion::Constraint::t> > edgeConstraint(v.size());
-	std::vector< std::vector< std::vector<double> > > IMap(v.size()); //Only has one of edges
-	std::vector< std::unordered_set< std::vector<double>, vectorHash<double> > > ISet(firstIndexMap.size());
-	
-	//Positive for ILP
-	for(int i = 0; i < (int)v.size(); ++i) {
-		for(int j = 0; j < (int)v[i].size(); ++j) {
-			for(int k = j+1; k < (int)v[i].size(); ++k) {
-				std::vector<int> firstIndex;
-				std::vector<int> secondIndex;
-				std::vector<double> values;
-				firstIndex.push_back(j);
-				secondIndex.push_back(k);
-				values.push_back(1.);
-				
-				auto myMatrix = mosek::fusion::Matrix::sparse(v[i].size(),v[i].size(), monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
-				
-				std::vector<double> mapInput(2*v[i].size(),0.);
-				
-				mapInput[j] = 1.;
-				mapInput[k+v[i].size()] = 1.;
-
-				IMap[i].push_back(mapInput);
-				ISet[i].insert(mapInput);
-				
-				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.)));
-			}
-		}
-	}
-	
-	OLP->solve();
-	ILP->solve();
-	
-	std::cout << std::endl;
-	
-	double OLPobj;
-	double ILPobj;
-	
-	if(maximize) {
-   	OLPobj = 1.-OLP->dualObjValue()/mult;
-   	ILPobj = 1.-ILP->dualObjValue()/mult;
-   }
-
-   else {
-   	OLPobj = OLP->dualObjValue()/mult;
-   	ILPobj = ILP->dualObjValue()/mult;
-   }
-	
-	//ILP->writeTask("ILP.ptf");
-	//OLP->writeTask("OLP.ptf");
-	
-	int iterations = 0;
-	
-	//Iteratively better linear approximations
-	//Destroys any idea of integer values, could fix, but would be hard
-	while( (OLP->dualObjValue() - ILP->dualObjValue())/(1.+abs(OLP->dualObjValue()) + abs(ILP->dualObjValue())) > epsilon) {
-		if(maximize) {
-			std::cout << iterations << " " << OLPobj << " " << ILPobj << " " << (OLP->dualObjValue() - ILP->dualObjValue())/(1.+abs(OLP->dualObjValue()) + abs(ILP->dualObjValue())) << std::endl;
-		}
-		
-		else {
-			std::cout << iterations << " " << ILPobj << " " << OLPobj << " " << (OLP->dualObjValue() - ILP->dualObjValue())/(1.+abs(OLP->dualObjValue()) + abs(ILP->dualObjValue())) << std::endl;
-		}
-		++iterations;
-		std::vector<double> longestEdge;
-		int index;	
-		
-		//if(iterations == 4) {
-			//return;
-		//}
-		
-		for(int i = 0; i < (int)v.size(); ++i) {
-			int n = complexes[i].getDim(); // = v[i].size()
-			
-			if((iterations % 2) == 0) {
-				double length = -1.;
-				
-				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
-					double tempLength = 0.;
-				
-					if(abs((*(edgeConstraint[i][j])->level())[0]) < epsilon) {	
-						for(int k = 0; k < n; ++k) {
-							tempLength += abs(IMap[i][j][k] - IMap[i][j][k+n]);
-						}
-						
-						if(tempLength > length) {
-							length = tempLength;
-							longestEdge = IMap[i][j];
-							index = j;
-						}	
-					}
-				}
-			}
-			
-			else {
-				double dual = 1000.;
-			
-				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
-				
-					if(abs((*(edgeConstraint[i][j])->level())[0]) < epsilon) {		
-						if((*(edgeConstraint[i][j])->dual())[0] < dual) {
-							dual = (*(edgeConstraint[i][j])->dual())[0];
-							longestEdge = IMap[i][j];
-							index = j;
-						}	
-					}
-				}
-			}
-			
-			
-			
-			/*else {
-				longestEdge = complexes[i].longestEdge();
-			}*/
-			
-			if(longestEdge.size() == 0) {
-				std::cout << "Longest Edge has a problem." << std::endl << std::endl;
-				throw std::exception();
-			}
-			
-			
-			
-			
-			std::vector<double> newVertex;
-			std::vector<double> longestEdgeInv(2*v[i].size());
-			
-			for(int j = 0; j < v[i].size(); ++j) {
-				newVertex.push_back((longestEdge[j] + longestEdge[j+v[i].size()])/2.);
-			}
-			
-			for(int j = 0; j < v[i].size(); ++j) {
-				longestEdgeInv[j] = longestEdge[j+v[i].size()];
-				longestEdgeInv[j+v[i].size()] = longestEdge[j];
-			}
-			
-			auto MosekNewVertex = monty::new_array_ptr(newVertex);
-			
-			//Vertex Constraint
-			OLP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
-			
-			//Vertex and Edge Constraint
-			//Don't need because of edge constraints
-			//ILP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
-			
-			std::unordered_set< std::vector<double>, vectorHash< double > > edgesSet;
-			complexes[i].subdivide(longestEdge, edgesSet);
-			
-			//Remove Old Constraint from Mosek
-			edgeConstraint[i][index]->remove();
-			edgeConstraint[i].erase(edgeConstraint[i].begin() + index);
-			IMap[i].erase(IMap[i].begin() + index);
-			if(ISet[i].find(longestEdge) != ISet[i].end()) {
-				ISet[i].erase(ISet[i].find(longestEdge));
-			}
-			else {
-				ISet[i].erase(ISet[i].find(longestEdgeInv));
-			}
-			
-			
-			for(auto myEdge : edgesSet) {
-				std::vector<double> myEdgeInv(2*n); 
-				
-				for(int j = 0; j < n; ++j) {
-					myEdgeInv[j] = myEdge[j+n];
-					myEdgeInv[j+n] = myEdge[j];
-				}
-				
-				if((ISet[i].find(myEdge) == ISet[i].end()) && (ISet[i].find(myEdgeInv) == ISet[i].end())) {
-					IMap[i].push_back(myEdge);
-					ISet[i].insert(myEdge);
-					
-					std::vector<double> myVertex1(n);
-					std::vector<double> myVertex2(n);
-					
-					for(int j = 0; j < n; ++j) {
-						myVertex1[j] = myEdge[j];
-						myVertex2[j] = myEdgeInv[j];
-					}	
-				
-					auto MosekVertex1 = monty::new_array_ptr(myVertex1);
-					auto MosekVertex2 = monty::new_array_ptr(myVertex2);
-				
-					edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekVertex1, mosek::fusion::Expr::mul(MosekM[i], MosekVertex2)), mosek::fusion::Domain::greaterThan(0.)));
-				}
-			}
-		}
-		
-		ILP->solve();
-		OLP->solve();		
-		
-		//ILP->writeTask("ILP" + std::to_string(iterations-1) + ".ptf");
-		//OLP->writeTask("OLP" + std::to_string(iterations-1) + ".ptf");
-			
-		if(maximize) {
-			OLPobj = 1.-OLP->dualObjValue()/mult;
-			ILPobj = 1.-ILP->dualObjValue()/mult;
-		}
-
-		else {
-			OLPobj = OLP->dualObjValue()/mult;
-			ILPobj = ILP->dualObjValue()/mult;
-		}
-	}
-	
-	std::cout << std::endl;
-	
-	if(maximize) {
-   	std::cout << "The outer objective function is: " << 1.-OLP->dualObjValue()/mult << std::endl << std::endl;
-   	std::cout << "The inner objective function is: " << 1.-ILP->dualObjValue()/mult << std::endl << std::endl;
-   }
-
-   else {
-   	std::cout << "The outer objective function is: " << OLP->dualObjValue()/mult << std::endl << std::endl;
-   	std::cout << "The inner objective function is: " << ILP->dualObjValue()/mult << std::endl << std::endl;
-   }
-   
-	return;
-
-}
-
-
-//------------------------------------------
-//-----Fast Exciting Plain Flag Algebra-----
-//------------------------------------------
-
-//Mix of fast flag algebra but with copositive matrices
-void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, std::vector<Equation> &known, bool maximize = true, const double epsilon = 1E-6) {
 	std::cout << "Starting plainFlagAlgebra." << std::endl;
 	
 	int fSize = f.size();
@@ -6358,6 +5801,756 @@ void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &z
 	
 	std::cout << "Generating last index map." << std::endl;
 	std::unordered_map<std::string, int> lastIndexMap = lastIndex(n,numColors,zeros);
+	std::cout << std::endl;
+
+	std::vector<Frac> B; //Gives numbers to be printed
+	
+	Frac zeroFrac(0,1);
+	//Calculating B
+	std::cout << "Calculating B." << std::endl << std::endl;
+	B.resize(allGraphs.size(),zeroFrac);
+
+	#pragma omp parallel for
+	for(int i = 0; i < fSize; ++i) {
+		B[secondIndexMap.at(f[i].getCanonLabel())] = f[i].getCoefficient();
+	}
+
+	//Stupid C++ doesn't have hash for int[2]
+	//Use this because otherwise we use an absurd amount of memory - only small loss in speed b/c unordered
+	//std::vector< std::vector< std::unordered_map<int[2],Frac,boost::hash<int[2]> > > > newA;
+	std::vector< std::vector< std::unordered_map<std::pair<int,int>,Frac,boost::hash<std::pair<int,int> > > > > newA;
+	newA.resize(allGraphs.size());
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		newA[i].resize(secondIndexMap.size()); 
+	}
+
+	int FCOORDcounter = 0;
+	
+	std::vector<int> dim(firstIndexMap.size(),0); 
+	std::vector< std::unordered_set<std::string> > dimSet(firstIndexMap.size());
+	
+	#pragma omp parallel
+	{
+		#pragma omp for nowait schedule(dynamic) 
+		for(int i = 0; i < allGraphs.size(); ++i) {
+			Graph G = allGraphs[i];
+			std::cout << "While generating A, iteration " << i+1 << " out of " << allGraphs.size() << std::endl;
+			
+			int b = secondIndexMap.at(G.getCanonLabel()); //Throws exception if out of range!
+			
+			for(int j = n/2; j <= n-1; ++j) {
+				
+				int sizeOfFlag = 2*j-n;
+				
+				if(sizeOfFlag > 0) {
+					std::vector<int> X(sizeOfFlag); //flag
+					for(int k = 0; k < sizeOfFlag; ++k) {
+						X[k] = k;
+					}
+					
+					Frac e = Frac(1,choose(n,j)*choose(j,sizeOfFlag)*factorial(sizeOfFlag));	
+					
+					do { //Next Subset
+						do { //Next Permutation
+							Graph Gcopy = G;
+							Gcopy.setFlag(X);
+							Graph G1 = Gcopy.getFlag();
+						
+							if(firstIndexMap.find(G1.getCanonLabel()) != firstIndexMap.end()) { //Make sure this is actually a flag we are considering 
+							
+								std::vector<int> Y(j - sizeOfFlag); //Every that isn't the flag
+								for(int k = 0; k < j- sizeOfFlag; ++k) {
+									Y[k] = k;
+								}
+							
+								do { //Y subset
+									//Need to adjust Y to be on [n] not [n-sizeOfFlag]
+									std::vector<int> realY(j - sizeOfFlag);
+									std::vector<int> adjusted(n-sizeOfFlag); //List of all non-flag vertices
+									int tempIndex = 0;
+									for(int k = 0; k < n; ++k) {
+										bool isFlag = false;
+										
+										for(int l = 0; l < sizeOfFlag; ++l) {
+											if(X[l] == k) {
+												isFlag = true;
+												l = sizeOfFlag;
+											}
+										}
+										
+										if(!isFlag) {
+											adjusted[tempIndex] = k;
+											++tempIndex;
+										}
+									}
+									
+									for(int k = 0; k < j - sizeOfFlag; ++k) {
+										realY[k] = adjusted[Y[k]];
+									}
+								
+									std::vector<int> restriction3(n,-1);
+									std::vector<int> restriction3c(n,-1);
+									
+									for(int k = 0; k < sizeOfFlag; ++k) {
+										restriction3[X[k]] = k;
+									}
+									
+									for(int k = 0; k < j - sizeOfFlag; ++k) {
+										restriction3[realY[k]] = k+sizeOfFlag;
+									}
+									
+									int tempIndex3 = sizeOfFlag;
+									
+									for(int k = 0; k < sizeOfFlag; ++k) {
+										restriction3c[X[k]] = k;
+									}
+									
+									//Probably not the fastest way to do this
+									for(int k = 0; k < n; ++k) {
+										bool inY = false;
+										for(int l = 0; l < j - sizeOfFlag; ++l) {
+											if(realY[l] == k) {
+												inY = true;
+												l = j - sizeOfFlag;
+											}
+										}
+										
+										if(!inY) {												
+											bool inFlag = false;
+											for(int l = 0; l < sizeOfFlag; ++l) {
+												if(X[l] == k) {
+													inFlag = true;
+													l = sizeOfFlag;
+												}
+											}
+											
+											if(!inFlag) {
+												restriction3c[k] = tempIndex3; //Double Check
+												++tempIndex3; 
+											}
+										}
+									}
+
+									Graph G3 = G.restriction(restriction3); //Labels a reminant of an old way of doing it, could probably come up with better name now, but I'm too lazy
+									Graph G3c = G.restriction(restriction3c);			
+									
+									//Could move this
+									std::vector<int> flag(sizeOfFlag);
+									for(int k = 0; k < sizeOfFlag; ++k) {
+										flag[k] = k;
+									}
+									
+									G3.setFlag(flag);
+									G3c.setFlag(flag);
+									
+									std::string lastIndexString1 = G3.getCanonLabel();
+									std::string lastIndexString2 = G3c.getCanonLabel();				
+									
+									int a = firstIndexMap.at(G1.getCanonLabel());
+							
+									int index1 = lastIndexMap.at(lastIndexString1);
+									int index2 = lastIndexMap.at(lastIndexString2);
+									int c = std::min(index1,index2);
+									int d = std::max(index1,index2);
+									
+									#pragma omp critical
+									{					
+										auto it = newA[i][a].find({c,d});
+										
+										if( it == newA[i][a].end() ) {
+											newA[i][a].insert({{c,d},e});
+											++FCOORDcounter;
+										}
+										
+										else {
+											it->second = it->second + e; 
+										}	
+										
+										if(dimSet[a].find(lastIndexString1) == dimSet[a].end()) {
+											++dim[a];
+											dimSet[a].insert(lastIndexString1);
+										}
+										
+										if(dimSet[a].find(lastIndexString2) == dimSet[a].end()) {
+											++dim[a];
+											dimSet[a].insert(lastIndexString2);
+										}
+									}
+									
+								} while(nextSubset(Y,n-sizeOfFlag,j-sizeOfFlag));
+							}
+						} while(next_permutation(X.begin(), X.end()));
+					} while(nextSubset(X,n,sizeOfFlag));
+					
+				}	
+			}
+		}
+	}
+	std::cout << std::endl;
+	
+	std::cout << "Making Integer." << std::endl;
+	
+	long long int mult = 1;
+	for(int i = 0; i < (int)known.size(); ++i) {
+		if(known[i].getAns().getNum() != 0) {
+			mult = lcm(mult,known[i].getAns().getDen());
+		}
+	} 
+	
+	std::vector<long long int> constraintMult;
+	int BCOORDcounter = 0;
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		constraintMult.push_back(B[i].getDen());
+		
+		for(int j = 0; j < firstIndexMap.size(); ++j) {
+			for(auto k : newA[i][j]) {
+				constraintMult[i] = lcm(constraintMult[i],k.second.getDen());
+			}
+		}
+		
+		for(int j = 0; j < (int)known.size(); ++j) {
+			for(int k = 0; k < known[j].getNumVariables(); ++k) {
+				constraintMult[i] = lcm(constraintMult[i], known[j].getVariable(k).getCoefficient().getDen());
+			}
+		}
+	}
+	
+	//Could use queue, but may be nice to access middle
+	std::vector< SimplicialComplex > complexes; 
+	
+	for(int i = 0; i < firstIndexMap.size(); ++i) {
+		SimplicialComplex temp({standardSimplex(dim[i])});
+		complexes.push_back(temp);
+	}
+	
+	
+	//set up inner and outer LPs
+	mosek::fusion::Model::t OLP = new mosek::fusion::Model("OLP"); auto _OLP = monty::finally([&]() { OLP->dispose(); }); //Set up this one first then copy it
+	
+	auto x = OLP->variable(); //Bounded?
+	auto y1 = OLP->variable((int)knownLess.size(), mosek::fusion::Domain::greaterThan(0)); //Less than
+	auto y2 = OLP->variable((int)knownEq.size());
+	std::vector<mosek::fusion::Constraint::t> constraints;
+	std::vector <mosek::fusion::Variable::t>  MosekM; //Matrix variables
+	
+	MosekM.resize(firstIndexMap.size());
+	constraints.resize(allGraphs.size());
+	
+		
+	for(int i = 0; i < (int)firstIndexMap.size(); ++i) {
+		MosekM[i] = OLP->variable( monty::new_array_ptr<int,1>({ static_cast<int>(dim[i]), static_cast<int>(dim[i]) }) );
+	}
+	
+	//Generate C1,C2
+	//NOT scaled yet
+	std::vector< std::vector<Frac> > C1;
+	std::vector< std::vector<Frac> > C2;
+	
+	C1.resize(knownLess.size());
+	C2.resize(knownEq.size());
+	
+	for(int i = 0; i < (int)knownLess.size(); ++i) {
+		C1[i].resize(allGraphs.size(),Frac(0,1));
+		
+		for(int j = 0; j < knownLess[i].getNumVariables(); ++j) {
+			C1[i][secondIndexMap.at(knownLess[i].getVariable(j).getCanonLabel())] = knownLess[i].getVariable(j).getCoefficient();
+		}
+	}
+	
+	for(int i = 0; i < (int)knownEq.size(); ++i) {
+		C2[i].resize(allGraphs.size(),Frac(0,1));
+		
+		for(int j = 0; j < knownEq[i].getNumVariables(); ++j) {
+			C2[i][secondIndexMap.at(knownEq[i].getVariable(j).getCanonLabel())] = knownEq[i].getVariable(j).getCoefficient();
+		}
+	}
+	
+	//All constraints from normal part
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		//Scale C1,C2
+		std::vector< std::vector<double> > scaledC1;
+		std::vector< std::vector<double> > scaledC2;
+
+		scaledC1.resize(knownLess.size());
+		scaledC2.resize(knownEq.size());
+		
+		for(int j = 0; j < (int)knownLess.size(); ++j) {
+			scaledC1[j].resize(knownLess[j].getNumVariables());
+			
+			for(int k = 0; k < knownLess[j].getNumVariables(); ++k) {
+				scaledC1[j][k] = (C1[j][k].getNum()*constraintMult[i])/C1[j][k].getDen();
+			}
+		}
+		
+		for(int j = 0; j < (int)knownEq.size(); ++j) {
+			scaledC2[j].resize(knownEq[j].getNumVariables());
+			
+			for(int k = 0; k < knownEq[j].getNumVariables(); ++k) {
+				scaledC2[j][k] = (C2[j][k].getNum()*constraintMult[i])/C2[j][k].getDen();
+			}
+		}
+		
+		auto MosekC1 = mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(scaledC1));
+		auto MosekC2 = mosek::fusion::Matrix::sparse(monty::new_array_ptr<double>(scaledC2));
+		
+	
+		auto forConstraint = mosek::fusion::Expr::sub(mosek::fusion::Expr::sub(mosek::fusion::Expr::mul(constraintMult[i],x), mosek::fusion::Expr::dot(MosekC1,y1)), mosek::fusion::Expr::dot(MosekC2,y2));
+	
+		for(int j = 0; j < firstIndexMap.size(); ++j) {
+			std::vector<int> firstIndex;
+			std::vector<int> secondIndex;
+			std::vector<double> values;
+		
+			for(auto k : newA[i][j]) {
+				firstIndex.push_back(k.first.first);
+				secondIndex.push_back(k.first.second);
+				values.push_back((k.second.getNum()*constraintMult[i])/k.second.getDen());
+			}
+			
+			auto partOfA = mosek::fusion::Matrix::sparse(dim[j],dim[j], monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
+			
+			forConstraint = mosek::fusion::Expr::add(forConstraint, mosek::fusion::Expr::dot(partOfA,MosekM[j]));
+		}
+		
+		if(maximize) {
+			constraints[i] = OLP->constraint(forConstraint, mosek::fusion::Domain::lessThan(constraintMult[i] - (B[i].getNum()*constraintMult[i])/B[i].getDen()));
+		}
+		
+		else { 
+			constraints[i] = OLP->constraint(forConstraint, mosek::fusion::Domain::lessThan((B[i].getNum()*constraintMult[i])/B[i].getDen()));
+		}
+	}
+
+	//Diagonal >= 0
+	for(int i = 0; i < (int)firstIndexMap.size(); ++i) {
+		for(int j = 0; j < (int)dim[i]; ++j) {
+			std::vector<int> firstIndex;
+			std::vector<int> secondIndex;
+			std::vector<double> values;
+			firstIndex.push_back(j);
+			secondIndex.push_back(j);
+			values.push_back(1.);
+			
+			auto myMatrix = mosek::fusion::Matrix::sparse(dim[i],dim[i], monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
+		
+			OLP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.));
+		}
+	}
+	
+	
+	//Symmetric
+	for(int i = 0; i < (int)firstIndexMap.size(); ++i) {
+		OLP->constraint( mosek::fusion::Expr::sub(mosek::fusion::Expr::transpose(MosekM[i]), MosekM[i]), mosek::fusion::Domain::equalsTo(0.));
+	}
+	
+	//Objective Function
+	//Scale C1,C2
+	std::vector<double> alpha1;
+	std::vector<double> alpha2;
+
+	alpha1.resize(knownLess.size());
+	alpha2.resize(knownEq.size());
+		
+	for(int i = 0; i < (int)knownLess.size(); ++i) {
+		alpha1[i] = (knownLess[i].getAns().getNum()*mult)/(knownLess[i].getAns().getDen());
+	}
+	
+	for(int i = 0; i < (int)knownEq.size(); ++i) {
+		alpha2[i] = (knownEq[i].getAns().getNum()*mult)/(knownEq[i].getAns().getDen());
+	}
+		
+	auto MosekAlpha1 = monty::new_array_ptr(alpha1);
+	auto MosekAlpha2 = monty::new_array_ptr(alpha2);
+	
+	OLP->objective( mosek::fusion::ObjectiveSense::Maximize, mosek::fusion::Expr::sub( mosek::fusion::Expr::sub( mosek::fusion::Expr::mul(mult,x), mosek::fusion::Expr::dot(MosekAlpha1,y1)), mosek::fusion::Expr::dot(MosekAlpha2,y2)));
+	
+	mosek::fusion::Model::t ILP = new mosek::fusion::Model("ILP"); auto _ILP = monty::finally([&]() { OLP->dispose(); }); //Copy ILP and then add some more constraints
+	
+	ILP = OLP->clone();
+	
+	std::vector< std::vector< mosek::fusion::Constraint::t> > edgeConstraint(firstIndexMap.size());
+	std::vector< std::vector< std::vector<double> > > IMap(firstIndexMap.size()); //Only has one of edges
+	std::vector< std::unordered_set< std::vector<double>, vectorHash<double> > > ISet(firstIndexMap.size());
+	
+	
+	//Positive for ILP
+	for(int i = 0; i < (int)firstIndexMap.size(); ++i) {
+		for(int j = 0; j < (int)dim[i]; ++j) {
+			for(int k = j+1; k < (int)dim[i]; ++k) {
+				std::vector<int> firstIndex;
+				std::vector<int> secondIndex;
+				std::vector<double> values;
+				firstIndex.push_back(j);
+				secondIndex.push_back(k);
+				values.push_back(1.);
+				
+				auto myMatrix = mosek::fusion::Matrix::sparse(dim[i],dim[i], monty::new_array_ptr<int>(firstIndex), monty::new_array_ptr<int>(secondIndex), monty::new_array_ptr<double>(values));
+				
+				std::vector<double> mapInput(2*dim[i],0.);
+				
+				mapInput[j] = 1.;
+				mapInput[k+dim[i]] = 1.;
+
+				IMap[i].push_back(mapInput);
+				ISet[i].insert(mapInput);
+				
+				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.)));
+			}
+		}
+	}
+	
+	OLP->solve();
+	ILP->solve();
+	
+	std::cout << std::endl;
+	
+	double OLPobj;
+	double ILPobj;
+	
+	if(maximize) {
+   	OLPobj = 1.-OLP->dualObjValue()/mult;
+   	ILPobj = 1.-ILP->dualObjValue()/mult;
+   }
+
+   else {
+   	OLPobj = OLP->dualObjValue()/mult;
+   	ILPobj = ILP->dualObjValue()/mult;
+   }
+	
+	//ILP->writeTask("ILP.ptf");
+	//OLP->writeTask("OLP.ptf");
+	
+	int iterations = 0;
+	
+	//Iteratively better linear approximations
+	//Destroys any idea of integer values, could fix, but would be hard
+	while( (OLP->dualObjValue() - ILP->dualObjValue())/(1.+abs(OLP->dualObjValue()) + abs(ILP->dualObjValue())) > epsilon) {
+		if(maximize) {
+			std::cout << iterations << " " << OLPobj << " " << ILPobj << " " << (OLP->dualObjValue() - ILP->dualObjValue())/(1.+abs(OLP->dualObjValue()) + abs(ILP->dualObjValue())) << std::endl;
+		}
+		
+		else {
+			std::cout << iterations << " " << ILPobj << " " << OLPobj << " " << (OLP->dualObjValue() - ILP->dualObjValue())/(1.+abs(OLP->dualObjValue()) + abs(ILP->dualObjValue())) << std::endl;
+		}
+		++iterations;
+		int index;	
+		
+		for(int i = 0; i < (int)firstIndexMap.size(); ++i) {
+			int n = complexes[i].getDim(); // = dim[i]
+			
+			std::vector<double> longestEdge;
+			
+			if((iterations % 1) == 0) {
+				double length = -1.;
+				
+				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
+					double tempLength = 0.;
+				
+					if(abs((*(edgeConstraint[i][j])->level())[0]) < epsilon) {	
+						for(int k = 0; k < n; ++k) {
+							tempLength += abs(IMap[i][j][k] - IMap[i][j][k+n]);
+						}
+						
+						//tempLength = tempLength*  abs((*(edgeConstraint[i][j])->dual())[0]);
+						
+						if(tempLength > length) {
+							length = tempLength;
+							longestEdge = IMap[i][j];
+							index = j;
+						}	
+					}
+				}
+			}
+			
+			else {
+				double dual = 1.E16;
+			
+				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
+				
+					if(abs((*(edgeConstraint[i][j])->level())[0]) < epsilon) {		
+						if((*(edgeConstraint[i][j])->dual())[0] < dual) {
+							dual = (*(edgeConstraint[i][j])->dual())[0];
+							longestEdge = IMap[i][j];
+							index = j;
+						}	
+					}
+				}
+			}
+			
+			
+			
+			/*else {
+				longestEdge = complexes[i].longestEdge();
+			}*/
+			
+			if(longestEdge.size() == 0) {
+				std::cout << "Longest Edge has a problem." << std::endl << std::endl;
+				longestEdge = complexes[i].longestEdge();
+				throw std::exception();
+			}
+			
+			std::vector<double> newVertex;
+			std::vector<double> longestEdgeInv(2*dim[i]);
+			
+			for(int j = 0; j < dim[i]; ++j) {
+				newVertex.push_back((longestEdge[j] + longestEdge[j+dim[i]])/2.);
+			}
+			
+			for(int j = 0; j < dim[i]; ++j) {
+				longestEdgeInv[j] = longestEdge[j+dim[i]];
+				longestEdgeInv[j+dim[i]] = longestEdge[j];
+			}
+			
+			auto MosekNewVertex = monty::new_array_ptr(newVertex);
+			
+			//Vertex Constraint
+			OLP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
+			
+			//Vertex and Edge Constraint
+			ILP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
+			
+			//Remove Old Constraint from Mosek
+			/*index = -1;
+			
+			for(int j = 0; j < (int)IMap[i].size(); ++j) {
+				if((IMap[i][j] == longestEdge) || (IMap[i][j] == longestEdgeInv)) {
+					index = j;
+					j = (int)IMap[i].size();
+				}
+			}
+			
+			if(index == -1) {
+				throw std::exception();
+			}*/
+			
+			std::unordered_set< std::vector<double>, vectorHash< double > > edgesSet;
+			complexes[i].subdivide(longestEdge, edgesSet);
+
+			edgeConstraint[i][index]->remove();
+			edgeConstraint[i].erase(edgeConstraint[i].begin() + index);
+			IMap[i].erase(IMap[i].begin() + index);
+			if(ISet[i].find(longestEdge) != ISet[i].end()) {
+				ISet[i].erase(ISet[i].find(longestEdge));
+			}
+			else {
+				ISet[i].erase(ISet[i].find(longestEdgeInv));
+			}
+			
+			for(auto myEdge : edgesSet) {
+				std::vector<double> myEdgeInv(2*n); 
+				
+				for(int j = 0; j < n; ++j) {
+					myEdgeInv[j] = myEdge[j+n];
+					myEdgeInv[j+n] = myEdge[j];
+				}
+				
+				if((ISet[i].find(myEdge) == ISet[i].end()) && (ISet[i].find(myEdgeInv) == ISet[i].end())) {
+					IMap[i].push_back(myEdge);
+					ISet[i].insert(myEdge);
+					
+					std::vector<double> myVertex1(n);
+					std::vector<double> myVertex2(n);
+					
+					for(int j = 0; j < n; ++j) {
+						myVertex1[j] = myEdge[j];
+						myVertex2[j] = myEdgeInv[j];
+					}	
+				
+					auto MosekVertex1 = monty::new_array_ptr(myVertex1);
+					auto MosekVertex2 = monty::new_array_ptr(myVertex2);
+				
+					edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekVertex1, mosek::fusion::Expr::mul(MosekM[i], MosekVertex2)), mosek::fusion::Domain::greaterThan(0.)));
+				}
+			}
+		}
+		
+		//ILP->writeTask("ILP.ptf");
+		//OLP->writeTask("OLP.ptf");
+		
+		ILP->solve();
+		OLP->solve();		
+			
+		if(maximize) {
+			OLPobj = 1.-OLP->dualObjValue()/mult;
+			ILPobj = 1.-ILP->dualObjValue()/mult;
+		}
+
+		else {
+			OLPobj = OLP->dualObjValue()/mult;
+			ILPobj = ILP->dualObjValue()/mult;
+		}
+	}
+	
+	std::cout << std::endl;
+	
+	if(maximize) {
+   	std::cout << "The outer objective function is: " << 1.-OLP->dualObjValue()/mult << std::endl << std::endl;
+   	std::cout << "The inner objective function is: " << 1.-ILP->dualObjValue()/mult << std::endl << std::endl;
+   }
+
+   else {
+   	std::cout << "The outer objective function is: " << OLP->dualObjValue()/mult << std::endl << std::endl;
+   	std::cout << "The inner objective function is: " << ILP->dualObjValue()/mult << std::endl << std::endl;
+   }
+   
+	return;
+}
+
+
+//------------------------------------------
+//-----Fast Exciting Plain Flag Algebra-----
+//------------------------------------------
+
+//Mix of fast flag algebra but with copositive matrices
+void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros, std::vector<Equation> &known, bool maximize = true, const double epsilon = 1E-6) {
+	std::cout << "Starting plainFlagAlgebra." << std::endl;
+	
+	int fSize = f.size();
+	int zerosSize = zeros.size();
+	int knownSize = known.size();
+		
+	if(n <= 1) {
+		std::cout << "Plain flag algebra method not set up for graphs with fewer than two vertices." << std::endl << std::endl;
+		throw std::exception();
+	}
+
+	if(fSize == 0) {
+		std::cout << "Need at least one graph in f in plainFlagAlgebra." << std::endl << std::endl;
+		throw std::exception();
+	}
+	
+	//Check if every equation in known has at least one variable
+	for(int i = 0; i < knownSize; ++i) {
+		if(known[i].getNumVariables() == 0) {
+			std::cout << "Equations in known must have at least one graph in plainFlagAlgebra." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+
+	int fN = f[0].getN();
+	
+	//Graphs in f can't have flags
+	for(int i = 0; i < fSize; ++i) {
+		if(f[i].getFlag().getN() != 0) {
+			std::cout << "All graphs in f in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+
+	//Graphs in known can't have flags
+	//Maybe fix?
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			if(known[i].getVariable(j).getFlag().getN() != 0) {
+				std::cout << "All graphs in known in plainFlagAlgebra must not have any flags." << std::endl << std::endl;
+				throw std::exception();
+			}
+		}
+	}
+	
+	//Make sure everything has correct number of colors
+	int numColors = f[0].getNumColors();
+	
+	for(int i = 1; i < fSize; ++i) {
+		if(f[i].getNumColors() != numColors) {
+			std::cout << "Everything in plainFlagAlgebra in f must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+	
+	for(int i = 0; i < zerosSize; ++i) {
+		if(zeros[i].getNumColors() != numColors) {
+			std::cout << "Everything in plainFlagAlgebra in zeros must have the same number of colors." << std::endl << std::endl;
+			throw std::exception();
+		}
+	}
+	
+	for(int i = 0; i < knownSize; ++i) {
+		for(int j = 0; j < known[i].getNumVariables(); ++j) {
+			if(known[i].getVariable(j).getNumColors() != numColors) {
+				std::cout << "Everything in plainFlagAlgebra in known must have the same number of colors." << std::endl << std::endl;
+				throw std::exception();
+			}
+		}
+	}
+	
+	//Not sure if strictly necessary, but it would probably give trash bounds otherwise
+	if(fN > n) {
+		std::cout << "Make n large enough so it has vertices at least as many vertices when multiplied by itself as n." << std::endl << std::endl;
+		throw std::exception();
+	}
+	
+	std::cout << std::endl;
+	
+	Equation fEq(f,zeros,Frac(1,1),0); //Type doesn't matter
+	std::vector<Edge> edges {};
+	Graph H(edges,1,numColors);
+	Equation eq1({H},zeros,Frac(1,1),0);
+	Equation eq2({H},zeros,Frac(1,1),0);
+	
+	std::cout << "Generating graphs to be used in resize." << std::endl;
+	std::vector<Graph> allGraphs = generate(n,numColors,zeros);
+	
+	std::cout << std::endl << "Resizing f." << std::endl;
+	Equation fEqResized = resize(fEq,allGraphs);
+	f.clear();
+	for(int i = 0; i < fEqResized.getNumVariables(); ++i) {
+		f.push_back(fEqResized.getVariable(i));
+	}
+	std::cout << std::endl;
+	
+	fSize = f.size();
+	
+	//Resize known
+	std::cout << "Resizing known." << std::endl;
+	//#pragma omp parallel for
+	for(int i = 0; i < knownSize; ++i) {
+		std::cout << i+1 << " out of " << knownSize << std::endl;
+		known[i] = resize(known[i],allGraphs);
+	}
+	std::cout << std::endl;
+
+	std::vector<Equation> knownEq;
+	std::vector<Equation> knownLess;
+	
+	for(int i = 0; i < knownSize; ++i) {
+		if(known[i].getType() == 1) {
+			knownLess.push_back(known[i]);
+		}
+		
+		else {
+			knownEq.push_back(known[i]);
+		}	
+	}
+	
+	std::ofstream myFile;
+	myFile.open("Duals.txt");
+	
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		myFile << "Label: " << i+1 << std::endl;
+		allGraphs[i].printAdjMatToFile(myFile);
+		myFile << std::endl;
+	}
+	
+	//Used to give indices of A
+	//Rather than multiplying we look at all graphs and work backwards to get coefficients
+	//This works well as we have already generated all graphs of size n and multiplication basically just has us partially doing that every time so it saves time on generation
+	//The only slow down could come from looking up indices but std::unordered_maps are SO fast it doesn't matter
+	
+	std::cout << "Generating first index map." << std::endl;
+	std::unordered_map<std::string, int> firstIndexMap = fastFirstIndex(n,numColors,zeros);
+	std::cout << std::endl;
+	
+	std::cout << "Generating second index map." << std::endl;
+	std::unordered_map<std::string, int> secondIndexMap;
+	for(int i = 0; i < (int)allGraphs.size(); ++i) {
+		secondIndexMap.insert(std::pair<std::string, int>(allGraphs[i].getCanonLabel(),i));
+	}
+	std::cout << std::endl;
+	
+	std::cout << "Generating last index map." << std::endl;
+	std::unordered_map<std::string, int> lastIndexMap = fastLastIndex(n,numColors,zeros);
 	std::cout << std::endl;
 
 	std::vector<Frac> B; //Gives numbers to be printed

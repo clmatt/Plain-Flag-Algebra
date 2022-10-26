@@ -79,7 +79,7 @@ int main() {
 	f = {P4};
 	
 	//Max = true
-	fastExcitingFlagAlgebra(f,5,zeros,known,true);
+	excitingFlagAlgebra(f,5,zeros,known,true);
 	
 	auto end=std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);

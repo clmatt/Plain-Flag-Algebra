@@ -396,7 +396,8 @@ inline size_t hash_combine(std::size_t& seed, const T& v)
     return rotl(seed,std::numeric_limits<size_t>::digits/3) ^ distribute(std::hash<T>{}(v));
 }
 
-template <typename T> // we can make this generic for any container [1]
+//Could also do this for containers which aren't vectors
+template <typename T> 
 struct vectorHash {
     std::size_t operator()(const std::vector<T> &vec) const {
         std::size_t seed = vec.size();
