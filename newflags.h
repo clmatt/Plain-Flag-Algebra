@@ -6172,6 +6172,7 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 	std::vector< std::vector< mosek::fusion::Constraint::t> > edgeConstraint(firstIndexMap.size());
 	std::vector< std::vector< std::vector<double> > > IMap(firstIndexMap.size()); //Only has one of edges
 	std::vector< std::unordered_set< std::vector<double>, vectorHash<double> > > ISet(firstIndexMap.size());
+	std::vector< std::unordered_map< std::vector<double> , std::vector< std::vector<double> > , vectorHash<double> > > depender(firstIndexMap.size()); //Maps to which edges depend on the input
 	
 	
 	//Positive for ILP
@@ -6194,6 +6195,7 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 
 				IMap[i].push_back(mapInput);
 				ISet[i].insert(mapInput);
+				depender[i][mapInput] = {};
 				
 				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.)));
 			}
@@ -6236,18 +6238,22 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 		++iterations;
 		int index;	
 		
+		if(iterations == 250) {
+			return;
+		}
+		
 		for(int i = 0; i < (int)firstIndexMap.size(); ++i) {
 			int n = complexes[i].getDim(); // = dim[i]
 			
 			std::vector<double> longestEdge;
 			
-			if((iterations % 2) == 0) {
+			if((iterations % 1) == 0) {
 				double length = -1.;
 				
 				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
 					double tempLength = 0.;
 				
-					if(abs((*(edgeConstraint[i][j])->level())[0]) <= 0) {	
+					if(abs((*(edgeConstraint[i][j])->level())[0]) < epsilon) {	
 						for(int k = 0; k < n; ++k) {
 							tempLength += abs(IMap[i][j][k] - IMap[i][j][k+n]);
 						}
@@ -6264,13 +6270,13 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 			}
 			
 			else {
-				double dual = -1.;
+				double dual = 1.E16;
 			
 				for(int j = 0; j < edgeConstraint[i].size(); ++j) {
 				
-					if(abs((*(edgeConstraint[i][j])->level())[0]) <= 0) {		
-						if(abs((*(edgeConstraint[i][j])->dual())[0]) > dual) {
-							dual = abs((*(edgeConstraint[i][j])->dual())[0]);
+					if(abs((*(edgeConstraint[i][j])->level())[0]) < epsilon) {		
+						if((*(edgeConstraint[i][j])->dual())[0] < dual) {
+							dual = (*(edgeConstraint[i][j])->dual())[0];
 							longestEdge = IMap[i][j];
 							index = j;
 						}	
@@ -6307,11 +6313,9 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 			//Vertex Constraint
 			OLP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
 			
-			//Vertex and Edge Constraint
-			
-			//Remove Old Constraint from Mosek			
-			std::unordered_set< std::vector<double>, vectorHash< double > > edgesSet;
-			complexes[i].subdivide(longestEdge, edgesSet);
+			//Remove Old Constraint from Mosek
+			std::unordered_map< std::vector<double>, std::vector<double>, vectorHash< double > > partialDepender;
+			complexes[i].subdivide(longestEdge, partialDepender);
 
 			edgeConstraint[i][index]->remove();
 			edgeConstraint[i].erase(edgeConstraint[i].begin() + index);
@@ -6323,7 +6327,58 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 				ISet[i].erase(ISet[i].find(longestEdgeInv));
 			}
 			
-			for(auto myEdge : edgesSet) {
+			//Add new constraints based on edge
+			std::vector<double> oldVertex1(n);
+			std::vector<double> oldVertex2(n);
+			
+			for(int j = 0; j < n; ++j) {
+				oldVertex1[j] = longestEdge[j];
+				oldVertex2[j] = longestEdge[j+n];
+			}
+			
+			auto MosekOldVertex1 = monty::new_array_ptr(oldVertex1);
+			auto MosekOldVertex2 = monty::new_array_ptr(oldVertex2);
+			
+			edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekOldVertex1, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.)));
+			edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekOldVertex2, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.)));
+			
+			std::vector<double> newEdge1(2*n);
+			std::vector<double> newEdge2(2*n);
+			
+			for(int j = 0; j < n; ++j) {
+				newEdge1[j] = oldVertex1[j];
+				newEdge1[j+n] = newVertex[j];
+				newEdge2[j] = oldVertex2[j];
+				newEdge2[j+n] = newVertex[j];
+			}
+			
+			ISet[i].insert(newEdge1);
+			ISet[i].insert(newEdge2);
+			IMap[i].push_back(newEdge1);
+			IMap[i].push_back(newEdge2);
+			depender[i][newEdge1] = {};
+			depender[i][newEdge2] = {};
+			
+			std::vector< std::vector<double> > newConstraints;
+			
+			if(depender[i].find(longestEdge) != depender[i].end()) {
+				newConstraints = depender[i].at(longestEdge);
+				depender[i].erase(longestEdge);
+			}
+			
+			else if(depender[i].find(longestEdgeInv) != depender[i].end()) {
+				newConstraints = depender[i].at(longestEdgeInv);
+				depender[i].erase(longestEdgeInv);
+			}
+			
+			else {
+				std::cout << "11111111111111111111111111111";
+			}
+			
+			//-1 b/c we have to initalize depender
+			for(int j = 0; j < newConstraints.size(); ++j) {
+				std::vector<double> myEdge = newConstraints[j];
+				
 				std::vector<double> myEdgeInv(2*n); 
 				
 				for(int j = 0; j < n; ++j) {
@@ -6332,23 +6387,62 @@ void excitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &zeros
 				}
 				
 				if((ISet[i].find(myEdge) == ISet[i].end()) && (ISet[i].find(myEdgeInv) == ISet[i].end())) {
-					IMap[i].push_back(myEdge);
-					ISet[i].insert(myEdge);
+					//Check if it is still an edge
+					bool isEdge = false;
+					for(int j = 0; j < complexes[i].numSimplices(); ++j) {
+						if(complexes[i].getSimplex(j).containsEdge(myEdge)) {
+							isEdge = true;
+							j = complexes[i].numSimplices();
+						}
+					}
 					
-					std::vector<double> myVertex1(n);
-					std::vector<double> myVertex2(n);
+					if(isEdge) {
+						IMap[i].push_back(myEdge);
+						ISet[i].insert(myEdge);
+						depender[i][myEdge] = {};
+						
+						std::vector<double> myVertex1(n);
+						std::vector<double> myVertex2(n);
+						
+						for(int j = 0; j < n; ++j) {
+							myVertex1[j] = myEdge[j];
+							myVertex2[j] = myEdgeInv[j];
+						}	
 					
-					for(int j = 0; j < n; ++j) {
-						myVertex1[j] = myEdge[j];
-						myVertex2[j] = myEdgeInv[j];
-					}	
-				
-					auto MosekVertex1 = monty::new_array_ptr(myVertex1);
-					auto MosekVertex2 = monty::new_array_ptr(myVertex2);
-				
-					edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekVertex1, mosek::fusion::Expr::mul(MosekM[i], MosekVertex2)), mosek::fusion::Domain::greaterThan(0.)));
+						auto MosekVertex1 = monty::new_array_ptr(myVertex1);
+						auto MosekVertex2 = monty::new_array_ptr(myVertex2);
+					
+						edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekVertex1, mosek::fusion::Expr::mul(MosekM[i], MosekVertex2)), mosek::fusion::Domain::greaterThan(0.)));
+					}
+					
 				}
 			}
+			
+			for(auto myPair: partialDepender) {
+				std::vector<double> myPairFirstInv(2*n);
+				for(int j = 0; j < n; ++j) {
+					myPairFirstInv[j] = myPair.first[j+n];
+					myPairFirstInv[j+n] = myPair.first[j];
+				}
+				
+				if((ISet[i].find(myPair.first) != ISet[i].end()) || (ISet[i].find(myPairFirstInv) != ISet[i].end())) {
+					
+					if(depender[i].find(myPair.first) != depender[i].end()) {
+						depender[i][myPair.first].push_back(myPair.second);
+					}
+					
+					else if(depender[i].find(myPairFirstInv) != depender[i].end()) {
+						depender[i][myPairFirstInv].push_back(myPair.second);
+					}
+					
+					else {
+						std::cout << "AHHHHHHHHHHH";
+					}
+					
+				}
+			}
+			
+
 		}
 		
 		//ILP->writeTask("ILP.ptf");
@@ -6925,6 +7019,7 @@ void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &z
 	std::vector< std::vector< mosek::fusion::Constraint::t> > edgeConstraint(firstIndexMap.size());
 	std::vector< std::vector< std::vector<double> > > IMap(firstIndexMap.size()); //Only has one of edges
 	std::vector< std::unordered_set< std::vector<double>, vectorHash<double> > > ISet(firstIndexMap.size());
+	std::vector< std::unordered_map< std::vector<double> , std::vector< std::vector<double> > , vectorHash<double> > > depender(firstIndexMap.size()); //Maps to which edges depend on the input
 	
 	
 	//Positive for ILP
@@ -6947,6 +7042,7 @@ void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &z
 
 				IMap[i].push_back(mapInput);
 				ISet[i].insert(mapInput);
+				depender[i][mapInput] = {{}};
 				
 				edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(myMatrix,MosekM[i]), mosek::fusion::Domain::greaterThan(0.)));
 			}
@@ -7060,25 +7156,9 @@ void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &z
 			//Vertex Constraint
 			OLP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
 			
-			//Vertex and Edge Constraint
-			ILP->constraint(mosek::fusion::Expr::dot(MosekNewVertex, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.));
-			
 			//Remove Old Constraint from Mosek
-			/*index = -1;
-			
-			for(int j = 0; j < (int)IMap[i].size(); ++j) {
-				if((IMap[i][j] == longestEdge) || (IMap[i][j] == longestEdgeInv)) {
-					index = j;
-					j = (int)IMap[i].size();
-				}
-			}
-			
-			if(index == -1) {
-				throw std::exception();
-			}*/
-			
-			std::unordered_set< std::vector<double>, vectorHash< double > > edgesSet;
-			complexes[i].subdivide(longestEdge, edgesSet);
+			std::unordered_map< std::vector<double>, std::vector<double>, vectorHash< double > > partialDepender;
+			complexes[i].subdivide(longestEdge, partialDepender);
 
 			edgeConstraint[i][index]->remove();
 			edgeConstraint[i].erase(edgeConstraint[i].begin() + index);
@@ -7090,7 +7170,42 @@ void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &z
 				ISet[i].erase(ISet[i].find(longestEdgeInv));
 			}
 			
-			for(auto myEdge : edgesSet) {
+			//Add new constraints based on edge
+			std::vector<double> oldVertex1(n);
+			std::vector<double> oldVertex2(n);
+			
+			for(int j = 0; j < n; ++j) {
+				oldVertex1[j] = longestEdge[j];
+				oldVertex2[j] = longestEdge[j+n];
+			}
+			
+			auto MosekOldVertex1 = monty::new_array_ptr(oldVertex1);
+			auto MosekOldVertex2 = monty::new_array_ptr(oldVertex2);
+			
+			edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekOldVertex1, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.)));
+			edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekOldVertex2, mosek::fusion::Expr::mul(MosekM[i], MosekNewVertex)), mosek::fusion::Domain::greaterThan(0.)));
+			
+			std::vector<double> newEdge1(2*n);
+			std::vector<double> newEdge2(2*n);
+			
+			for(int j = 0; j < n; ++j) {
+				newEdge1[j] = oldVertex1[j];
+				newEdge1[j+n] = newVertex[j];
+				newEdge2[j] = oldVertex2[j];
+				newEdge2[j+n] = newVertex[j];
+			}
+			
+			ISet[i].insert(newEdge1);
+			ISet[i].insert(newEdge2);
+			IMap[i].push_back(newEdge1);
+			IMap[i].push_back(newEdge2);
+			
+			std::vector< std::vector<double> > newConstraints = depender[i].at(longestEdge);
+			
+			//-1 b/c we have to initalize depender
+			for(int j = 0; j < newConstraints.size(); ++j) {
+				std::vector<double> myEdge = newConstraints[j];
+				
 				std::vector<double> myEdgeInv(2*n); 
 				
 				for(int j = 0; j < n; ++j) {
@@ -7114,6 +7229,17 @@ void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &z
 					auto MosekVertex2 = monty::new_array_ptr(myVertex2);
 				
 					edgeConstraint[i].push_back(ILP->constraint(mosek::fusion::Expr::dot(MosekVertex1, mosek::fusion::Expr::mul(MosekM[i], MosekVertex2)), mosek::fusion::Domain::greaterThan(0.)));
+				}
+			}
+			
+			
+			for(auto myPair: partialDepender) {
+				if(depender[i].find(myPair.first) == depender[i].end()) {
+					depender[i][myPair.first] = {myPair.second};
+				}
+				
+				else {
+					depender[i][myPair.first].push_back(myPair.second);
 				}
 			}
 		}
@@ -7149,4 +7275,3 @@ void fastExcitingFlagAlgebra(std::vector<Graph> &f, int n, std::vector<Graph> &z
    
 	return;
 }
-

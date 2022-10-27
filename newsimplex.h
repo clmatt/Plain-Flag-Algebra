@@ -227,6 +227,15 @@ class SimplicialComplex {
 		}
 		
 		
+		//-----------------------------
+		//-----Number of Simplices-----
+		//-----------------------------
+		
+		int numSimplices() const{
+			return simplices.size();
+		}
+		
+		
 		//---------------------
 		//-----Add simplex-----
 		//---------------------
@@ -290,7 +299,8 @@ class SimplicialComplex {
 				
 		//Output is edges in subdivided simplex - used in copositive 
 		//Maybe not the fastest b/c need to recompute maps, but I don't think this is a bottleneck
-		void subdivide(const std::vector<double> &myEdge, std::unordered_set< std::vector<double>, vectorHash< double > > &output) {	
+		//Using a map is a bit hacky, but it's fine
+		void subdivide(const std::vector<double> &myEdge, std::unordered_map<std::vector<double>, std::vector<double>, vectorHash<double> >  &output) {	
 
 			std::vector<int> indices; //Gives which simplices the edge is in
 			
@@ -306,55 +316,46 @@ class SimplicialComplex {
 			}
 					
 			std::vector<double> newVertex(n);
+			std::vector<double> oldVertex1(n);
+			std::vector<double> oldVertex2(n);
 			
 			for(int i = 0; i < n; ++i) {
 				newVertex[i] = (myEdge[i] + myEdge[i+n])/2.;
+				oldVertex1[i] = myEdge[i];
+				oldVertex2[i] = myEdge[i+n];
 			}
 			
-			std::vector<double> subdivided1(2*n);
-			std::vector<double> subdivided2(2*n);
-			
-			for(int i = 0; i < n; ++i) {
-				subdivided1[i] = newVertex[i];
-				subdivided2[i] = newVertex[i];
-				
-				subdivided1[i+n] = myEdge[i];
-				subdivided2[i+n] = myEdge[i+n];
-			}
-			
-			output.insert(subdivided1);
-			output.insert(subdivided2);
-			
-			//Also do inverses
-			for(int i = 0; i < n; ++i) {
-				subdivided1[i+n] = newVertex[i];
-				subdivided2[i+n] = newVertex[i];
-				
-				subdivided1[i] = myEdge[i];
-				subdivided2[i] = myEdge[i+n];
-			}
-			
-			//More than we need, but this is easier to compute		
 			for(int i = 0; i < (int)indices.size(); ++i) {
 				std::vector< std::vector<double> > vertices = simplices[indices[i]].getVertices();
 				int index1 = -1;
 				int index2 = -1;
 				
 				for(int j = 0; j < n; ++j) {
-					for(int k = j+1; k < n; ++k) {
-						std::vector<double> temp = vertices[j];
-						temp.insert(temp.end(), vertices[k].begin(), vertices[k].end());
+					if((vertices[j] != oldVertex1) && (vertices[j] != oldVertex2)) {
+						std::vector<double> myEdge1(2*n);
+						std::vector<double> myEdge2(2*n);
+						std::vector<double> myEdge3(2*n);
 						
-						std::vector<double> tempInv = vertices[k];
-						tempInv.insert(tempInv.end(), vertices[j].begin(), vertices[j].end());
-						
-						if((temp != myEdge) && (tempInv != myEdge)) {
-							output.insert(temp);
+						for(int k = 0; k < n; ++k) {
+							myEdge1[k] = vertices[j][k];
+							myEdge2[k] = vertices[j][k];
+							myEdge3[k] = vertices[j][k];
+							myEdge1[k+n] = oldVertex1[k];
+							myEdge2[k+n] = oldVertex2[k];
+							myEdge3[k+n] = newVertex[k];
 						}
 						
-						else{ 
+						output[myEdge1] = myEdge3;
+						output[myEdge2] = myEdge3;
+					} 
+					
+					else {
+						if(index1 == -1) {
 							index1 = j;
-							index2 = k;
+						}
+						
+						else {
+							index2 = j;
 						}
 					}
 				}
@@ -376,7 +377,6 @@ class SimplicialComplex {
 			
 		}
 };
-
 
 
 
