@@ -64,3 +64,28 @@ Pointwise validity gives [[P(R) F]] = 0 for every rooted F (`localized_degree_co
 and the inequality form gives PSD localising blocks [[(R - lo/N) v v^T]] ⪰ 0 (not yet
 implemented). At n = 6 neither the averaged nor the localised form improves R(4,5)
 beyond 31. n = 6 is probably too small; we need n = 7-8, hence the C++ core.
+
+## 2026-11-20: legacy code at n = 7; new C++ core
+
+Legacy code (via harness + normalised phase-1 + CSDP), R(4,5), n = 7:
+- objective form: 1/d = 28.086, so R(4,5) <= 29 (matches Table A.6);
+- feasibility form: N = 31, 30, 29 numerically infeasible (margins 7.4e-7, 3.6e-7, 1.5e-7);
+  N = 28: CSDP "stuck at edge of primal feasibility".
+
+So the thesis-era code, posed as a normalised phase-1 problem, already reaches 29 on n = 7,
+where the thesis (Mosek, unnormalised) reached only 31 on n = 8. The mathematics of the
+legacy SDP generation is fine for n <= 7 (it agrees with the reference); the failure was
+in how infeasibility was posed to the solver and read back. The margins are ~1e-7, so
+exact certificates need care.
+
+New C++ core (`cpp/`, CMake + Ninja, GMP, nauty with TLS, OpenMP):
+- `Flag` (k <= 10) with canonical forms: brute force over non-root permutations when
+  there are <= 4 non-roots (every flag in Y), nauty with root cells otherwise. Unit tests
+  check 3000 random cases where brute force and nauty must induce the same classes.
+- `Theory`: generation of admissible graphs and flags, plus density / product / average /
+  lift in exact GMP rationals.
+- `computeY`: Algorithm 2 with exact integer counts (no fractions, no overflow).
+- `flagsdp` CLI: S-expression spec in, exact text problem out (`flagcheck/cppbackend.py`).
+- `test_cpp_backend.py`: graphs, complete flag lists, every Y entry and every constraint
+  vector equal the reference **exactly** on 13 problems (2 and 3 colours, empty type,
+  Ramsey zeros, degree polynomials via C++ multiply/average). Mutation-checked.

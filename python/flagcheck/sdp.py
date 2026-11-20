@@ -48,6 +48,10 @@ class FlagSDP:
 def combo_to_vector(expr: Combo, n: int, colors: int, zeros, graphs: List[Flag]) -> List[Fraction]:
     """Chain-rule a combination of graphs (s = 0, at most n vertices) up to n vertices and
     return its coefficient vector over `graphs`."""
+    if not isinstance(expr, dict):
+        from .spec import evaluate  # expression tree (spec.Expr)
+
+        expr = evaluate(expr, colors, zeros)
     index = {G: i for i, G in enumerate(graphs)}
     vec = [Fraction(0)] * len(graphs)
     for F in expr:
