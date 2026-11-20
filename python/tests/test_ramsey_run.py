@@ -1,0 +1,47 @@
+"""Soundness and end-to-end tests of the Ramsey driver (flagcheck.ramsey_run)."""
+
+import shutil
+from fractions import Fraction
+
+import pytest
+
+from flagcheck import cppbackend
+from flagcheck.limits import StepGraphon
+from flagcheck.ramsey import KNOWN_RAMSEY_GRAPHS, red_degrees
+from flagcheck.ramsey_run import build_problem, degree_window, ramsey_upper, run
+from flagcheck.spec import evaluate
+
+
+@pytest.mark.parametrize("kl,n", [((3, 3), 4), ((3, 4), 5), ((3, 5), 4)])
+def test_every_constraint_holds_on_a_real_critical_graph(kl, n):
+    """For N = R(k,l) - 1 a real graph exists, so its balanced blow-up must satisfy every
+    equality exactly, and every localising multiplier must be >= 0 at every root."""
+    k, l = kl
+    G = KNOWN_RAMSEY_GRAPHS[kl]()
+    N = G.k
+    lo, hi = degree_window(k, l, N)
+    assert lo <= min(red_degrees(G)) and max(red_degrees(G)) <= hi
+    W = StepGraphon.blowup(G)
+    p = build_problem(k, l, N, n, "all")
+    assert p.eqs
+    for expr, rhs in p.eqs:
+        assert W.evaluate(evaluate(expr, 3, p.zeros)) == rhs
+    for m, g in p.localizing:
+        gc = evaluate(g, 3, p.zeros)
+        assert all(W.evaluate(gc, (v,)) >= 0 for v in range(N))
+
+
+def test_degree_window_values():
+    assert ramsey_upper(2, 5) == 5 and ramsey_upper(5, 4) == 25
+    assert degree_window(4, 5, 24) == (24 - 18, 13)
+    assert degree_window(4, 6, 39) == (39 - 25, 17)   # thesis: red degree in [14, 17]
+
+
+@pytest.mark.skipif(not cppbackend.available() or shutil.which("csdp") is None, reason="needs flagsdp + CSDP")
+@pytest.mark.parametrize("degrees", ["none", "avg", "local", "psd", "all"])
+def test_driver_end_to_end_small(degrees):
+    # R(3,4) <= 9 must be proved with every option, and R(3,4) <= 8 never.
+    _, _, res9, _ = run(3, 4, 9, 5, degrees)
+    _, _, res8, _ = run(3, 4, 8, 5, degrees)
+    assert res9.bound > 0
+    assert res8.bound <= 0
