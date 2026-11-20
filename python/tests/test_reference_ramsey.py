@@ -128,3 +128,50 @@ def test_localized_degree_constraints_are_sound_and_nontrivial():
     assert all(W.evaluate(e) == 0 for e, _ in good)
     bad = localized_degree_constraints([7], 17, zeros, 4)
     assert any(W.evaluate(e) != 0 for e, _ in bad)
+
+
+def test_is_psd_exact():
+    from flagcheck.certificate import is_psd_exact
+
+    assert is_psd_exact([[1, 1], [1, 1]])
+    assert is_psd_exact([[0, 0], [0, 2]])
+    assert not is_psd_exact([[0, 1], [1, 0]])
+    assert not is_psd_exact([[1, 2], [2, 1]])
+    assert is_psd_exact([[2, -1, 0], [-1, 2, -1], [0, -1, 2]])
+
+
+@pytest.mark.parametrize("kl,n,window", [((3, 4), 5, (2, 3)), ((3, 5), 4, (4, 4))])
+def test_localizing_blocks_psd_on_real_graphs(kl, n, window):
+    """Soundness of localising blocks: for a real Ramsey graph and the TRUE degree window
+    (from smaller Ramsey numbers), the multipliers are >= 0 at every root and every block
+    evaluates to a PSD matrix on the blow-up densities."""
+    from flagcheck.certificate import is_psd_exact
+    from flagcheck.ramsey import one_flag, red_flag
+    from flagcheck.sdp import localizing_block
+    from flagcheck.spec import Add, Lit, Mul, Scale, evaluate
+
+    k, l = kl
+    G = KNOWN_RAMSEY_GRAPHS[kl]()
+    N = G.k
+    lo, hi = window
+    assert lo <= min(red_degrees(G)) and max(red_degrees(G)) <= hi
+    zeros = ramsey_zeros(k, l)
+    W = StepGraphon.blowup(G)
+    lower = Add((Lit(red_flag()), Scale(Fraction(-lo, N), one_flag())))
+    upper = Add((Scale(Fraction(hi, N), one_flag()), Scale(Fraction(-1), Lit(red_flag()))))
+    graphs = list(generate(n, 3, zeros))
+    dist = W.graph_distribution(n)
+    for g, m in [(lower, 2), (upper, 2), (Mul((lower, upper)), 1)]:
+        gc = evaluate(g, 3, zeros)
+        for part in range(N):
+            assert W.evaluate(gc, (part,)) >= 0
+        sigma, flags, entries = localizing_block(g, m, n, 3, zeros, graphs)
+        size = len(flags)
+        M = [[Fraction(0)] * size for _ in range(size)]
+        for gi, Gr in enumerate(graphs):
+            pG = dist.get(Gr, Fraction(0))
+            for (i, j), v in entries[gi].items():
+                M[i][j] += pG * v
+                if i != j:
+                    M[j][i] += pG * v
+        assert is_psd_exact(M)

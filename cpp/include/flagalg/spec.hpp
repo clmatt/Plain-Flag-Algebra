@@ -8,6 +8,7 @@
 //   objective <expr>               (prove objective >= d)
 //   eq <rational> <expr>           (expr = rational)
 //   le <rational> <expr>           (expr <= rational)
+//   psd <m> <expr>                 (localising block, see Spec::Localizing)
 // Expressions (S-expressions):
 //   (flag k s c0 c1 ...)           flag literal, colours in lexicographic pair order
 //   (add e1 e2 ...)  (scale q e)  (mul e1 e2 ...)  (avg e)
@@ -44,6 +45,13 @@ struct Spec {
     std::vector<Flag> zeros;
     std::shared_ptr<Expr> objective;  // may be null (objective 0)
     std::vector<Constraint> constraints;
+    // Localising PSD blocks: [[ g * v v^T ]]_sigma >= 0 for all sigma-flags v on m vertices.
+    // Only valid when g >= 0 pointwise at every root in every object considered.
+    struct Localizing {
+        int m;
+        std::shared_ptr<Expr> g;
+    };
+    std::vector<Localizing> localizing;
 };
 
 Spec parseSpec(const std::string& text);

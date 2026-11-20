@@ -193,10 +193,17 @@ Combo Theory::lift(const Combo& c, int m) const {
     Combo out;
     for (const auto& [F, coeff] : c) {
         if (F.k > m) throw std::invalid_argument("lift: cannot lift to fewer vertices");
-        for (const Flag& H : flags(F.type(), m)) {
-            mpq_class d = density(F, H);
-            if (d != 0) addTerm(out, H, coeff * d);
+        auto key = std::make_pair(F, m);
+        auto it = liftCache_.find(key);
+        if (it == liftCache_.end()) {
+            Combo single;
+            for (const Flag& H : flags(F.type(), m)) {
+                mpq_class d = density(F, H);
+                if (d != 0) single.emplace(H, d);
+            }
+            it = liftCache_.emplace(key, std::move(single)).first;
         }
+        for (const auto& [H, d] : it->second) addTerm(out, H, coeff * d);
     }
     return out;
 }

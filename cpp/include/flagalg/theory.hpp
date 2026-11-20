@@ -52,6 +52,7 @@ private:
     std::map<int, std::unordered_set<Flag, FlagHash>> zerosBySize_;
     mutable std::map<int, std::vector<Flag>> graphCache_;
     mutable std::map<std::pair<Flag, int>, std::vector<Flag>> flagCache_;
+    mutable std::map<std::pair<Flag, int>, Combo> liftCache_;  // single flag -> lifted combination
 };
 
 void addTerm(Combo& c, const Flag& f, const mpq_class& v);

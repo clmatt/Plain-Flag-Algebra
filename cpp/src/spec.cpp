@@ -121,6 +121,13 @@ Spec parseSpec(const std::string& text) {
                 std::getline(rs, exprText);
                 spec.constraints.push_back(
                     {key == "eq" ? Constraint::Eq : Constraint::Le, parseRational(q), parseWhole(exprText)});
+            } else if (key == "psd") {
+                std::istringstream rs(rest);
+                int m;
+                rs >> m;
+                std::string exprText;
+                std::getline(rs, exprText);
+                spec.localizing.push_back({m, parseWhole(exprText)});
             } else {
                 throw std::invalid_argument("unknown directive " + key);
             }

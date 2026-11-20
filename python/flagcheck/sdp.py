@@ -40,6 +40,7 @@ class FlagSDP:
     f: List[Fraction]
     eqs: List[Tuple[List[Fraction], Fraction]] = field(default_factory=list)
     ineqs: List[Tuple[List[Fraction], Fraction]] = field(default_factory=list)
+    block_kinds: List[str] = field(default_factory=list)  # "plain" / "localizing"; empty = all plain
 
     def graph_index(self) -> Dict[Flag, int]:
         return {G: i for i, G in enumerate(self.graphs)}
@@ -70,8 +71,14 @@ def build_reference_sdp(
     eqs: Sequence[Tuple[Combo, Fraction]] = (),
     ineqs: Sequence[Tuple[Combo, Fraction]] = (),
     include_empty_type: bool = False,
+    localizing: Sequence[Tuple[int, object]] = (),
 ) -> FlagSDP:
-    """Everything is computed by the Python reference from definitions."""
+    """Everything is computed by the Python reference from definitions.
+
+    `localizing` lists (m, g): a block [[ g v v^T ]]_sigma >= 0 over all sigma-flags v on m
+    vertices, where sigma is the type of g. It is only valid if g >= 0 pointwise at every
+    root of every object considered; the caller is responsible for that (see the
+    soundness tests)."""
     zeros = tuple(zeros)
     graphs = list(generate(n, colors, zeros))
     blocks = sdp_blocks(n, colors, zeros, include_empty_type)
@@ -82,8 +89,16 @@ def build_reference_sdp(
             full = Y_matrix(G, sigma, flags)
             row.append({(i, j): full[i][j] for i in range(len(flags)) for j in range(i, len(flags)) if full[i][j]})
         Y.append(row)
+    kinds = ["plain"] * len(blocks)
+    for m, g in localizing:
+        sigma, flags, entries = localizing_block(g, m, n, colors, zeros, graphs)
+        blocks.append((sigma, flags))
+        kinds.append("localizing")
+        for gi in range(len(graphs)):
+            Y[gi].append(entries[gi])
     f = combo_to_vector(objective or {}, n, colors, zeros, graphs)
     return FlagSDP(
+        block_kinds=kinds,
         n=n,
         colors=colors,
         graphs=graphs,
@@ -93,6 +108,41 @@ def build_reference_sdp(
         eqs=[(combo_to_vector(e, n, colors, zeros, graphs), Fraction(rhs)) for e, rhs in eqs],
         ineqs=[(combo_to_vector(e, n, colors, zeros, graphs), Fraction(rhs)) for e, rhs in ineqs],
     )
+
+
+def localizing_block(g, m: int, n: int, colors: int, zeros, graphs: List[Flag]):
+    """Entries lift([[ g F_i F_j ]], n) over all admissible sigma-flags F on m vertices.
+    Returns (sigma, flags, per-graph sparse upper triangles)."""
+    from .algebra import average, combo, multiply
+    from .graphs import generate_flags
+    from .spec import evaluate
+
+    zeros = tuple(zeros)
+    gc = evaluate(g, colors, zeros)
+    if not gc:
+        raise ValueError("localizing multiplier is zero")
+    first = next(iter(gc))
+    if any(F.s != first.s or F.type().cols != first.type().cols for F in gc):
+        raise ValueError("localizing multiplier mixes labelled types")
+    sigma = first.type()
+    s = first.s
+    if m < s or max(F.k for F in gc) + 2 * (m - s) > n:
+        raise ValueError("[[g F F]] does not fit in n vertices")
+    flags = list(generate_flags(sigma, m, colors, zeros))
+    index = {G: i for i, G in enumerate(graphs)}
+    entries = [{} for _ in graphs]
+    for i, Fi in enumerate(flags):
+        gFi = multiply(gc, combo((Fi, 1)), colors, zeros)
+        for j in range(i, len(flags)):
+            e = lift(average(multiply(gFi, combo((flags[j], 1)), colors, zeros)), n, colors, zeros)
+            for G, v in e.items():
+                entries[index[G]][(i, j)] = v
+    return Flag(sigma.k, 0, sigma.cols), flags, entries
+
+
+def build_from_problem(problem) -> FlagSDP:
+    return build_reference_sdp(problem.n, problem.colors, problem.zeros, problem.objective, problem.eqs,
+                               problem.ineqs, problem.include_empty_type, problem.localizing)
 
 
 # ---------------------------------------------------------------------------

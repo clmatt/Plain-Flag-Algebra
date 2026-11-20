@@ -8,14 +8,18 @@
 //   colors <c>
 //   graphs <G>                 followed by G lines "k s c0 c1 ..."
 //   blocks <B>                 then per block:
-//     block <b> <m> <num flags> <denominator> <sigma: k s c...>
+//     block <b> <m> <num flags> <denominator> <plain|localizing> <sigma: k s c...>
 //     <num flags> lines "k s c..."
 //   objective <nnz>            followed by "<graph> <rational>" lines
 //   constraint <eq|le> <rhs> <nnz>   followed by "<graph> <rational>" lines (repeated)
-//   Y <num entries>            followed by "<graph> <block> <i> <j> <count>" lines (i <= j)
+//   Y <num entries>            followed by "<graph> <block> <i> <j> <value>" lines (i <= j);
+//                              entry = value / denominator (integer counts for plain blocks,
+//                              exact rationals with denominator 1 for localizing blocks)
 //   end
 #include <chrono>
 #include <fstream>
+#include <map>
+#include <tuple>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -87,14 +91,60 @@ int main(int argc, char** argv) {
         auto blocks = makeBlocks(T, n, spec.emptyType);
         std::cerr << "blocks: " << blocks.size() << " (" << seconds(t0) << "s)\n";
 
+        // Localising blocks: entry (i, j) = lift([[ g F_i F_j ]], n), exact rationals.
+        struct LocBlock {
+            Flag sigma;
+            int m;
+            std::vector<Flag> flags;
+            std::map<std::tuple<int, int, int>, mpq_class> entries;  // (graph, i, j)
+        };
+        std::vector<LocBlock> locBlocks;
+        for (const auto& L : spec.localizing) {
+            Combo g = evaluate(T, *L.g);
+            if (g.empty()) throw std::invalid_argument("psd: multiplier is zero");
+            const Flag& f0 = g.begin()->first;
+            int maxk = 0;
+            for (const auto& [f, v] : g) {
+                if (f.s != f0.s || f.type() != f0.type())
+                    throw std::invalid_argument("psd: multiplier mixes labelled types");
+                maxk = std::max<int>(maxk, f.k);
+            }
+            LocBlock B;
+            B.sigma = f0.type();
+            B.m = L.m;
+            const int s = f0.s;
+            if (L.m < s || maxk + 2 * (L.m - s) > n)
+                throw std::invalid_argument("psd: [[g F F]] does not fit in n vertices");
+            B.flags = T.flags(B.sigma, L.m);
+            for (std::size_t i = 0; i < B.flags.size(); ++i) {
+                Combo gF = T.multiply(g, Combo{{B.flags[i], 1}});
+                for (std::size_t j = i; j < B.flags.size(); ++j) {
+                    Combo e = T.lift(T.average(T.multiply(gF, Combo{{B.flags[j], 1}})), n);
+                    for (const auto& [G, v] : e) {
+                        auto it = gi.find(G);
+                        if (it == gi.end()) throw std::logic_error("psd: lifted graph not in the graph list");
+                        B.entries[{it->second, static_cast<int>(i), static_cast<int>(j)}] = v;
+                    }
+                }
+            }
+            std::cerr << "localising block: " << B.flags.size() << " flags (" << seconds(t0) << "s)\n";
+            locBlocks.push_back(std::move(B));
+        }
+
         std::ofstream out(argv[2]);
         out << "FLAGSDP 1\nn " << n << "\ncolors " << spec.colors << "\n";
         out << "graphs " << graphs.size() << "\n";
         for (const auto& g : graphs) out << g.str() << "\n";
-        out << "blocks " << blocks.size() << "\n";
+        out << "blocks " << blocks.size() + locBlocks.size() << "\n";
         for (std::size_t b = 0; b < blocks.size(); ++b) {
             const auto& B = blocks[b];
-            out << "block " << b << " " << B.m << " " << B.flags.size() << " " << B.denominator << " "
+            out << "block " << b << " " << B.m << " " << B.flags.size() << " " << B.denominator << " plain "
+                << B.sigma.str() << "\n";
+            for (const auto& f : B.flags) out << f.str() << "\n";
+        }
+        for (std::size_t b = 0; b < locBlocks.size(); ++b) {
+            const auto& B = locBlocks[b];
+            out << "block " << blocks.size() + b << " " << B.m << " " << B.flags.size() << " 1 localizing "
                 << B.sigma.str() << "\n";
             for (const auto& f : B.flags) out << f.str() << "\n";
         }
@@ -132,6 +182,12 @@ int main(int argc, char** argv) {
                 }
             std::cerr << "Y: " << end << "/" << graphs.size() << " graphs (" << seconds(t0) << "s)\n";
         }
+        for (std::size_t b = 0; b < locBlocks.size(); ++b)
+            for (const auto& [key, v] : locBlocks[b].entries) {
+                yBody << std::get<0>(key) << " " << blocks.size() + b << " " << std::get<1>(key) << " "
+                      << std::get<2>(key) << " " << v.get_str() << "\n";
+                ++numEntries;
+            }
         out << "Y " << numEntries << "\n" << yBody.str() << "end\n";
         if (!out) throw std::runtime_error("write failed");
         std::cerr << "done (" << seconds(t0) << "s)\n";

@@ -22,7 +22,7 @@ from flagcheck.problems import (
     ramsey_objective,
 )
 from flagcheck.ramsey import ROOT, monochromatic_clique, one_flag, ramsey_zeros, red_flag, GREEN
-from flagcheck.sdp import build_reference_sdp, solve_csdp
+from flagcheck.sdp import build_from_problem, solve_csdp
 from flagcheck.spec import Add, Avg, Lit, Mul, Scale
 
 pytestmark = pytest.mark.skipif(not cppbackend.available(), reason="flagsdp not built")
@@ -40,6 +40,17 @@ def degree_problem(N, n, window, localized_flag=None):
     return Problem(f"deg{N}", n, 3, zeros, {}, eqs=eqs, normalize=True)
 
 
+def localizing_problem(N, n):
+    """(3,4) feasibility with localising blocks for R - 2/N >= 0 (m = 2) and for the
+    two-sided window (R - 2/N)(4/N - R) >= 0 (m = 1, i.e. a 1x1 block)."""
+    p = ramsey_feasibility(3, 4, N, n)
+    lower = Add((Lit(red_flag()), Scale(Fraction(-2, N), one_flag())))
+    upper = Add((Scale(Fraction(4, N), one_flag()), Scale(-1, Lit(red_flag()))))
+    p.localizing = [(2, lower), (1, Mul((lower, upper)))]
+    p.name = f"loc{N}"
+    return p
+
+
 PROBLEMS = [
     goodman(3),
     goodman(4),
@@ -54,14 +65,18 @@ PROBLEMS = [
     ramsey_feasibility(3, 5, 14, 6),
     degree_problem(8, 5, (2, 4)),
     degree_problem(8, 5, (3, 3), localized_flag=Flag(3, 1, (1, 2, 0))),
+    localizing_problem(8, 5),
 ]
 
 
 @pytest.mark.parametrize("problem", PROBLEMS, ids=lambda p: p.name)
 def test_cpp_matches_reference_exactly(problem):
-    ref = build_reference_sdp(problem.n, problem.colors, problem.zeros, problem.objective,
-                              problem.eqs, problem.ineqs, problem.include_empty_type)
+    ref = build_from_problem(problem)
     cpp = cppbackend.build_cpp_sdp(problem)
+    assert cpp.block_kinds == (ref.block_kinds or ["plain"] * len(ref.blocks))
+    plain = [b for b, k in enumerate(cpp.block_kinds) if k == "plain"]
+    loc_cpp = [b for b, k in enumerate(cpp.block_kinds) if k == "localizing"]
+    loc_ref = [b for b, k in enumerate(ref.block_kinds) if k == "localizing"]
 
     # 1. Same graphs; build the index map cpp -> ref through Python's canonical form.
     ref_index = {G: i for i, G in enumerate(ref.graphs)}
@@ -78,8 +93,8 @@ def test_cpp_matches_reference_exactly(problem):
             assert cv[g] == rv[r], (problem.name, g)
 
     # 3. Same type classes; each block is the complete, duplicate-free flag list.
-    cpp_types = sorted(canonical(Flag(s.k, 0, s.cols)) for s, _ in cpp.blocks)
-    ref_types = sorted(canonical(Flag(s.k, 0, s.cols)) for s, _ in ref.blocks)
+    cpp_types = sorted(canonical(Flag(cpp.blocks[b][0].k, 0, cpp.blocks[b][0].cols)) for b in plain)
+    ref_types = sorted(canonical(Flag(s.k, 0, s.cols)) for (s, _), k in zip(ref.blocks, ref.block_kinds) if k == "plain")
     assert cpp_types == ref_types
     for sigma, flags in cpp.blocks:
         canon = [canonical(F) for F in flags]
@@ -90,18 +105,32 @@ def test_cpp_matches_reference_exactly(problem):
 
     # 4. Every Y entry, recomputed independently for C++'s labelled types and flag lists.
     for g, G in enumerate(cpp.graphs):
-        for b, (sigma, flags) in enumerate(cpp.blocks):
+        for b in plain:
+            sigma, flags = cpp.blocks[b]
             full = Y_matrix(G, sigma, flags)
             expected = {(i, j): full[i][j] for i in range(len(flags)) for j in range(i, len(flags)) if full[i][j]}
             assert cpp.Y[g][b] == expected, (problem.name, g, b)
+
+    # 5. Localising blocks: same labelled type, and equal entries after mapping flags.
+    assert len(loc_cpp) == len(loc_ref)
+    for cb, rb in zip(loc_cpp, loc_ref):
+        assert cpp.blocks[cb][0].cols == ref.blocks[rb][0].cols
+        rindex = {F: i for i, F in enumerate(ref.blocks[rb][1])}
+        perm = [rindex[canonical(F)] for F in cpp.blocks[cb][1]]
+        assert sorted(perm) == list(range(len(perm)))
+        for g, r in enumerate(to_ref):
+            mapped = {}
+            for (i, j), v in cpp.Y[g][cb].items():
+                a, c = perm[i], perm[j]
+                mapped[(min(a, c), max(a, c))] = v
+            assert mapped == ref.Y[r][rb], (problem.name, g, cb)
 
 
 @pytest.mark.skipif(shutil.which("csdp") is None, reason="needs CSDP")
 @pytest.mark.parametrize("problem", [goodman(3), inducibility(P4, 5), ramsey_feasibility(4, 4, 18, 6)],
                          ids=lambda p: p.name)
 def test_cpp_and_reference_solve_to_same_value(problem):
-    ref = build_reference_sdp(problem.n, problem.colors, problem.zeros, problem.objective,
-                              problem.eqs, problem.ineqs, problem.include_empty_type)
+    ref = build_from_problem(problem)
     cpp = cppbackend.build_cpp_sdp(problem)
     a = solve_csdp(ref, normalize=problem.normalize).primal_objective
     b = solve_csdp(cpp, normalize=problem.normalize).primal_objective

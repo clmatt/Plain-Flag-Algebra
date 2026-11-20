@@ -105,5 +105,7 @@ def write_spec(problem, path: str) -> None:
         lines.append(f"eq {_rat(rhs)} {sexpr(e)}")
     for e, rhs in problem.ineqs:
         lines.append(f"le {_rat(rhs)} {sexpr(e)}")
+    for m, g in getattr(problem, "localizing", ()):
+        lines.append(f"psd {m} {sexpr(g)}")
     with open(path, "w") as fh:
         fh.write("\n".join(lines) + "\n")

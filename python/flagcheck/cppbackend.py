@@ -40,12 +40,13 @@ def load(path: str) -> FlagSDP:
     n = int(expect("n")[1])
     colors = int(expect("colors")[1])
     graphs = [_flag(next(it).split()) for _ in range(int(expect("graphs")[1]))]
-    blocks, denominators = [], []
+    blocks, denominators, kinds = [], [], []
     for b in range(int(expect("blocks")[1])):
         parts = expect("block")
         assert int(parts[1]) == b
-        nflags, den = int(parts[3]), int(parts[4])
-        sigma = _flag(parts[5:])
+        nflags, den, kind = int(parts[3]), int(parts[4]), parts[5]
+        sigma = _flag(parts[6:])
+        kinds.append(kind)
         flags = [_flag(next(it).split()) for _ in range(nflags)]
         blocks.append((sigma, flags))
         denominators.append(den)
@@ -67,11 +68,13 @@ def load(path: str) -> FlagSDP:
         raise ValueError(f"expected Y, got {line}")
     Y = [[{} for _ in blocks] for _ in graphs]
     for _ in range(int(line[1])):
-        g, b, i, j, c = (int(x) for x in next(it).split())
-        Y[g][b][(i, j)] = Fraction(c, denominators[b])
+        g, b, i, j, c = next(it).split()
+        g, b, i, j = int(g), int(b), int(i), int(j)
+        Y[g][b][(i, j)] = Fraction(c) / denominators[b]
     if next(it).strip() != "end":
         raise ValueError("missing end marker")
-    return FlagSDP(n=n, colors=colors, graphs=graphs, blocks=blocks, Y=Y, f=f, eqs=eqs, ineqs=ineqs)
+    return FlagSDP(n=n, colors=colors, graphs=graphs, blocks=blocks, Y=Y, f=f, eqs=eqs, ineqs=ineqs,
+                   block_kinds=kinds)
 
 
 def build_cpp_sdp(problem, workdir: Optional[str] = None, threads: Optional[int] = None) -> FlagSDP:

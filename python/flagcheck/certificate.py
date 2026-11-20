@@ -134,3 +134,29 @@ def round_solution(sol: NumericSolution, bits: int = 40, eig_floor: float = 0.0,
     y = [rat(sol.lp[L.y_plus(j)] - sol.lp[L.y_minus(j)]) for j in range(L.num_eqs)]
     u = [max(Fraction(0), rat(sol.lp[L.u(i)])) for i in range(L.num_ineqs)]
     return Certificate(blocks, y, u)
+
+
+def is_psd_exact(M) -> bool:
+    """Exact PSD test of a symmetric rational matrix by LDL^T with diagonal pivoting.
+    A zero pivot is only allowed when its whole remaining row is zero."""
+    A = [[Fraction(x) for x in row] for row in M]
+    n = len(A)
+    active = list(range(n))
+    while active:
+        p = max(active, key=lambda i: A[i][i])
+        d = A[p][p]
+        if d < 0:
+            return False
+        if d == 0:
+            if any(A[p][j] != 0 for j in active):
+                return False
+            active.remove(p)
+            continue
+        active.remove(p)
+        for i in active:
+            if A[i][p] == 0:
+                continue
+            f = A[i][p] / d
+            for j in active:
+                A[i][j] -= f * A[p][j]
+    return True
