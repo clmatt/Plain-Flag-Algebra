@@ -17,6 +17,17 @@ def available() -> bool:
     return os.path.exists(FLAGSDP)
 
 
+def binary_fingerprint() -> str:
+    """sha256 of the flagsdp binary in use, recorded with every result."""
+    import hashlib
+
+    try:
+        with open(FLAGSDP, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return "unavailable"
+
+
 def _flag(tokens) -> Flag:
     k, s = int(tokens[0]), int(tokens[1])
     cols = tuple(int(x) for x in tokens[2:])
@@ -70,6 +81,10 @@ def load(path: str) -> FlagSDP:
     for _ in range(int(line[1])):
         g, b, i, j, c = next(it).split()
         g, b, i, j = int(g), int(b), int(i), int(j)
+        if not (0 <= i <= j < len(blocks[b][1])) or not (0 <= g < len(graphs)):
+            raise ValueError(f"bad Y entry {g} {b} {i} {j}")
+        if (i, j) in Y[g][b]:
+            raise ValueError(f"duplicate Y entry {g} {b} {i} {j}")
         Y[g][b][(i, j)] = Fraction(c) / denominators[b]
     if next(it).strip() != "end":
         raise ValueError("missing end marker")

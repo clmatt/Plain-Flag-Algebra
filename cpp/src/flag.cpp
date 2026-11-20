@@ -103,6 +103,7 @@ Flag restrict(const Flag& f, const int* v, int count, int s) {
 Flag extend(const Flag& f, const std::uint8_t* colors) {
     Flag g;
     const int k = f.k;
+    if (k + 1 > kMaxVertices) throw std::length_error("extend: more than kMaxVertices vertices");
     g.k = static_cast<std::uint8_t>(k + 1);
     g.s = f.s;
     for (int i = 0; i < k; ++i)

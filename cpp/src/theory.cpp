@@ -94,6 +94,7 @@ std::vector<Flag> extendAll(const Theory& T, const std::vector<Flag>& parents) {
 }  // namespace
 
 const std::vector<Flag>& Theory::graphs(int n) const {
+    if (n < 0 || n > kMaxVertices) throw std::length_error("graphs: n out of range");
     auto it = graphCache_.find(n);
     if (it != graphCache_.end()) return it->second;
     std::vector<Flag> out;
@@ -137,7 +138,9 @@ mpq_class Theory::density(const Flag& F, const Flag& H) const {
         ++total;
         if (canon(restrict(H, v.data(), F.k, s)) == target) ++hits;
     } while (nextSubset(X, H.k - s));
-    return mpq_class(hits, total);
+    mpq_class q(hits, total);
+    q.canonicalize();
+    return q;
 }
 
 mpq_class Theory::productCoefficient(const Flag& F1, const Flag& F2, const Flag& H) const {
@@ -161,7 +164,9 @@ mpq_class Theory::productCoefficient(const Flag& F1, const Flag& F2, const Flag&
         ++total;
         if (canon(restrict(H, v1.data(), s + a, s)) == t1 && canon(restrict(H, v2.data(), s + b, s)) == t2) ++hits;
     } while (nextSubset(X, a + b));
-    return mpq_class(hits, total);
+    mpq_class q(hits, total);
+    q.canonicalize();
+    return q;
 }
 
 mpq_class Theory::averageCoefficient(const Flag& F) const {
@@ -186,7 +191,9 @@ mpq_class Theory::averageCoefficient(const Flag& F) const {
             if (canon(restrict(F, v.data(), k, s)) == target) ++hits;
         } while (std::next_permutation(perm.begin(), perm.end()));
     } while (nextSubset(theta, k));
-    return mpq_class(hits, total);
+    mpq_class q(hits, total);
+    q.canonicalize();
+    return q;
 }
 
 Combo Theory::lift(const Combo& c, int m) const {

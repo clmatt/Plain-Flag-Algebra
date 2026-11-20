@@ -38,8 +38,12 @@ from .ramsey import (
 )
 from .spec import Add, Avg, Lit, Mul, Scale
 
-# Proven upper bounds (exact values where known), Radziszowski DS1.18 (April 2026).
-# Trivial cases R(1,l) = 1 and R(2,l) = l.
+# Proven upper bounds (exact values where known), S. Radziszowski, "Small Ramsey Numbers",
+# Electron. J. Combin. DS1, revision #18 (April 24, 2026):
+#   exact values R(3,3..9), R(4,4), R(4,5) = 25           -- Table Ia / items (b), (c), (g)
+#   R(4,6) <= 40, R(4,7) <= 58, R(5,5) <= 46, R(5,6) <= 85 -- Table Ib (Angeltveit-McKay)
+# An entry BELOW the true value would be unsound (the degree window would exclude real
+# graphs); an entry above it only weakens the window. Trivial cases R(1,l) = 1, R(2,l) = l.
 RAMSEY_UPPER = {
     (3, 3): 6, (3, 4): 9, (3, 5): 14, (3, 6): 18, (3, 7): 23, (3, 8): 28, (3, 9): 36,
     (4, 4): 18, (4, 5): 25, (4, 6): 40, (4, 7): 58, (5, 5): 46, (5, 6): 85,
@@ -64,7 +68,7 @@ def red_minus(c: Fraction):
     return Add((Lit(red_flag()), Scale(-c, one_flag())))
 
 
-def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none") -> Problem:
+def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False) -> Problem:
     zeros = tuple(ramsey_zeros(k, l))
     eqs = [green_clique_constraint(j, N) for j in range(2, n + 1)]
     localizing = []
@@ -73,6 +77,9 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none") -> Prob
         raise ValueError(f"empty degree window [{lo}, {hi}]: already impossible")
     factors = [red_minus(Fraction(d, N)) for d in range(lo, hi + 1)]
     width = len(factors)
+    if degrees in ("avg", "local", "all") and width + 1 > n:
+        if degrees != "all":
+            raise ValueError(f"degree polynomial of width {width} does not fit in n = {n}")
     if degrees in ("avg", "all") and width + 1 <= n:
         eqs.append((Avg(Mul(tuple(factors))), Fraction(0)))
     if degrees in ("local", "all") and width + 1 <= n:
@@ -88,8 +95,9 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none") -> Prob
         localizing += [(m, lower), (m, upper)]
         m2 = (n - 3) // 2 + 1       # |g| = 3 for the product
         localizing.append((m2, Mul((lower, upper))))
-    return Problem(f"R{k}{l}_N{N}_n{n}_{degrees}", n, NUM_COLORS, zeros, {}, eqs=eqs,
-                   normalize=True, localizing=localizing)
+    name = f"R{k}{l}_N{N}_n{n}_{degrees}" + ("_e" if empty_type else "")
+    return Problem(name, n, NUM_COLORS, zeros, {}, eqs=eqs, normalize=True, localizing=localizing,
+                   include_empty_type=empty_type)
 
 
 def _frac(x) -> str:
@@ -97,9 +105,25 @@ def _frac(x) -> str:
     return f"{x.numerator}/{x.denominator}"
 
 
+def _git_revision() -> str:
+    import subprocess
+
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        rev = subprocess.run(["git", "-C", here, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        dirty = subprocess.run(["git", "-C", here, "status", "--porcelain"], capture_output=True, text=True).stdout
+        return rev + ("-dirty" if dirty.strip() else "")
+    except OSError:
+        return "unknown"
+
+
 def save_result(path, params, sol, cert, res, timings):
+    from .cppbackend import binary_fingerprint
+
     data = {
         "params": params,
+        "git_revision": _git_revision(),
+        "flagsdp_sha256": binary_fingerprint(),
         "csdp_primal_objective": sol.primal_objective,
         "csdp_dual_objective": sol.dual_objective,
         "proven_bound": _frac(res.bound),
@@ -118,13 +142,13 @@ def save_result(path, params, sol, cert, res, timings):
         json.dump(data, fh)
 
 
-def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50):
+def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, empty_type=False):
     from .cppbackend import build_cpp_sdp
     from .sdp import solve_csdp
 
     t = {}
     t0 = time.time()
-    problem = build_problem(k, l, N, n, degrees)
+    problem = build_problem(k, l, N, n, degrees, empty_type)
     sdp = build_cpp_sdp(problem, threads=threads)
     t["build"] = time.time() - t0
     t0 = time.time()
@@ -134,7 +158,8 @@ def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50):
     cert = round_solution(sol, bits=bits)
     res = check_certificate(sdp, cert)
     t["check"] = time.time() - t0
-    params = {"k": k, "l": l, "N": N, "n": n, "degrees": degrees, "window": degree_window(k, l, N)}
+    params = {"k": k, "l": l, "N": N, "n": n, "degrees": degrees, "empty_type": empty_type,
+              "window": degree_window(k, l, N)}
     if results_dir:
         save_result(os.path.join(results_dir, f"{problem.name}.json"), params, sol, cert, res, t)
     return sdp, sol, res, t
@@ -148,9 +173,10 @@ def main():
     ap.add_argument("n", type=int)
     ap.add_argument("--degrees", default="none", choices=["none", "avg", "local", "psd", "all"])
     ap.add_argument("--threads", type=int, default=None)
+    ap.add_argument("--empty-type", action="store_true", help="include the empty type (even n only)")
     ap.add_argument("--results", default=os.path.join(os.path.dirname(__file__), "..", "..", "results"))
     a = ap.parse_args()
-    sdp, sol, res, t = run(a.k, a.l, a.N, a.n, a.degrees, a.threads, a.results)
+    sdp, sol, res, t = run(a.k, a.l, a.N, a.n, a.degrees, a.threads, a.results, empty_type=a.empty_type)
     print(f"R({a.k},{a.l})<={a.N} n={a.n} degrees={a.degrees} window={degree_window(a.k, a.l, a.N)}: "
           f"graphs={len(sdp.graphs)} blocks={len(sdp.blocks)} csdp={sol.primal_objective:.3e} "
           f"exact={float(res.bound):.3e} PROVED={res.bound > 0} "

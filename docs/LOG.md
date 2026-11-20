@@ -89,3 +89,27 @@ New C++ core (`cpp/`, CMake + Ninja, GMP, nauty with TLS, OpenMP):
 - `test_cpp_backend.py`: graphs, complete flag lists, every Y entry and every constraint
   vector equal the reference **exactly** on 13 problems (2 and 3 colours, empty type,
   Ramsey zeros, degree polynomials via C++ multiply/average). Mutation-checked.
+
+## 2026-11-20: independent soundness review (reviewer agent) and fixes
+
+The reviewer found no way for the mathematics or the exact checker to produce a false
+proof. It checked: the certificate implication, the off-diagonal factor 2 against the
+storage convention, the exact integer scaling, Y validity (one labelled representative
+per type class), localising blocks, every Ramsey constraint family (blow-up zeros, green
+powers, degree window with correct red/blue roles, degree polynomials, multipliers),
+generation completeness, nauty canonical invariance with fixed roots, absence of
+overflow, and the loader/format. Fixes for the gaps it raised:
+
+1. `verify` was not independent by default. It now checks, against the reference: the
+   full graph list (completeness; a missing graph could hide a false proof), every
+   flag list, one plain block per type class, and for K sampled graphs every Y matrix,
+   objective/constraint coefficient and localising-block entry.
+2. C++ now enforces n <= kMaxVertices (10) instead of undefined behaviour.
+3. Results record the git revision and the flagsdp sha256; verify notes mismatches.
+4. RAMSEY_UPPER entries cited (DS1.18 Table Ia/Ib).
+5. GMP rationals are canonicalised; degree options raise an error instead of silently
+   skipping; an empty-type option was added; the loader rejects bad/duplicate Y keys.
+
+Results so far (exact certificates): R(4,5) <= 29 on n = 7, in both the objective form
+(1/d = 28.0856) and the feasibility form (N = 31, 30, 29; margins 7.4e-7, 3.6e-7, 1.4e-7).
+N = 28 is not provable on n = 7 without extra constraints (margin -5e-9).

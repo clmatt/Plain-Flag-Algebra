@@ -136,6 +136,9 @@ Spec parseSpec(const std::string& text) {
         }
     }
     if (spec.n < 1) throw std::invalid_argument("spec: n must be given");
+    if (spec.n > kMaxVertices) throw std::invalid_argument("spec: n exceeds kMaxVertices");
+    for (const auto& L : spec.localizing)
+        if (L.m > kMaxVertices) throw std::invalid_argument("spec: psd flag size exceeds kMaxVertices");
     return spec;
 }
 
