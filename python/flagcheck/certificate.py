@@ -160,3 +160,104 @@ def is_psd_exact(M) -> bool:
             for j in active:
                 A[i][j] -= f * A[p][j]
     return True
+
+
+def check_flagsdp_file(path: str, cert: Certificate) -> CheckResult:
+    """Exactly the computation of check_certificate, streamed from a `flagsdp` output file
+    so that problems too large to load as Fractions can be checked. Plain-block Y lines
+    are integer counts (sorted by graph); localising-block lines are exact rationals."""
+    with open(path) as fh:
+        def nxt():
+            return fh.readline().split()
+
+        if nxt() != ["FLAGSDP", "1"]:
+            raise ValueError("not a FLAGSDP v1 file")
+        nxt()  # n
+        nxt()  # colors
+        m = int(nxt()[1])
+        for _ in range(m):
+            fh.readline()
+        nb = int(nxt()[1])
+        sizes, dens, kinds = [], [], []
+        for b in range(nb):
+            parts = nxt()
+            if parts[0] != "block" or int(parts[1]) != b:
+                raise ValueError("bad block header")
+            sizes.append(int(parts[3]))
+            dens.append(int(parts[4]))
+            kinds.append(parts[5])
+            for _ in range(sizes[-1]):
+                fh.readline()
+        f = [Fraction(0)] * m
+        parts = nxt()
+        for _ in range(int(parts[1])):
+            g, v = nxt()
+            f[int(g)] = Fraction(v)
+        eqs, ineqs = [], []
+        parts = nxt()
+        while parts[0] == "constraint":
+            vec = {}
+            for _ in range(int(parts[3])):
+                g, v = nxt()
+                vec[int(g)] = Fraction(v)
+            (eqs if parts[1] == "eq" else ineqs).append((vec, Fraction(parts[2])))
+            parts = nxt()
+        if parts[0] != "Y":
+            raise ValueError("expected Y section")
+        if len(cert.blocks) != nb or len(cert.y) != len(eqs) or len(cert.u) != len(ineqs):
+            raise ValueError("certificate does not match the problem shape")
+        if any(Fraction(u) < 0 for u in cert.u):
+            raise ValueError("inequality multipliers must be non-negative")
+        grams = []
+        for (rows, weights), d in zip(cert.blocks, sizes):
+            if any(Fraction(w) < 0 for w in weights):
+                raise ValueError("Gram weights must be non-negative")
+            grams.append(_integer_gram(rows, weights, d))
+
+        ysum = [Fraction(0)] * m
+        cur_g, acc = -1, {}
+
+        def flush():
+            if cur_g >= 0:
+                for b, num in acc.items():
+                    ysum[cur_g] += Fraction(num, dens[b] * grams[b][1])
+
+        seen, seen_loc = set(), set()
+        for _ in range(int(parts[1])):
+            g, b, i, j, v = fh.readline().split()
+            g, b, i, j = int(g), int(b), int(i), int(j)
+            if not (0 <= i <= j < sizes[b]) or not (0 <= g < m):
+                raise ValueError(f"bad Y entry {g} {b} {i} {j}")
+            mult = 1 if i == j else 2
+            if kinds[b] == "plain":
+                if g != cur_g:
+                    if g < cur_g:
+                        raise ValueError("plain Y entries are not sorted by graph")
+                    flush()
+                    cur_g, acc = g, {}
+                    seen = set()
+                if (b, i, j) in seen:
+                    raise ValueError(f"duplicate Y entry {g} {b} {i} {j}")
+                seen.add((b, i, j))
+                acc[b] = acc.get(b, 0) + int(v) * grams[b][0][i, j] * mult
+            else:
+                if (g, b, i, j) in seen_loc:
+                    raise ValueError(f"duplicate Y entry {g} {b} {i} {j}")
+                seen_loc.add((g, b, i, j))
+                ysum[g] += Fraction(v) * Fraction(int(grams[b][0][i, j]) * mult, dens[b] * grams[b][1])
+        flush()
+        if fh.readline().strip() != "end":
+            raise ValueError("missing end marker")
+
+    slacks = []
+    for g in range(m):
+        r = f[g] - ysum[g]
+        for (vec, alpha), y in zip(eqs, cert.y):
+            if y:
+                r -= Fraction(y) * (vec.get(g, Fraction(0)) - alpha)
+        for (vec, beta), u in zip(ineqs, cert.u):
+            if u:
+                r -= Fraction(u) * (beta - vec.get(g, Fraction(0)))
+        slacks.append(r)
+    bound = min(slacks)
+    return CheckResult(bound, slacks, [g for g, r in enumerate(slacks) if r == bound])

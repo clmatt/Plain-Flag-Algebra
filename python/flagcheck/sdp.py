@@ -256,13 +256,25 @@ class NumericSolution:
 
 def solve_csdp(sdp: FlagSDP, workdir: Optional[str] = None, params: Optional[dict] = None,
                normalize: bool = False) -> NumericSolution:
-    import numpy as np
-
     own = workdir is None
     workdir = workdir or tempfile.mkdtemp(prefix="flagsdp_")
     prob = os.path.join(workdir, "problem.dat-s")
-    sol = os.path.join(workdir, "problem.sol")
     layout = write_sdpa(sdp, prob, normalize)
+    try:
+        return run_csdp(prob, [len(flags) for _, flags in sdp.blocks], layout, workdir, params)
+    finally:
+        if own:
+            for name in os.listdir(workdir):
+                os.remove(os.path.join(workdir, name))
+            os.rmdir(workdir)
+
+
+def run_csdp(prob: str, block_sizes: List[int], layout: LPLayout, workdir: str,
+             params: Optional[dict] = None) -> NumericSolution:
+    """Run CSDP on an existing SDPA file (written by write_sdpa or by `flagsdp --sdpa`)."""
+    import numpy as np
+
+    sol = os.path.join(workdir, "problem.sol")
     if params:
         with open(os.path.join(workdir, "param.csdp"), "w") as fh:
             for k, v in params.items():
@@ -279,7 +291,7 @@ def solve_csdp(sdp: FlagSDP, workdir: Optional[str] = None, params: Optional[dic
         raise RuntimeError(f"CSDP produced no solution (exit {proc.returncode}):\n{log}")
     with open(sol) as fh:
         y = [float(x) for x in fh.readline().split()]
-        blocks = [np.zeros((len(flags), len(flags))) for _, flags in sdp.blocks]
+        blocks = [np.zeros((d, d)) for d in block_sizes]
         lp = [0.0] * layout.size
         for line in fh:
             parts = line.split()
@@ -293,8 +305,4 @@ def solve_csdp(sdp: FlagSDP, workdir: Optional[str] = None, params: Optional[dic
                 blocks[blk - 1][j, i] = v
             else:
                 lp[i] = v
-    if own:
-        for name in os.listdir(workdir):
-            os.remove(os.path.join(workdir, name))
-        os.rmdir(workdir)
     return NumericSolution(proc.returncode, pobj, dobj, blocks, lp, y, layout, log)

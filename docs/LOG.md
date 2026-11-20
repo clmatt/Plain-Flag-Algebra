@@ -113,3 +113,19 @@ overflow, and the loader/format. Fixes for the gaps it raised:
 Results so far (exact certificates): R(4,5) <= 29 on n = 7, in both the objective form
 (1/d = 28.0856) and the feasibility form (N = 31, 30, 29; margins 7.4e-7, 3.6e-7, 1.4e-7).
 N = 28 is not provable on n = 7 without extra constraints (margin -5e-9).
+
+## 2026-11-20: scaling to n = 8; n = 7 independently confirmed
+
+- Exact cross-check at research scale: C++ and the Python reference agree on every graph
+  (1360), flag list, Y entry and constraint vector for R(4,5), N = 29, n = 7 (23-minute
+  run). So the C++ is independently confirmed at the size the results come from.
+- Degree constraints at n = 7, N = 28 (localising PSD, localised equalities, both): none
+  proves N = 28 (margins -4e-9, -3e-8, -1.1e-8). So n = 7 is exhausted for N = 28 with
+  these families.
+- n = 8 probe for R(4,5): 10681 graphs, 287 type blocks, built in < 1 min with 126 MB peak.
+  Python cannot hold ~10^7 Y entries as Fractions in 3.5 GB, so:
+  * `flagsdp --sdpa F --normalize` writes the CSDP input directly. It is identical, entry
+    for entry, to Python's write_sdpa (tests/test_large_pipeline.py).
+  * `check_flagsdp_file` checks certificates by streaming the exact file. It gives slacks
+    identical to check_certificate on random certificates.
+  * `ramsey_run` now always uses this path.

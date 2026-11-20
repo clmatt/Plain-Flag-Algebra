@@ -142,27 +142,40 @@ def save_result(path, params, sol, cert, res, timings):
         json.dump(data, fh)
 
 
-def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, empty_type=False):
-    from .cppbackend import build_cpp_sdp
-    from .sdp import solve_csdp
+def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, empty_type=False, workdir=None):
+    """Large-problem path: C++ writes both the exact problem and the CSDP input; the
+    certificate is checked by streaming the exact problem file (tests/test_large_pipeline.py
+    shows both steps agree with the in-memory path)."""
+    import shutil
+    import tempfile
+
+    from .certificate import check_flagsdp_file
+    from .cppbackend import read_shape, run_flagsdp
+    from .sdp import LPLayout, run_csdp
 
     t = {}
+    own = workdir is None
+    workdir = workdir or tempfile.mkdtemp(prefix="ramsey_")
     t0 = time.time()
     problem = build_problem(k, l, N, n, degrees, empty_type)
-    sdp = build_cpp_sdp(problem, threads=threads)
+    out, dat = run_flagsdp(problem, workdir, threads=threads, sdpa=True, normalize=True)
+    m, sizes, neq, nle = read_shape(out)
     t["build"] = time.time() - t0
     t0 = time.time()
-    sol = solve_csdp(sdp, normalize=True)
+    sol = run_csdp(dat, sizes, LPLayout(m, neq, nle, True), workdir)
     t["solve"] = time.time() - t0
     t0 = time.time()
     cert = round_solution(sol, bits=bits)
-    res = check_certificate(sdp, cert)
+    res = check_flagsdp_file(out, cert)
     t["check"] = time.time() - t0
+    shape = type("Shape", (), {"graphs": range(m), "blocks": sizes})()
+    if own:
+        shutil.rmtree(workdir, ignore_errors=True)
     params = {"k": k, "l": l, "N": N, "n": n, "degrees": degrees, "empty_type": empty_type,
               "window": degree_window(k, l, N)}
     if results_dir:
         save_result(os.path.join(results_dir, f"{problem.name}.json"), params, sol, cert, res, t)
-    return sdp, sol, res, t
+    return shape, sol, res, t
 
 
 def main():

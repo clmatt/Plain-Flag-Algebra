@@ -92,6 +92,53 @@ def load(path: str) -> FlagSDP:
                    block_kinds=kinds)
 
 
+def run_flagsdp(problem, workdir: str, threads: Optional[int] = None, sdpa: bool = False,
+                normalize: bool = False):
+    """Run flagsdp; return (flagsdp output path, SDPA path or None). Nothing is loaded."""
+    spec = os.path.join(workdir, "problem.spec")
+    out = os.path.join(workdir, "problem.flagsdp")
+    dat = os.path.join(workdir, "problem.dat-s") if sdpa else None
+    write_spec(problem, spec)
+    cmd = [FLAGSDP, spec, out] + (["--threads", str(threads)] if threads else [])
+    if sdpa:
+        cmd += ["--sdpa", dat] + (["--normalize"] if normalize else [])
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"flagsdp failed:\n{proc.stderr[-3000:]}")
+    return out, dat
+
+
+def read_shape(path: str):
+    """(number of graphs, block sizes, number of eq / le constraints) without loading Y."""
+    with open(path) as fh:
+        it = iter(fh)
+        assert next(it).split() == ["FLAGSDP", "1"]
+        next(it), next(it)
+        m = int(next(it).split()[1])
+        for _ in range(m):
+            next(it)
+        sizes = []
+        for _ in range(int(next(it).split()[1])):
+            parts = next(it).split()
+            sizes.append(int(parts[3]))
+            for _ in range(sizes[-1]):
+                next(it)
+        parts = next(it).split()
+        for _ in range(int(parts[1])):
+            next(it)
+        neq = nle = 0
+        parts = next(it).split()
+        while parts[0] == "constraint":
+            if parts[1] == "eq":
+                neq += 1
+            else:
+                nle += 1
+            for _ in range(int(parts[3])):
+                next(it)
+            parts = next(it).split()
+    return m, sizes, neq, nle
+
+
 def build_cpp_sdp(problem, workdir: Optional[str] = None, threads: Optional[int] = None) -> FlagSDP:
     own = workdir is None
     workdir = workdir or tempfile.mkdtemp(prefix="flagsdp_cpp_")
