@@ -1,10 +1,15 @@
-
 *.txt
+!python/**/*.txt
+!cpp/**/*.txt
+!CMakeLists.txt
 nauty27r2
 *.out
 *.g6
 mosek
-Ramsey
+mosek.lic
 *.bas
 *.cbf
 *.sol
+*.dat-s
+build/
+__pycache__/
