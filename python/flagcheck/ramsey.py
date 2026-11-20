@@ -129,5 +129,35 @@ def degree_polynomial(allowed: Sequence[int], N: int, zeros, extra_factors: Sequ
     return average(expr)
 
 
+def rooted_degree_polynomial(allowed: Sequence[int], N: int, zeros) -> Combo:
+    """prod_{d in allowed} (R - d/N) as a 1-flag combination, before averaging. It is 0 at
+    every root whose red degree lies in `allowed`."""
+    expr = one_flag()
+    for d in allowed:
+        factor = add(combo((red_flag(), 1)), one_flag(), Fraction(-d, N))
+        expr = multiply(expr, factor, NUM_COLORS, tuple(zeros))
+    return expr
+
+
+def localized_degree_constraints(allowed: Sequence[int], N: int, zeros, n: int):
+    """[[ P(R) * F ]] = 0 for every admissible 1-flag F that fits in n vertices, where
+    P(R) = prod_{d in allowed} (R - d/N).
+
+    Valid because P(R) vanishes at every root of a real graph whose degrees lie in
+    `allowed`, so P(R)*F vanishes pointwise too. F = the identity flag gives the plain
+    averaged constraint `degree_polynomial`."""
+    from .graphs import generate_flags
+
+    zeros = tuple(zeros)
+    P = rooted_degree_polynomial(allowed, N, zeros)
+    out = []
+    for m in range(1, n - len(allowed) + 1):
+        for F in generate_flags(ROOT, m, NUM_COLORS, zeros):
+            expr = average(multiply(P, combo((F, 1)), NUM_COLORS, zeros))
+            if expr:
+                out.append((expr, Fraction(0)))
+    return out
+
+
 def lift_to(expr: Combo, n: int, zeros) -> Combo:
     return lift(expr, n, NUM_COLORS, zeros)

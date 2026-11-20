@@ -113,3 +113,18 @@ def test_unbalanced_blowups_have_green_density_at_least_one_over_N():
     skewed = StepGraphon.blowup(G, [Fraction(1, 10)] * 4 + [Fraction(6, 10)]).evaluate(expr)
     assert balanced == Fraction(1, 5)
     assert skewed > Fraction(1, 5)
+
+
+def test_localized_degree_constraints_are_sound_and_nontrivial():
+    """[[P(R) F]] = 0 for every rooted F: must vanish on Paley(17) (8-regular) and must
+    detect a wrong degree set."""
+    from flagcheck.ramsey import localized_degree_constraints, paley
+
+    G = paley(17)
+    W = StepGraphon.blowup(G)
+    zeros = ramsey_zeros(4, 4)
+    good = localized_degree_constraints([8], 17, zeros, 4)
+    assert len(good) > 1
+    assert all(W.evaluate(e) == 0 for e, _ in good)
+    bad = localized_degree_constraints([7], 17, zeros, 4)
+    assert any(W.evaluate(e) != 0 for e, _ in bad)
