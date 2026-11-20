@@ -36,10 +36,16 @@ def _flag(tokens) -> Flag:
     return Flag(k, s, cols)
 
 
-def load(path: str) -> FlagSDP:
+def load(path: str, keep_graphs=None) -> FlagSDP:
+    """Load a flagsdp output file. With keep_graphs (a set of graph indices), Y entries of
+    all other graphs are skipped (their Y dicts stay empty), so large files can be
+    inspected partially."""
     with open(path) as fh:
-        it = iter(fh.read().splitlines())
+        it = (line.rstrip("\n") for line in fh)
+        return _load(it, keep_graphs)
 
+
+def _load(it, keep_graphs) -> FlagSDP:
     def expect(word):
         parts = next(it).split()
         if parts[0] != word:
@@ -81,6 +87,8 @@ def load(path: str) -> FlagSDP:
     for _ in range(int(line[1])):
         g, b, i, j, c = next(it).split()
         g, b, i, j = int(g), int(b), int(i), int(j)
+        if keep_graphs is not None and g not in keep_graphs:
+            continue
         if not (0 <= i <= j < len(blocks[b][1])) or not (0 <= g < len(graphs)):
             raise ValueError(f"bad Y entry {g} {b} {i} {j}")
         if (i, j) in Y[g][b]:

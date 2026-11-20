@@ -70,9 +70,9 @@ def check_structure(sdp, problem) -> None:
             seen_types.add(t)
 
 
-def spot_check(sdp, problem, k: int, seed: int = 0) -> int:
-    rng = random.Random(seed)
-    sample = rng.sample(range(len(sdp.graphs)), min(k, len(sdp.graphs)))
+def spot_check(sdp, problem, sample) -> int:
+    """Recompute, for the graphs in `sample`, every plain Y matrix, every objective and
+    constraint coefficient and every localising entry from definitions."""
     kinds = sdp.block_kinds or ["plain"] * len(sdp.blocks)
     colors, zeros = problem.colors, tuple(problem.zeros)
     # Objective and constraint expressions, evaluated once by the reference.
@@ -124,6 +124,14 @@ def main(argv=None):
     ap.add_argument("--reference", action="store_true", help="rebuild everything with the Python reference")
     ap.add_argument("--spot-check", type=int, default=25)
     a = ap.parse_args(argv)
+    try:
+        return _verify(a)
+    except (ValueError, AssertionError) as ex:
+        print(f"VERIFICATION FAILED: {ex}")
+        return 1
+
+
+def _verify(a):
     with open(a.result) as fh:
         data = json.load(fh)
     p = data["params"]
@@ -133,19 +141,31 @@ def main(argv=None):
 
         sdp = build_from_problem(problem)
         print("rebuilt entirely with the Python reference")
+        res = check_certificate(sdp, load_certificate(data))
     else:
-        from .cppbackend import binary_fingerprint, build_cpp_sdp
+        import shutil
+        import tempfile
+
+        from .certificate import check_flagsdp_file
+        from .cppbackend import binary_fingerprint, load, read_shape, run_flagsdp
 
         fp = binary_fingerprint()
         if data.get("flagsdp_sha256") and data["flagsdp_sha256"] != fp:
             print("note: current flagsdp binary differs from the one that produced the result")
-        sdp = build_cpp_sdp(problem)
-        check_structure(sdp, problem)
-        print(f"graph list ({len(sdp.graphs)}) and all {len(sdp.blocks)} flag lists match the reference")
-        if a.spot_check:
-            print(f"spot-checked {spot_check(sdp, problem, a.spot_check)} graphs (Y, constraints, localising "
-                  f"blocks) against the reference: OK")
-    res = check_certificate(sdp, load_certificate(data))
+        workdir = tempfile.mkdtemp(prefix="verify_")
+        try:
+            out, _ = run_flagsdp(problem, workdir)
+            m = read_shape(out)[0]
+            sample = random.Random(0).sample(range(m), min(a.spot_check, m))
+            sdp = load(out, keep_graphs=set(sample))  # header + Y of the sampled graphs only
+            check_structure(sdp, problem)
+            print(f"graph list ({len(sdp.graphs)}) and all {len(sdp.blocks)} flag lists match the reference")
+            if sample:
+                print(f"spot-checked {spot_check(sdp, problem, sample)} graphs (Y, constraints, localising "
+                      f"blocks) against the reference: OK")
+            res = check_flagsdp_file(out, load_certificate(data))
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
     stored = Fraction(data["proven_bound"])
     ok = res.bound == stored
     print(f"R({p['k']},{p['l']}) <= {p['N']} (n={p['n']}, degrees={p['degrees']}): proven bound {res.bound} "
