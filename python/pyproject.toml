@@ -1,0 +1,9 @@
+[project]
+name = "flagcheck"
+version = "0.1.0"
+description = "Independent reference implementation and exact certificate verifier for plain flag algebra computations"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
