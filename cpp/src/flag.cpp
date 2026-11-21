@@ -7,6 +7,8 @@
 
 extern "C" {
 #include <nauty.h>
+
+#include <cmath>
 }
 
 namespace flagalg {
@@ -128,8 +130,9 @@ Flag canonicalBrute(const Flag& f) {
     return best;
 }
 
-Flag canonicalNauty(const Flag& f, int numColors) {
+Flag canonicalNauty(const Flag& f, int numColors, double* groupSize) {
     const int k = f.k, s = f.s;
+    if (groupSize) *groupSize = 1;
     if (k <= 1) return f;
     int layers = 1;
     while ((1 << layers) < numColors) ++layers;
@@ -167,6 +170,9 @@ Flag canonicalNauty(const Flag& f, int numColors) {
     options.defaultptn = FALSE;
     statsblk stats;
     densenauty(g.data(), lab.data(), ptn.data(), orbits.data(), &options, &stats, m, nv, cg.data());
+    // Layers are separate cells joined only by the vertical edges, so the group of the
+    // layered graph is the colour-preserving automorphism group of f (roots fixed).
+    if (groupSize) *groupSize = stats.grpsize1 * std::pow(10.0, stats.grpsize2);
     // Positions 0..k-1 hold the layer-0 vertices (roots first, in order).
     std::array<int, kMaxVertices> order{};
     for (int p = 0; p < k; ++p) {
@@ -176,6 +182,24 @@ Flag canonicalNauty(const Flag& f, int numColors) {
     for (int r = 0; r < s; ++r)
         if (order[r] != r) throw std::logic_error("canonicalNauty: roots moved");
     return restrict(f, order.data(), k, s);
+}
+
+std::uint64_t automorphismCount(const Flag& f, int numColors) {
+    double size = 1;
+    canonicalNauty(f, numColors, &size);
+    if (!(size >= 1 && size < 9.0e15)) throw std::logic_error("automorphismCount: group size out of range");
+    return static_cast<std::uint64_t>(std::llround(size));
+}
+
+std::uint64_t automorphismCountBrute(const Flag& f) {
+    const int k = f.k, s = f.s;
+    std::array<int, kMaxVertices> perm{};
+    std::iota(perm.begin(), perm.begin() + k, 0);
+    std::uint64_t count = 0;
+    do {
+        if (restrict(f, perm.data(), k, s).cols == f.cols) ++count;
+    } while (std::next_permutation(perm.begin() + s, perm.begin() + k));
+    return count;
 }
 
 Flag canonical(const Flag& f, int numColors) {

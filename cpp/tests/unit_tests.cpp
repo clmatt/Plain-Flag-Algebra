@@ -129,7 +129,22 @@ static void testIndexedLift() {
     }
 }
 
+// nauty's group size must equal the brute-force automorphism count, rooted or not, and
+// for flags with many symmetries (monochromatic, two colour classes) as well as random.
+static void testAutomorphismCount() {
+    std::mt19937 rng(11);
+    for (int k = 1; k <= 7; ++k)
+        for (int s = 0; s <= std::min(k, 2); ++s)
+            for (int c : {2, 3})
+                for (int t = 0; t < 60; ++t) {
+                    Flag f = randomFlag(rng, k, s, t < 10 ? 1 : (t < 20 ? 2 : c));
+                    CHECK(automorphismCount(f, c) == automorphismCountBrute(f));
+                }
+    CHECK(automorphismCount(makeFlag(5, 0, std::vector<int>(10, 1)), 3) == 120);
+}
+
 int main() {
+    testAutomorphismCount();
     testNextSubsetAndBinom();
     testCanonicalAgreement();
     testCounts();

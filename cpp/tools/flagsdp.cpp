@@ -96,8 +96,97 @@ int main(int argc, char** argv) {
         for (int i = 0; i < static_cast<int>(graphs.size()); ++i) gi.emplace(graphs[i], i);
         std::cerr << "graphs on " << n << " vertices: " << graphs.size() << " (" << seconds(t0) << "s)\n";
 
+        // Clone elimination (python/flagcheck/blowup.py): y_G = sum_Q M[G][Q] z_Q over the
+        // green-free graphs Q, with D M integral for D = N^n n!:
+        //   D M[G][Q] = n!/aut(G) (N)_r aut(Q_r) (n-r)! c(Q_r, Q),
+        // c(Q_r, Q) = number of r-subsets of Q inducing the quotient Q_r of G.
+        const bool reduced = spec.blowup > 0;
+        std::vector<Flag> reducedGraphs;
+        std::vector<int> toReduced(graphs.size(), -1);
+        std::vector<std::vector<std::pair<int, mpz_class>>> rowsM(reduced ? graphs.size() : 0), colsM;
+        mpz_class D = 1;
+        if (reduced) {
+            const int N = spec.blowup;
+            if (spec.colors != 3) throw std::invalid_argument("blowup needs 3 colours (0 = clone)");
+            for (std::size_t g = 0; g < graphs.size(); ++g) {
+                bool free = true;
+                for (int i = 0; i < n && free; ++i)
+                    for (int j = i + 1; j < n; ++j)
+                        if (graphs[g].color(i, j) == 0) {
+                            free = false;
+                            break;
+                        }
+                if (free) {
+                    toReduced[g] = static_cast<int>(reducedGraphs.size());
+                    reducedGraphs.push_back(graphs[g]);
+                }
+            }
+            mpz_class nFact = 1;
+            for (int i = 2; i <= n; ++i) nFact *= i;
+            mpz_pow_ui(D.get_mpz_t(), mpz_class(N).get_mpz_t(), n);
+            D *= nFact;
+            for (std::size_t g = 0; g < graphs.size(); ++g) {
+                const Flag& G = graphs[g];
+                std::vector<int> classOf(n, -1), reps;
+                for (int v = 0; v < n; ++v) {
+                    if (classOf[v] >= 0) continue;
+                    classOf[v] = static_cast<int>(reps.size());
+                    for (int u = v + 1; u < n; ++u)
+                        if (G.color(u, v) == 0) classOf[u] = classOf[v];
+                    reps.push_back(v);
+                }
+                for (int u = 0; u < n; ++u)       // blow-up structure: green classes, uniform colours
+                    for (int w = u + 1; w < n; ++w) {
+                        const bool same = classOf[u] == classOf[w];
+                        if (same != (G.color(u, w) == 0) ||
+                            (!same && G.color(u, w) != G.color(reps[classOf[u]], reps[classOf[w]])))
+                            throw std::logic_error("blowup: graph is not a blow-up");
+                    }
+                const int r = static_cast<int>(reps.size());
+                const Flag Qr = T.canon(restrict(G, reps, 0));
+                mpz_class A = nFact;
+                const unsigned long autG = static_cast<unsigned long>(automorphismCount(G, 3));
+                if (A % autG != 0) throw std::logic_error("blowup: aut(G) does not divide n factorial");
+                A /= autG;
+                for (int i = 0; i < r; ++i) A *= (N - i);
+                A *= static_cast<unsigned long>(automorphismCount(Qr, 3));
+                for (int i = 2; i <= n - r; ++i) A *= i;
+                const long subsets = static_cast<long>(binom(n, r));
+                for (const auto& [H, d] : T.lift(Combo{{Qr, 1}}, n)) {
+                    auto it = gi.find(H);
+                    if (it == gi.end()) throw std::logic_error("blowup: lifted graph not in the list");
+                    if (toReduced[it->second] < 0) continue;
+                    mpq_class cnt = d * subsets;
+                    cnt.canonicalize();
+                    if (cnt.get_den() != 1) throw std::logic_error("blowup: non-integral subgraph count");
+                    rowsM[g].emplace_back(toReduced[it->second], A * cnt.get_num());
+                }
+            }
+            colsM.resize(reducedGraphs.size());
+            for (std::size_t g = 0; g < graphs.size(); ++g)
+                for (const auto& [q, c] : rowsM[g]) colsM[q].emplace_back(static_cast<int>(g), c);
+            std::cerr << "blowup N=" << N << ": " << reducedGraphs.size() << " green-free graphs (" << seconds(t0)
+                      << "s)\n";
+        }
+        // c . y = (c M) . z, with M = (D M) / D
+        auto reduceVec = [&](const std::vector<std::pair<int, mpq_class>>& vec) {
+            std::map<int, mpq_class> acc;
+            for (const auto& [g, v] : vec)
+                for (const auto& [q, c] : rowsM[g]) acc[q] += v * c;
+            std::vector<std::pair<int, mpq_class>> res;
+            for (auto& [q, v] : acc)
+                if (v != 0) {
+                    mpq_class x = v / D;
+                    x.canonicalize();
+                    res.emplace_back(q, x);
+                }
+            return res;
+        };
+        const auto& outGraphs = reduced ? reducedGraphs : graphs;
+
         std::vector<std::pair<int, mpq_class>> objective;
         if (spec.objective) objective = toVector(T, evaluate(T, *spec.objective), n, gi, "objective");
+        if (reduced) objective = reduceVec(objective);
 
         auto blocks = makeBlocks(T, n, spec.emptyType);
         std::cerr << "blocks: " << blocks.size() << " (" << seconds(t0) << "s)\n";
@@ -138,18 +227,34 @@ int main(int argc, char** argv) {
                     }
                 }
             }
+            if (reduced) {
+                std::map<std::tuple<int, int, int>, mpq_class> red;
+                for (const auto& [key, v] : B.entries)
+                    for (const auto& [q, c] : rowsM[std::get<0>(key)])
+                        red[{q, std::get<1>(key), std::get<2>(key)}] += v * c;
+                B.entries.clear();
+                for (auto& [key, v] : red)
+                    if (v != 0) {
+                        mpq_class x = v / D;
+                        x.canonicalize();
+                        B.entries[key] = x;
+                    }
+            }
             std::cerr << "localising block: " << B.flags.size() << " flags (" << seconds(t0) << "s)\n";
             locBlocks.push_back(std::move(B));
         }
 
         std::ofstream out(argv[2]);
         out << "FLAGSDP 1\nn " << n << "\ncolors " << spec.colors << "\n";
-        out << "graphs " << graphs.size() << "\n";
-        for (const auto& g : graphs) out << g.str() << "\n";
+        out << "graphs " << outGraphs.size() << "\n";
+        for (const auto& g : outGraphs) out << g.str() << "\n";
         out << "blocks " << blocks.size() + locBlocks.size() << "\n";
         for (std::size_t b = 0; b < blocks.size(); ++b) {
             const auto& B = blocks[b];
-            out << "block " << b << " " << B.m << " " << B.flags.size() << " " << B.denominator << " plain "
+            out << "block " << b << " " << B.m << " " << B.flags.size() << " "
+                << (reduced ? mpz_class(mpz_class(static_cast<unsigned long>(B.denominator)) * D).get_str()
+                            : std::to_string(B.denominator))
+                << " plain "
                 << B.sigma.str() << "\n";
             for (const auto& f : B.flags) out << f.str() << "\n";
         }
@@ -166,7 +271,7 @@ int main(int argc, char** argv) {
         // entries; the order of entry lines differs, which the SDPA format allows):
         // LP block = lambda_G (m), d+, d-, (y+_j, y-_j) per equality, u_i per inequality, [nu].
         std::ofstream sdpa;
-        const std::size_t m = graphs.size();
+        const std::size_t m = outGraphs.size();
         std::size_t numEq = 0, numLe = 0;
         for (const auto& C : spec.constraints) ++(C.kind == Constraint::Eq ? numEq : numLe);
         const std::size_t lpSize = m + 2 + 2 * numEq + numLe + (normalize ? 1 : 0);
@@ -201,7 +306,8 @@ int main(int argc, char** argv) {
         for (std::size_t c = 0; c < spec.constraints.size(); ++c) {
             const auto& C = spec.constraints[c];
             const bool eq = C.kind == Constraint::Eq;
-            const auto vec = toVector(T, evaluate(T, *C.expr), n, gi, "constraint");
+            auto vec = toVector(T, evaluate(T, *C.expr), n, gi, "constraint");
+            if (reduced) vec = reduceVec(vec);
             out << "constraint " << (eq ? "eq" : "le") << " " << C.rhs.get_str() << " " << vec.size() << "\n";
             for (auto& [g, v] : vec) out << g << " " << v.get_str() << "\n";
             if (sdpa.is_open()) {
@@ -248,6 +354,7 @@ int main(int argc, char** argv) {
         if (!yBody) throw std::runtime_error("cannot write " + yPath);
         std::size_t numEntries = 0;
         const std::size_t chunk = 256;
+        std::vector<std::vector<YEntry>> allY(reduced ? graphs.size() : 0);   // reduced: kept for the sums
         for (std::size_t start = 0; start < graphs.size(); start += chunk) {
             const std::size_t end = std::min(graphs.size(), start + chunk);
             std::vector<std::vector<YEntry>> results(end - start);
@@ -262,6 +369,10 @@ int main(int argc, char** argv) {
                 }
             }
             if (!error.empty()) throw std::runtime_error(error);
+            if (reduced) {
+                for (std::size_t g = start; g < end; ++g) allY[g] = std::move(results[g - start]);
+                continue;
+            }
             for (std::size_t g = start; g < end; ++g)
                 for (const auto& e : results[g - start]) {
                     yBody << g << " " << e.block << " " << e.i << " " << e.j << " " << e.count << "\n";
@@ -271,6 +382,40 @@ int main(int argc, char** argv) {
                              << static_cast<double>(e.count) / static_cast<double>(blocks[e.block].denominator) << "\n";
                 }
             std::cerr << "Y: " << end << "/" << graphs.size() << " graphs (" << seconds(t0) << "s)\n";
+        }
+        if (reduced) {
+            // count'_Q(b, i, j) = sum_G (D M[G][Q]) count_G(b, i, j), over the block denominator
+            // den_b D: still integer counts, so the file format and the checker are unchanged.
+            std::vector<mpz_class> blockDen(blocks.size());
+            for (std::size_t b = 0; b < blocks.size(); ++b)
+                blockDen[b] = mpz_class(static_cast<unsigned long>(blocks[b].denominator)) * D;
+            for (std::size_t start = 0; start < reducedGraphs.size(); start += chunk) {
+                const std::size_t end = std::min(reducedGraphs.size(), start + chunk);
+                std::vector<std::vector<std::pair<std::uint64_t, mpz_class>>> sums(end - start);
+#pragma omp parallel for schedule(dynamic, 1)
+                for (std::size_t q = start; q < end; ++q) {
+                    std::unordered_map<std::uint64_t, mpz_class> acc;
+                    for (const auto& [g, c] : colsM[q])
+                        for (const auto& e : allY[g]) {
+                            const std::uint64_t key = (static_cast<std::uint64_t>(e.block) << 40) |
+                                                      (static_cast<std::uint64_t>(e.i) << 20) | e.j;
+                            mpz_addmul_ui(acc[key].get_mpz_t(), c.get_mpz_t(), static_cast<unsigned long>(e.count));
+                        }
+                    auto& v = sums[q - start];
+                    v.assign(acc.begin(), acc.end());
+                    std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+                }
+                for (std::size_t q = start; q < end; ++q)
+                    for (const auto& [key, cnt] : sums[q - start]) {
+                        const std::uint64_t b = key >> 40, i = (key >> 20) & 0xFFFFF, j = key & 0xFFFFF;
+                        yBody << q << " " << b << " " << i << " " << j << " " << cnt.get_str() << "\n";
+                        ++numEntries;
+                        if (sdpa.is_open())
+                            sdpa << q + 1 << " " << b + 1 << " " << i + 1 << " " << j + 1 << " "
+                                 << mpq_class(cnt, blockDen[b]).get_d() << "\n";
+                    }
+                std::cerr << "reduced Y: " << end << "/" << reducedGraphs.size() << " (" << seconds(t0) << "s)\n";
+            }
         }
         for (std::size_t b = 0; b < locBlocks.size(); ++b)
             for (const auto& [key, v] : locBlocks[b].entries) {

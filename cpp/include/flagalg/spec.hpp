@@ -9,6 +9,8 @@
 //   eq <rational> <expr>           (expr = rational)
 //   le <rational> <expr>           (expr <= rational)
 //   psd <m> <expr>                 (localising block, see Spec::Localizing)
+//   blowup <N>                     (eliminate the clone variables of an N-vertex blow-up,
+//                                   colour 0 = clone; see python/flagcheck/blowup.py)
 // Expressions (S-expressions):
 //   (flag k s c0 c1 ...)           flag literal, colours in lexicographic pair order
 //   (add e1 e2 ...)  (scale q e)  (mul e1 e2 ...)  (avg e)
@@ -42,6 +44,7 @@ struct Spec {
     int colors = 2;
     int n = 0;
     bool emptyType = false;
+    int blowup = 0;                   // > 0: write the reduced problem over green-free graphs
     std::vector<Flag> zeros;
     std::shared_ptr<Expr> objective;  // may be null (objective 0)
     std::vector<Constraint> constraints;

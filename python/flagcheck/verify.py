@@ -14,6 +14,9 @@ Only the problem parameters and the certificate are read from the file. Then:
    * for K random graphs (--spot-check, default 25): every plain-block Y matrix, every
      objective/constraint coefficient and every localising-block entry is recomputed from
      definitions and compared exactly.
+   For a clone-eliminated result (params "blowup"), the graph list must be the green-free
+   admissible graphs, and each sampled entry for Q is recomputed as sum_G M[G][Q] times the
+   value at G, with the column M[.][Q] counted directly (flagcheck.blowup.column).
 3. The certificate is re-checked in exact arithmetic, and the proven bound must equal
    the stored one and be positive.
 """
@@ -40,6 +43,10 @@ def load_certificate(data) -> Certificate:
 def check_structure(sdp, problem) -> None:
     """Graph list and plain flag lists against the independent reference."""
     ref_graphs = set(generate(problem.n, problem.colors, problem.zeros))
+    if problem.blowup:
+        from .blowup import is_green_free
+
+        ref_graphs = {G for G in ref_graphs if is_green_free(G)}
     cpp_graphs = [canonical(G) for G in sdp.graphs]
     if len(set(cpp_graphs)) != len(cpp_graphs):
         raise AssertionError("duplicate graphs in the C++ list")
@@ -80,27 +87,50 @@ def spot_check(sdp, problem, sample) -> int:
     loc_blocks = [b for b, kind in enumerate(kinds) if kind == "localizing"]
     if len(loc_specs) != len(loc_blocks):
         raise AssertionError("number of localising blocks differs from the problem")
-    for g in sample:
-        G = sdp.graphs[g]
+    def values(G):
+        """Reference values at the graph G: plain Y dicts, vector coefficients, localising dicts."""
         ev = GraphEvaluator(G)
+        Ys = {}
         for b, (sigma, flags) in enumerate(sdp.blocks):
-            if kinds[b] != "plain":
-                continue
-            full = Y_matrix(G, sigma, flags)
-            expected = {(i, j): full[i][j] for i in range(len(flags)) for j in range(i, len(flags)) if full[i][j]}
-            if sdp.Y[g][b] != expected:
-                raise AssertionError(f"Y mismatch for graph {g}, block {b}")
-        for j, (e, vec) in enumerate(zip(exprs, vectors)):
-            want = ev.value(e) if e else Fraction(0)
-            if want != vec[g]:
-                raise AssertionError(f"objective/constraint {j - 1} coefficient mismatch for graph {g}")
+            if kinds[b] == "plain":
+                full = Y_matrix(G, sigma, flags)
+                Ys[b] = {(i, j): full[i][j] for i in range(len(flags)) for j in range(i, len(flags)) if full[i][j]}
+        coeffs = [ev.value(e) if e else Fraction(0) for e in exprs]
         for (m, gexpr), b in zip(loc_specs, loc_blocks):
             flags = sdp.blocks[b][1]
+            Ys[b] = {}
             for i in range(len(flags)):
                 for j in range(i, len(flags)):
-                    want = ev.value(Avg(Mul((gexpr, Lit(flags[i]), Lit(flags[j])))))
-                    if sdp.Y[g][b].get((i, j), Fraction(0)) != want:
-                        raise AssertionError(f"localising entry mismatch: graph {g}, block {b}, ({i},{j})")
+                    v = ev.value(Avg(Mul((gexpr, Lit(flags[i]), Lit(flags[j])))))
+                    if v:
+                        Ys[b][(i, j)] = v
+        return Ys, coeffs
+
+    if problem.blowup:
+        from .blowup import column
+
+        all_graphs = list(generate(problem.n, problem.colors, problem.zeros))
+        cache = {}
+    for g in sample:
+        if problem.blowup:      # values at Q = sum_G M[G][Q] * values at G
+            Ys, coeffs = {b: {} for b in range(len(sdp.blocks))}, [Fraction(0)] * len(exprs)
+            for h, m in column(canonical(sdp.graphs[g]), all_graphs, problem.blowup).items():
+                if h not in cache:
+                    cache[h] = values(all_graphs[h])
+                hY, hc = cache[h]
+                for b, d in hY.items():
+                    for key, v in d.items():
+                        Ys[b][key] = Ys[b].get(key, Fraction(0)) + m * v
+                coeffs = [c + m * v for c, v in zip(coeffs, hc)]
+            Ys = {b: {k: v for k, v in d.items() if v} for b, d in Ys.items()}
+        else:
+            Ys, coeffs = values(sdp.graphs[g])
+        for b in range(len(sdp.blocks)):
+            if sdp.Y[g][b] != Ys.get(b, {}):
+                raise AssertionError(f"Y mismatch for graph {g}, block {b} ({kinds[b]})")
+        for j, (want, vec) in enumerate(zip(coeffs, vectors)):
+            if want != vec[g]:
+                raise AssertionError(f"objective/constraint {j - 1} coefficient mismatch for graph {g}")
     return len(sample)
 
 
@@ -122,7 +152,7 @@ def _verify(a):
         data = json.load(fh)
     p = data["params"]
     problem = build_problem(p["k"], p["l"], p["N"], p["n"], p["degrees"], p.get("empty_type", False),
-                            p.get("extras", ()), p.get("loc_size"))
+                            p.get("extras", ()), p.get("loc_size"), p.get("blowup", False))
     if problem.assumptions:
         print("hypotheses (published / computed Ramsey data, see ramsey_run.py and edge_tables.py):")
         for a_ in problem.assumptions:
@@ -131,6 +161,10 @@ def _verify(a):
         from .sdp import build_from_problem
 
         sdp = build_from_problem(problem)
+        if problem.blowup:
+            from .blowup import reduce_sdp
+
+            sdp = reduce_sdp(sdp, problem.blowup, problem.zeros)
         print("rebuilt entirely with the Python reference")
         res = check_certificate(sdp, load_certificate(data))
     else:

@@ -107,5 +107,7 @@ def write_spec(problem, path: str) -> None:
         lines.append(f"le {_rat(rhs)} {sexpr(e)}")
     for m, g in getattr(problem, "localizing", ()):
         lines.append(f"psd {m} {sexpr(g)}")
+    if getattr(problem, "blowup", 0):
+        lines.append(f"blowup {problem.blowup}")
     with open(path, "w") as fh:
         fh.write("\n".join(lines) + "\n")

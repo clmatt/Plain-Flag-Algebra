@@ -65,6 +65,9 @@ Flag extend(const Flag& f, const std::uint8_t* colors);
 constexpr int kBruteForceNonRoots = 4;
 Flag canonical(const Flag& f, int numColors);
 Flag canonicalBrute(const Flag& f);
-Flag canonicalNauty(const Flag& f, int numColors);
+Flag canonicalNauty(const Flag& f, int numColors, double* groupSize = nullptr);
+// Number of automorphisms (permutations fixing every root and every colour); nauty.
+std::uint64_t automorphismCount(const Flag& f, int numColors);
+std::uint64_t automorphismCountBrute(const Flag& f);   // for tests
 
 }  // namespace flagalg

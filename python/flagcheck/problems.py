@@ -36,6 +36,9 @@ class Problem:
     localizing: List[Tuple[int, object]] = field(default_factory=list)
     # Facts from outside flag algebra that the constraints rely on (printed by verify).
     assumptions: List[str] = field(default_factory=list)
+    # N > 0: eliminate the clone variables of an N-vertex blow-up (flagcheck.blowup); the
+    # SDP is then over the green-free graphs only.
+    blowup: int = 0
 
 
 K3 = from_edges(3, [(0, 1, 1), (0, 2, 1), (1, 2, 1)])

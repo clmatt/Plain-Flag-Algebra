@@ -105,6 +105,9 @@ Spec parseSpec(const std::string& text) {
                 spec.colors = std::stoi(rest);
             } else if (key == "n") {
                 spec.n = std::stoi(rest);
+            } else if (key == "blowup") {
+                spec.blowup = std::stoi(rest);
+                if (spec.blowup < 1) throw std::invalid_argument("blowup N must be positive");
             } else if (key == "empty_type") {
                 spec.emptyType = std::stoi(rest) != 0;
             } else if (key == "zero") {
