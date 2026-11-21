@@ -301,3 +301,16 @@ Probe, R(4,6) N = 40, n = 8, local + green,codeg,edges, loc_size 6 (under ulimit
 11667 graphs, 293 blocks, 961 eq + 2096 le constraints, 18.8M LP entries, peak RSS 166 MB,
 38 min (almost all of it lifting constraints to 8 vertices). Files: 1.4 GB.
 The solve was started 2026-11-21 08:17 (~/jobs/night_n8.log, CSDP log in ~/runs/night_n8).
+
+## 2026-11-21: n = 8 solve timing; indexed lift
+
+R(4,6) N = 40, n = 8, local + green,codeg,edges (m = 11667): CSDP started 08:56, iterations
+0-2 done by 09:37, iteration 3 not reached by 09:57, so 20+ min per iteration (10-20 h for
+a full solve). WSL memory during the solve: ~2.25 GB. The memory guard stopped it at 09:57
+when a comparison test (running the old, dense-table flagsdp) was started next to it;
+the solve itself was not the cause.
+
+Indexed unrooted lift (theory.cpp): p(F, H) read from an index of all k-subsets of the
+n-vertex graphs instead of scanning every n-vertex graph per F. Byte-identical flagsdp
+output on 9 problems; unit test against density() (mutation-checked); 42 s -> 16 s for
+R(4,6) N = 40 n = 7.
