@@ -68,7 +68,22 @@ def red_minus(c: Fraction):
     return Add((Lit(red_flag()), Scale(-c, one_flag())))
 
 
-def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False) -> Problem:
+EXTRAS = ("green", "codeg", "edges", "lpsd")
+
+
+def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False,
+                  extras=(), loc_size=None) -> Problem:
+    """extras (see neighbourhoods.py):
+      green  every clone class has measure exactly 1/N, at 1- and 2-vertex roots;
+      codeg  common-neighbourhood bounds |S| <= R(k-a, l-b) - 1 at red and blue pairs;
+      edges  red edge counts inside red / blue neighbourhoods (edge_tables);
+      lpsd   also a localising PSD block for every codeg / edges multiplier.
+    Linear localised constraints use rooted flags F with |g| + |F| - s <= loc_size
+    (default n - 1)."""
+    extras = tuple(sorted(set(extras)))
+    if not set(extras) <= set(EXTRAS):
+        raise ValueError(f"unknown extras {set(extras) - set(EXTRAS)}")
+    loc_size = n - 1 if loc_size is None else loc_size
     zeros = tuple(ramsey_zeros(k, l))
     eqs = [green_clique_constraint(j, N) for j in range(2, n + 1)]
     localizing = []
@@ -95,9 +110,33 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
         localizing += [(m, lower), (m, upper)]
         m2 = (n - 3) // 2 + 1       # |g| = 3 for the product
         localizing.append((m2, Mul((lower, upper))))
-    name = f"R{k}{l}_N{N}_n{n}_{degrees}" + ("_e" if empty_type else "")
-    return Problem(name, n, NUM_COLORS, zeros, {}, eqs=eqs, normalize=True, localizing=localizing,
-                   include_empty_type=empty_type)
+    assumptions = [f"R({k},{l - 1}) <= {ramsey_upper(k, l - 1)}", f"R({k - 1},{l}) <= {ramsey_upper(k - 1, l)}"]
+    ineqs = []
+    if extras:
+        from . import neighbourhoods as nb
+
+        if "green" in extras:
+            for _, g in nb.green_multipliers(N):
+                eqs += [(e, Fraction(0)) for e in nb.localized(g, loc_size, zeros)]
+        mults = []
+        if "codeg" in extras:
+            m, facts = nb.codegree_multipliers(k, l, N, ramsey_upper)
+            mults += m
+            assumptions += facts
+        if "edges" in extras:
+            m, facts = nb.edge_multipliers(k, l, N, range(lo, hi + 1), n)
+            mults += m
+            assumptions += facts
+        for _, g in mults:                       # g >= 0 pointwise  =>  -[[g F]] <= 0
+            ineqs += [(Scale(Fraction(-1), e), Fraction(0)) for e in nb.localized(g, loc_size, zeros)]
+            if "lpsd" in extras:
+                spec = nb.localizing_specs(g, n)
+                if spec:
+                    localizing.append(spec)
+    name = (f"R{k}{l}_N{N}_n{n}_{degrees}" + ("_e" if empty_type else "")
+            + ("_x-" + "-".join(extras) if extras else ""))
+    return Problem(name, n, NUM_COLORS, zeros, {}, eqs=eqs, ineqs=ineqs, normalize=True, localizing=localizing,
+                   include_empty_type=empty_type, assumptions=sorted(set(assumptions)))
 
 
 def _frac(x) -> str:
@@ -117,7 +156,7 @@ def _git_revision() -> str:
         return "unknown"
 
 
-def save_result(path, params, sol, cert, res, timings):
+def save_result(path, params, sol, cert, res, timings, assumptions=()):
     from .cppbackend import binary_fingerprint
 
     data = {
@@ -130,6 +169,7 @@ def save_result(path, params, sol, cert, res, timings):
         "proven_bound_float": float(res.bound),
         "proved_infeasible": res.bound > 0,
         "timings": timings,
+        "assumptions": list(assumptions),
         "certificate": {
             "blocks": [{"rows": [[_frac(x) for x in q] for q in rows], "weights": [_frac(w) for w in ws]}
                        for rows, ws in cert.blocks],
@@ -142,7 +182,8 @@ def save_result(path, params, sol, cert, res, timings):
         json.dump(data, fh)
 
 
-def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, empty_type=False, workdir=None):
+def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, empty_type=False, workdir=None,
+        extras=(), loc_size=None):
     """Large-problem path: C++ writes both the exact problem and the CSDP input; the
     certificate is checked by streaming the exact problem file (tests/test_large_pipeline.py
     shows both steps agree with the in-memory path)."""
@@ -157,7 +198,7 @@ def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, emp
     own = workdir is None
     workdir = workdir or tempfile.mkdtemp(prefix="ramsey_")
     t0 = time.time()
-    problem = build_problem(k, l, N, n, degrees, empty_type)
+    problem = build_problem(k, l, N, n, degrees, empty_type, extras, loc_size)
     out, dat = run_flagsdp(problem, workdir, threads=threads, sdpa=True, normalize=True)
     m, sizes, neq, nle = read_shape(out)
     t["build"] = time.time() - t0
@@ -172,9 +213,10 @@ def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, emp
     if own:
         shutil.rmtree(workdir, ignore_errors=True)
     params = {"k": k, "l": l, "N": N, "n": n, "degrees": degrees, "empty_type": empty_type,
-              "window": degree_window(k, l, N)}
+              "window": degree_window(k, l, N), "extras": sorted(set(extras)), "loc_size": loc_size}
     if results_dir:
-        save_result(os.path.join(results_dir, f"{problem.name}.json"), params, sol, cert, res, t)
+        save_result(os.path.join(results_dir, f"{problem.name}.json"), params, sol, cert, res, t,
+                    problem.assumptions)
     return shape, sol, res, t
 
 
@@ -187,10 +229,14 @@ def main():
     ap.add_argument("--degrees", default="none", choices=["none", "avg", "local", "psd", "all"])
     ap.add_argument("--threads", type=int, default=None)
     ap.add_argument("--empty-type", action="store_true", help="include the empty type (even n only)")
+    ap.add_argument("--extras", default="", help="comma-separated subset of " + ",".join(EXTRAS))
+    ap.add_argument("--loc-size", type=int, default=None, help="max |g| + |F| - s for localised constraints")
     ap.add_argument("--results", default=os.path.join(os.path.dirname(__file__), "..", "..", "results"))
     a = ap.parse_args()
-    sdp, sol, res, t = run(a.k, a.l, a.N, a.n, a.degrees, a.threads, a.results, empty_type=a.empty_type)
-    print(f"R({a.k},{a.l})<={a.N} n={a.n} degrees={a.degrees} window={degree_window(a.k, a.l, a.N)}: "
+    extras = [x for x in a.extras.split(",") if x]
+    sdp, sol, res, t = run(a.k, a.l, a.N, a.n, a.degrees, a.threads, a.results, empty_type=a.empty_type,
+                           extras=extras, loc_size=a.loc_size)
+    print(f"R({a.k},{a.l})<={a.N} n={a.n} degrees={a.degrees} extras={a.extras or '-'} window={degree_window(a.k, a.l, a.N)}: "
           f"graphs={len(sdp.graphs)} blocks={len(sdp.blocks)} csdp={sol.primal_objective:.3e} "
           f"exact={float(res.bound):.3e} PROVED={res.bound > 0} "
           f"(build {t['build']:.0f}s, solve {t['solve']:.0f}s, check {t['check']:.0f}s)", flush=True)

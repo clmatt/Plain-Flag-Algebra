@@ -129,3 +129,64 @@ N = 28 is not provable on n = 7 without extra constraints (margin -5e-9).
   * `check_flagsdp_file` checks certificates by streaming the exact file. It gives slacks
     identical to check_certificate on random certificates.
   * `ramsey_run` now always uses this path.
+
+## 2026-11-20: plain R(4,6) n = 7 sweep; neighbourhood constraints
+
+Plain sweep (n = 7, degree options none/avg/psd/local/all): N = 42 and N = 41 are not
+proved with any option (margins between -6e-10 and -3.4e-8). Every failing run is a tiny
+negative, which is what a genuinely feasible relaxation looks like, so solver precision
+is not the bottleneck. The relaxation needs facts that 7-vertex samples cannot see.
+The sweep was stopped before N = 40 and 39 in favour of the following.
+
+New constraint families (`flagcheck/neighbourhoods.py`, `--extras`). Each is valid
+pointwise on the balanced blow-up of every (k,l)-graph on N vertices and is localised
+([[g F]] >= 0 or = 0 for every rooted F; `lpsd` adds [[g v v^T]] >= 0):
+
+- green: every clone class has measure exactly 1/N, at 1- and 2-vertex roots.
+- codeg: at a red or blue pair of roots, the vertices with a fixed colour pattern to the
+  pair form a (k-a, l-b)-graph, so there are at most R(k-a, l-b) - 1 of them.
+- edges: the red edge counts inside the red and blue neighbourhoods of every vertex lie
+  in [min, max] over (k-1,l)- and (k,l-1)-graphs of that order. Imposed through the exact
+  Lagrange interpolant over the degree window (when it fits in n) and the convex-hull
+  lines (always).
+
+Edge data (`flagcheck/edge_tables.py`):
+- computed from McKay's complete lists of (3,4)-, (3,5)-, (3,6)- and (4,4)-graphs, his
+  min/max-edge (4,5) sets for 4-23 vertices, and all 352366 (4,5)-graphs on 24 vertices;
+- graph counts agree with his page, and 12937 sampled graphs were re-checked to be
+  genuine Ramsey graphs;
+- every (3,k) minimum agrees with Goedgebeur-Radziszowski (2013) Table 3;
+- orders <= 6 agree with exhaustive brute force.
+
+The user approved these published computational results as hypotheses. `verify` prints
+every hypothesis a certificate relies on.
+
+`verify` spot checks now use `flagcheck/direct.py`. It evaluates every constraint
+coefficient and localising entry in the sampled graph straight from the definitions
+(disjoint random subsets), which makes it a third implementation. It agrees with the
+reference on random expressions.
+
+Tests:
+- every multiplier is >= 0 (green: = 0) at every root of blow-ups of C5, Wagner, C13,
+  Paley(17), and C5 as a (3,4)-graph (cubic interpolant);
+- Paley(17) is tight for the red-pair codegree bound and the red-neighbourhood maximum,
+  and a bound one tighter is violated;
+- C++ matches the reference exactly with all extras;
+- R(3,4) <= 9 is proved and <= 8 never;
+- no option refutes C13 (N = 13) or Paley(17) (N = 17, n = 5 and 6).
+
+Benchmark, R(4,6), N = 42, n = 7:
+
+| degrees | extras            | margin    | proved |
+|---------|-------------------|-----------|--------|
+| none    | green,codeg,edges | -7.4e-9   | no     |
+| local   | green,codeg,edges | +1.623e-3 | YES    |
+
+So there is no (4,6)-graph on 42 vertices, i.e. R(4,6) <= 42, one better than the
+recursive bound 43 that the plain method could not improve. (Classical counting: with
+degree 17 everywhere, the red triangle count from red neighbourhoods, at most 42*42/3,
+contradicts the count of red edges in blue neighbourhoods, which is at least 42*116.) The
+degree information has to be pointwise: the identity uses sum_v d_v^2.
+`python -m flagcheck.verify` re-checked the certificate from scratch (margin 1.623e-3).
+Convention reminder: infeasible at N means R(k,l) <= N. N = 40 matches the best known
+bound (R(4,6) <= 40, DS1.18); N = 39 would be new.

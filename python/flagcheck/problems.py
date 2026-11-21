@@ -34,6 +34,8 @@ class Problem:
     normalize: bool = False          # use for feasibility (infeasibility-proof) problems
     # Localising PSD blocks (m, g): [[ g v v^T ]] >= 0. Only valid when g >= 0 pointwise.
     localizing: List[Tuple[int, object]] = field(default_factory=list)
+    # Facts from outside flag algebra that the constraints rely on (printed by verify).
+    assumptions: List[str] = field(default_factory=list)
 
 
 K3 = from_edges(3, [(0, 1, 1), (0, 2, 1), (1, 2, 1)])

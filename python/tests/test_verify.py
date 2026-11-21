@@ -24,6 +24,30 @@ def result_file():
     shutil.rmtree(d, ignore_errors=True)
 
 
+@pytest.fixture(scope="module")
+def extras_result_file():
+    d = tempfile.mkdtemp()
+    run(3, 4, 9, 5, "none", results_dir=d, extras=("green", "codeg", "edges", "lpsd"))
+    yield os.path.join(d, "R34_N9_n5_none_x-codeg-edges-green-lpsd.json")
+    shutil.rmtree(d, ignore_errors=True)
+
+
+def test_verify_with_extras(extras_result_file, capsys):
+    assert verify_main([extras_result_file, "--spot-check", "8"]) == 0
+    out = capsys.readouterr().out
+    assert "e(3,3," in out and "R(2,4) <= 4" in out       # hypotheses are printed
+    assert verify_main([extras_result_file, "--reference"]) == 0
+
+
+def test_verify_rejects_dropped_extras(extras_result_file, tmp_path):
+    """The certificate uses the extra constraints, so it cannot verify without them."""
+    data = json.load(open(extras_result_file))
+    data["params"]["extras"] = []
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(data))
+    assert verify_main([str(bad), "--spot-check", "0"]) == 1
+
+
 def test_verify_cpp_path(result_file):
     assert verify_main([result_file, "--spot-check", "10"]) == 0
 

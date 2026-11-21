@@ -22,6 +22,7 @@ from flagcheck.problems import (
     ramsey_objective,
 )
 from flagcheck.ramsey import ROOT, monochromatic_clique, one_flag, ramsey_zeros, red_flag, GREEN
+from flagcheck.ramsey_run import build_problem
 from flagcheck.sdp import build_from_problem, solve_csdp
 from flagcheck.spec import Add, Avg, Lit, Mul, Scale
 
@@ -66,6 +67,9 @@ PROBLEMS = [
     degree_problem(8, 5, (2, 4)),
     degree_problem(8, 5, (3, 3), localized_flag=Flag(3, 1, (1, 2, 0))),
     localizing_problem(8, 5),
+    # neighbourhood constraints: 2-rooted multipliers, linear and localising
+    build_problem(3, 4, 8, 5, "none", extras=("green", "codeg", "edges", "lpsd")),
+    build_problem(3, 4, 5, 5, "none", extras=("edges", "lpsd")),        # cubic interpolant
 ]
 
 

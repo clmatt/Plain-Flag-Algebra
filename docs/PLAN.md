@@ -55,6 +55,12 @@ Anyone (human or agent) resuming the work should read both files first.
 ### Phase 3: Ramsey bounds [in progress]
 - [x] Normalised phase-1 formulation; exact certificates at n = 7 (margins ~1e-7 survive rounding)
 - [x] R(4,5) <= 29 on n = 7, exactly certified (objective form 1/d = 28.0856)
-- [ ] R(4,5): feasibility at N = 29, 28, 27 with degree constraints (n = 7), then n = 8
-- [ ] R(4,6): the thesis degree-polynomial idea (deg24 bug fixed), aiming below 40
+- [x] R(4,5) / R(4,6) with degree constraints only at n = 7: no improvement (N = 28 / N = 42, 41
+      not provable; margins ~ -1e-8, i.e. the relaxation is feasible)
+- [x] Neighbourhood constraints (green, codeg, edges; published edge data, user-approved),
+      with soundness tests on real Ramsey graphs and a direct evaluator in verify
+- [x] R(4,6) <= 42 (N = 42 infeasible) certified and verified, margin 1.6e-3
+- [ ] R(4,5) calibration with extras: N = 28..25 should prove, N = 24 must not
+- [ ] R(4,6): N = 41, 40 (= best known), 39 (new) with extras; then lpsd / n = 8
+- [ ] R(4,5) n = 8 plain run (N = 28) result
 - [ ] Every claimed bound has a certificate in `results/` that passes `flagcheck.verify`

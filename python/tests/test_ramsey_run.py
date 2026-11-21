@@ -45,3 +45,25 @@ def test_driver_end_to_end_small(degrees):
     _, _, res8, _ = run(3, 4, 8, 5, degrees)
     assert res9.bound > 0
     assert res8.bound <= 0
+
+
+ALL_EXTRAS = ("green", "codeg", "edges", "lpsd")
+
+
+@pytest.mark.skipif(not cppbackend.available() or shutil.which("csdp") is None, reason="needs flagsdp + CSDP")
+@pytest.mark.parametrize("extras", [("green",), ("codeg",), ("edges",), ALL_EXTRAS])
+def test_driver_with_extras_small(extras):
+    _, _, res9, _ = run(3, 4, 9, 5, "none", extras=extras)
+    _, _, res8, _ = run(3, 4, 8, 5, "none", extras=extras)
+    assert res9.bound > 0
+    assert res8.bound <= 0
+
+
+@pytest.mark.skipif(not cppbackend.available() or shutil.which("csdp") is None, reason="needs flagsdp + CSDP")
+@pytest.mark.parametrize("kln", [(3, 5, 13, 5), (4, 4, 17, 5), (4, 4, 17, 6)])
+def test_extras_never_refute_a_real_graph(kln):
+    """C13 and Paley(17) exist (and are tight for several of the bounds), so no option may
+    ever produce a positive certificate here."""
+    k, l, N, n = kln
+    _, sol, res, _ = run(k, l, N, n, "all", extras=ALL_EXTRAS)
+    assert res.bound <= 0, sol.primal_objective
