@@ -245,3 +245,18 @@ R(4,5) = 25, n = 7, degrees=all + green,codeg,edges:
 
 `verify` re-checked R46_N41 (R(4,6) <= 41): passes.
 R(4,6) N = 40, local + green,codeg,edges,pedges: -5.4e-9, not proved.
+
+## 2026-11-20: N = 40 with localising PSD blocks; n = 8 stopped
+
+R(4,6) N = 40, n = 7, degrees=all:
+
+| extras                           | blocks | margin   | build / solve |
+|----------------------------------|--------|----------|---------------|
+| green,codeg,edges,lpsd           | 93     | -6.4e-9  | 1480 s / 382 s |
+| green,codeg,edges,pedges,lpsd    | 132    | -1.0e-8  | 991 s / 643 s  |
+
+Neither proves anything. Every n = 7 variant tried so far is feasible at N = 40, so N = 39
+was not run (per the stopping rule). `verify` re-checked R45_N28 (R(4,5) <= 28): passes.
+
+The n = 8 run of plain R(4,5) at N = 28 was stopped after about 3 h 45 m, at the user's
+request: it was using about 2 GB of WSL memory and Windows was down to 337 MB free.
