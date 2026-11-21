@@ -196,6 +196,29 @@ mpq_class Theory::averageCoefficient(const Flag& F) const {
     return q;
 }
 
+const Theory::SubIndex& Theory::subgraphIndex(int k, int m) const {
+    auto key = std::make_pair(k, m);
+    auto it = subIndexCache_.find(key);
+    if (it != subIndexCache_.end()) return it->second;
+    const auto& Hs = graphs(m);
+    // per graph H: the canonical k-vertex induced subgraphs with multiplicities
+    std::vector<std::vector<std::pair<Flag, std::uint32_t>>> perH(Hs.size());
+#pragma omp parallel for schedule(dynamic, 64)
+    for (std::size_t h = 0; h < Hs.size(); ++h) {
+        std::unordered_map<Flag, std::uint32_t, FlagHash> counts;
+        std::vector<int> sub(k);
+        std::iota(sub.begin(), sub.end(), 0);
+        do {
+            ++counts[canon(restrict(Hs[h], sub, 0))];
+        } while (nextSubset(sub, m));
+        perH[h].assign(counts.begin(), counts.end());
+    }
+    SubIndex index;
+    for (std::size_t h = 0; h < Hs.size(); ++h)  // in graph order, so each list is sorted by h
+        for (const auto& [F, n] : perH[h]) index[F].emplace_back(static_cast<std::uint32_t>(h), n);
+    return subIndexCache_[key] = std::move(index);
+}
+
 Combo Theory::lift(const Combo& c, int m) const {
     Combo out;
     for (const auto& [F, coeff] : c) {
@@ -204,9 +227,25 @@ Combo Theory::lift(const Combo& c, int m) const {
         auto it = liftCache_.find(key);
         if (it == liftCache_.end()) {
             Combo single;
-            for (const Flag& H : flags(F.type(), m)) {
-                mpq_class d = density(F, H);
-                if (d != 0) single.emplace(H, d);
+            if (F.s == 0 && F.k > 0) {
+                // p(F, H) = #{k-subsets of H inducing F} / C(m, k), read off the index
+                long subsets = 1;
+                for (int i = 0; i < F.k; ++i) subsets = subsets * (m - i) / (i + 1);
+                const auto& index = subgraphIndex(F.k, m);
+                auto f = index.find(canon(F));
+                if (f != index.end()) {
+                    const auto& Hs = graphs(m);
+                    for (const auto& [h, n] : f->second) {
+                        mpq_class d(static_cast<long>(n), subsets);
+                        d.canonicalize();
+                        single.emplace(Hs[h], d);
+                    }
+                }
+            } else {
+                for (const Flag& H : flags(F.type(), m)) {
+                    mpq_class d = density(F, H);
+                    if (d != 0) single.emplace(H, d);
+                }
             }
             it = liftCache_.emplace(key, std::move(single)).first;
         }

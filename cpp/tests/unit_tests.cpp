@@ -5,6 +5,7 @@
 #include <random>
 #include <set>
 #include <string>
+#include <tuple>
 
 #include "flagalg/sdp.hpp"
 #include "flagalg/theory.hpp"
@@ -104,11 +105,36 @@ static void testYRowSums() {
     }
 }
 
+// The indexed unrooted lift must equal the chain rule computed from density() directly,
+// including for inadmissible F (empty lift) and for F = H (k = m).
+static void testIndexedLift() {
+    std::mt19937 rng(7);
+    Flag redTriangle = makeFlag(3, 0, {1, 1, 1});
+    for (auto [c, zeros, mmax] : {std::make_tuple(2, std::vector<Flag>{}, 6),
+                                  std::make_tuple(3, std::vector<Flag>{redTriangle}, 5)}) {
+        Theory T(c, zeros), ref(c, zeros);
+        for (int m = 1; m <= mmax; ++m)
+            for (int k = 1; k <= m; ++k) {
+                std::vector<Flag> Fs = T.graphs(k);
+                for (int r = 0; r < 5; ++r) Fs.push_back(T.canon(randomFlag(rng, k, 0, c)));
+                for (const Flag& F : Fs) {
+                    Combo fast = T.lift(Combo{{F, 1}}, m), slow;
+                    for (const Flag& H : ref.graphs(m)) {
+                        mpq_class d = ref.density(F, H);
+                        if (d != 0) slow.emplace(H, d);
+                    }
+                    CHECK(fast == slow);
+                }
+            }
+    }
+}
+
 int main() {
     testNextSubsetAndBinom();
     testCanonicalAgreement();
     testCounts();
     testYRowSums();
+    testIndexedLift();
     if (failures) {
         std::cerr << failures << " check(s) failed\n";
         return 1;

@@ -53,6 +53,12 @@ private:
     mutable std::map<int, std::vector<Flag>> graphCache_;
     mutable std::map<std::pair<Flag, int>, std::vector<Flag>> flagCache_;
     mutable std::map<std::pair<Flag, int>, Combo> liftCache_;  // single flag -> lifted combination
+
+    // For unrooted lifts: (k, m) -> canonical k-vertex graph F -> [(index into graphs(m),
+    // number of k-subsets of that graph inducing F)]. Built once from the m-vertex side.
+    using SubIndex = std::unordered_map<Flag, std::vector<std::pair<std::uint32_t, std::uint32_t>>, FlagHash>;
+    const SubIndex& subgraphIndex(int k, int m) const;
+    mutable std::map<std::pair<int, int>, SubIndex> subIndexCache_;
 };
 
 void addTerm(Combo& c, const Flag& f, const mpq_class& v);
