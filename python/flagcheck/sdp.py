@@ -18,6 +18,7 @@ The proven d for a rational certificate is exactly min_G r_G, computed in `certi
 """
 
 import os
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -339,8 +340,14 @@ def run_csdp(prob: str, block_sizes: List[int], layout: LPLayout, workdir: str,
         with open(os.path.join(workdir, "param.csdp"), "w") as fh:
             for k, v in params.items():
                 fh.write(f"{k}={v}\n")
-    proc = subprocess.run(["csdp", prob, sol], cwd=workdir, capture_output=True, text=True)
-    log = proc.stdout + proc.stderr
+    # Output goes to workdir/csdp.log as it is produced (line-buffered when stdbuf exists),
+    # so the progress of a long solve can be watched.
+    cmd = (["stdbuf", "-oL"] if shutil.which("stdbuf") else []) + ["csdp", prob, sol]
+    log_path = os.path.join(workdir, "csdp.log")
+    with open(log_path, "w") as fh:
+        proc = subprocess.run(cmd, cwd=workdir, stdout=fh, stderr=subprocess.STDOUT)
+    with open(log_path) as fh:
+        log = fh.read()
     pobj = dobj = float("nan")
     for line in log.splitlines():
         if line.startswith("Primal objective value:"):
