@@ -404,3 +404,21 @@ cuts before it; the chain is saved), ending with a phase-1 check. A single linea
 statistic gains nothing from case splits (its range over a convex region is an interval);
 the leverage is coarse lattices (degree counts, spacing 1/N) and the interaction of
 several rounded statistics.
+
+Results, R(4,6) N = 40, n = 7, local + green,codeg,edges:
+
+| statistic                  | certified range of the count | whole counts left |
+|----------------------------|------------------------------|-------------------|
+| red triangles              | 493.3 .. 545.4               | 52                |
+| blue triangles             | 1919.5 .. 2072.4             | 153               |
+| (same, with --blowup)      | 1919.7 .. 2072.4             | 153               |
+| vertices of red degree 15  | -0.06 .. 22.2                | 0..22             |
+| vertices of red degree 16  | -0.27 .. 40.0                | 0..40             |
+| vertices of red degree 17  | 0 .. 28.1                    | 0..28             |
+| vertices of odd degree / 2 | 0 .. 20.0                    | 0..20             |
+
+Clone elimination does not narrow the ranges (its value is speed only). The degree
+distribution is essentially unconstrained at n = 7, so integrality propagation on degree
+counts has nothing to bite on; stopped after round 0 (chain in results/chain_R46_N40_n7_deg).
+eint (neighbourhood edge-count integrality) at n = 7: R(4,6) N = 40 margin -7.1e-9,
+R(4,5) N = 27 margin -7.3e-9: not proved.
