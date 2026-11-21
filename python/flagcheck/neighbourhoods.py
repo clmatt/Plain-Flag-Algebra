@@ -26,6 +26,7 @@ Hypotheses used (all recorded in Problem.assumptions):
 
 from fractions import Fraction
 from itertools import combinations, permutations, product
+from math import comb
 from typing import List, Sequence, Tuple
 
 from .algebra import identity_flag
@@ -256,6 +257,81 @@ def edge_multipliers(k: int, l: int, N: int, window: Sequence[int], n: int):
             for i, (sl, ic) in enumerate(_hull_lines(pts, lower=(side == "min"))):
                 line = Add((Scale(sl, Lit(red_flag())), Scale(ic, one_flag())))
                 out.append((f"{label}-{side}-line{i}", Add((Scale(sign, Lit(T)), Scale(-sign, line)))))
+    return out, facts
+
+
+def triple_extension(to_root: int, reds: int) -> Flag:
+    """1-flag: root plus x, y, z, all joined to the root in `to_root`, with `reds` red
+    edges among them (the rest blue); reds = 2 is the path x-y-z... up to isomorphism."""
+    among = [(1, 2), (1, 3), (2, 3)]
+    edges = [(0, x, to_root) for x in (1, 2, 3)]
+    edges += [(i, j, RED if t < reds else BLUE) for t, (i, j) in enumerate(among)]
+    return from_edges(4, edges, s=1)
+
+
+def _plane_lines(plane, lower: bool):
+    """Valid lines y >= a x + b (lower) or y <= a x + b (upper) through the hull of the points;
+    a single x value gives the horizontal line through the extreme y."""
+    best = {}                     # per x only the extreme y matters (and avoids vertical edges)
+    for x, y in plane:
+        best[x] = y if x not in best else (min(best[x], y) if lower else max(best[x], y))
+    if len(best) == 1:
+        (y,) = best.values()
+        return [(Fraction(0), y)]
+    lines = _hull_lines(list(best.items()), lower)
+    for a, b in lines:            # valid for every point, not only the per-x extremes
+        assert all((a * x + b <= y) if lower else (a * x + b >= y) for x, y in plane)
+    return lines
+
+
+def stat_multipliers(k: int, l: int, N: int, window: Sequence[int]):
+    """Neighbourhood structure from complete lists (nbhd_stats.TRIPLE_POINTS).
+
+    At a root v of degree d, N_r(v) is a (k-1, l)-graph on d vertices and N_b(v) a
+    (k, l-1)-graph on N-1-d; when every such graph is listed, (e, p, t) of the
+    neighbourhood is one of the listed points. In densities at the root,
+        E = 2e/N^2 (double_extension),  P = 6p/N^3, T = 6t/N^3 (triple_extension),
+    and each exact convex-hull line Y >= a_d X + b_d (or <=) of the listed points in the
+    planes (E,P), (E,T), (P,T) holds at roots of degree d. As for the edge constraints, a_d
+    and b_d are interpolated exactly in R over the window: g = +-(Y - A(R) X - B(R)) with
+    A(d/N) = a_d, B(d/N) = b_d, so g >= 0 at every root. Degrees without a complete list
+    get the trivially valid lines Y >= 0 and Y <= 6 C(s,3) / N^3."""
+    from .nbhd_stats import table, triple_points
+    from .ramsey import one_flag
+
+    out, facts = [], []
+    window = list(window)
+    for label, rc, (a, b), size in (("red", RED, (k - 1, l), lambda d: d),
+                                    ("blue", BLUE, (k, l - 1), lambda d: N - 1 - d)):
+        if a <= 2 or b <= 2:
+            continue                      # no red edges, or a red clique: nothing to say
+        tabled = {d: triple_points(a, b, size(d)) for d in window if size(d) >= 3}
+        tabled = {d: pts for d, pts in tabled.items() if pts}
+        if not tabled:
+            continue
+        key = (min(a, b), max(a, b))
+        facts += [f"triple stats of all {size(d)}-vertex ({key[0]},{key[1]})-graphs "
+                  f"({table()[key][size(d)]['count']} graphs, McKay)" for d in tabled]
+        coords = {"E": (lambda q: Fraction(2 * q[0], N * N), Lit(double_extension(rc, RED))),
+                  "P": (lambda q: Fraction(6 * q[1], N ** 3), Lit(triple_extension(rc, 2))),
+                  "T": (lambda q: Fraction(6 * q[2], N ** 3), Lit(triple_extension(rc, 3)))}
+        planes = [("E", "P")] + ([("E", "T"), ("P", "T")] if a >= 4 else [])   # T = 0 when a = 3
+        for xn, yn in planes:
+            (fx, X), (fy, Y) = coords[xn], coords[yn]
+            for side in ("min", "max"):
+                lower = side == "min"
+                sign = 1 if lower else -1               # g = sign * (Y - A X - B)
+                lines = {}
+                for d in window:
+                    if d in tabled:
+                        lines[d] = _plane_lines({(fx(q), fy(q)) for q in tabled[d]}, lower)
+                    else:
+                        lines[d] = [(Fraction(0), Fraction(0) if lower else Fraction(6 * comb(size(d), 3), N ** 3))]
+                for i in range(max(len(v) for v in lines.values())):
+                    A = _lagrange({d: v[i % len(v)][0] for d, v in lines.items()}, window, N)
+                    B = _lagrange({d: v[i % len(v)][1] for d, v in lines.items()}, window, N)
+                    g = Add((Scale(sign, Y), Scale(-sign, Mul((A, X))), Scale(-sign, B)))
+                    out.append((f"nstats[{label}:{xn}{yn}]-{side}-{i}", g))
     return out, facts
 
 

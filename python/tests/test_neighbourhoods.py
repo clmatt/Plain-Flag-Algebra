@@ -255,7 +255,7 @@ def test_every_extra_constraint_holds_on_a_critical_graph(kl, n):
     k, l = kl
     G = KNOWN_RAMSEY_GRAPHS[kl]()
     W = StepGraphon.blowup(G)
-    p = build_problem(k, l, G.k, n, "none", extras=("green", "codeg", "tcodeg", "edges", "pedges", "lpsd"))
+    p = build_problem(k, l, G.k, n, "none", extras=("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "lpsd"))
     assert p.ineqs and p.assumptions
     for expr, rhs in p.eqs:
         assert W.evaluate(evaluate(expr, 3, p.zeros)) == rhs
@@ -324,3 +324,155 @@ def test_triple_codegree_families():
     # implied by pairs, hence absent: x blue to all of a red triangle ((4,5), 24 = pair bound)
     assert not any(nm.startswith("tcodeg[rrr:bbb") for nm in names)
     assert "R(3,4) <= 9" in facts and "R(2,5) <= 5" in facts
+
+
+# ---------------------------------------------------------------------------
+# Neighbourhood structure (nstats)
+# ---------------------------------------------------------------------------
+
+import os
+from itertools import combinations as _combs
+
+from flagcheck import nbhd_stats
+from flagcheck.graphs import from_edges
+
+DATA = os.path.expanduser("~/data/ramsey")
+
+
+def _value_at(W, e, root):
+    """Exact value of an expression at one root of a blow-up: rooted densities multiply
+    pointwise, so this is independent of the flag-product machinery."""
+    if isinstance(e, Lit):
+        return W.flag_density(e.flag, root)
+    if isinstance(e, dict):
+        return sum(v * W.flag_density(F, root) for F, v in e.items())
+    if isinstance(e, Add):
+        return sum(_value_at(W, a, root) for a in e.args)
+    if isinstance(e, Scale):
+        return e.q * _value_at(W, e.arg, root)
+    if isinstance(e, Mul):
+        out = Fraction(1)
+        for a in e.args:
+            out *= _value_at(W, a, root)
+        return out
+    raise TypeError(e)
+
+
+def _stats(G, verts):
+    """(e, p, t) of the red graph induced on verts, by brute force."""
+    cnt = [0, 0, 0, 0]
+    for T in _combs(verts, 3):
+        cnt[sum(G.color(x, y) == RED for x, y in _combs(T, 2))] += 1
+    e = sum(G.color(x, y) == RED for x, y in _combs(verts, 2))
+    return e, cnt[2], cnt[3]
+
+
+def _graph_from_g6(line):
+    from flagcheck.edge_tables import parse_g6
+
+    n, edges = parse_g6(line)
+    E = set(edges)
+    return from_edges(n, [(i, j, RED if (i, j) in E else BLUE) for i, j in _combs(range(n), 2)])
+
+
+def test_triple_table_matches_published_counts_and_edge_tables():
+    T = nbhd_stats.table()
+    for (a, b, s), n in nbhd_stats.EXPECTED_COUNTS.items():
+        assert T[(a, b)][s]["count"] == n
+    for (a, b), d in T.items():
+        for s, v in d.items():
+            es = [p[0] for p in v["points"]]
+            assert (min(es), max(es)) == EDGE_BOUNDS[(a, b)][s], (a, b, s)
+
+
+@pytest.mark.parametrize("ab", [(3, 4), (3, 5), (3, 6), (4, 4)])
+def test_triple_table_complete_on_small_orders_by_brute_force(ab):
+    """Independent of McKay's files: every labelled (a,b)-graph on s <= 6 vertices."""
+    a, b = ab
+    for s in range(3, 7):
+        pairs = list(_combs(range(s), 2))
+        seen = set()
+        for mask in range(1 << len(pairs)):
+            edges = [p for i, p in enumerate(pairs) if mask >> i & 1]
+            if is_ab_graph(s, edges, a, b):
+                G = from_edges(s, [(i, j, RED if (i, j) in set(edges) else BLUE) for i, j in pairs])
+                seen.add(_stats(G, range(s)))
+        assert seen == nbhd_stats.triple_points(a, b, s), (a, b, s)
+
+
+def test_complement_points():
+    """(4,3)-graphs are complements of (3,4)-graphs: checked on the Paley(17) blue
+    neighbourhoods, which are (4,3)-graphs on 8 vertices."""
+    G = paley(17)
+    for v in range(17):
+        blue = [x for x in range(17) if x != v and G.color(v, x) == BLUE]
+        red = [x for x in range(17) if x != v and G.color(v, x) == RED]
+        assert _stats(G, blue) in nbhd_stats.triple_points(4, 3, 8)
+        assert _stats(G, red) in nbhd_stats.triple_points(3, 4, 8)
+
+
+def test_stat_flags_mean_what_they_say():
+    G = paley(17)
+    N = G.k
+    W = StepGraphon.blowup(G)
+    for v in (0, 5):
+        for rc in (RED, BLUE):
+            S = [x for x in range(N) if x != v and G.color(v, x) == rc]
+            e, p, t = _stats(G, S)
+            assert W.flag_density(nb.double_extension(rc, RED), (v,)) == Fraction(2 * e, N * N)
+            assert W.flag_density(nb.triple_extension(rc, 2), (v,)) == Fraction(6 * p, N ** 3)
+            assert W.flag_density(nb.triple_extension(rc, 3), (v,)) == Fraction(6 * t, N ** 3)
+
+
+def _real_graphs():
+    yield (4, 4), paley(17)
+    yield (3, 5), circulant(13, [1, 5])
+    if os.path.exists(os.path.join(DATA, "r45_24.g6")):
+        with open(os.path.join(DATA, "r45_24.g6"), "rb") as fh:
+            for i, line in enumerate(fh):
+                if i in (0, 176183, 352365):
+                    yield (4, 5), _graph_from_g6(line)
+    for s in (16, 15):
+        path = os.path.join(DATA, f"r44_{s}.g6")
+        if os.path.exists(path):
+            with open(path, "rb") as fh:
+                yield (4, 4), _graph_from_g6(fh.readline())
+
+
+@pytest.mark.parametrize("kl,G", list(_real_graphs()), ids=lambda x: str(x) if isinstance(x, tuple) else str(x.k))
+def test_stat_multipliers_hold_at_every_vertex(kl, G):
+    k, l = kl
+    N = G.k
+    assert is_ramsey_graph(G, k, l)
+    lo, hi = degree_window(k, l, N)
+    mults, facts = nb.stat_multipliers(k, l, N, range(lo, hi + 1))
+    W = StepGraphon.blowup(G)
+    tight = 0
+    for name, g in mults:
+        vals = [_value_at(W, g, (v,)) for v in range(N)]
+        assert min(vals) >= 0, name
+        tight += min(vals) == 0
+    assert tight, "some hull line should be attained by a real graph"
+    assert facts
+    if kl == (4, 5):     # neighbourhoods of a (4,5)-graph are (3,5)- and (4,4)-graphs
+        assert any("(3,5)-graphs" in f for f in facts) and any("(4,4)-graphs" in f for f in facts)
+
+
+def test_stat_multiplier_detects_a_wrong_point():
+    """A table holding only a point with a different path count than the actual
+    neighbourhood must make some multiplier negative at that vertex: the constraints
+    really use the data."""
+    G = paley(17)
+    N = G.k
+    W = StepGraphon.blowup(G)
+    real = nbhd_stats.triple_points(3, 4, 8)
+    S = [x for x in range(1, N) if G.color(0, x) == RED]
+    mine = _stats(G, S)
+    others = {next(q for q in real if q[1] != mine[1])}
+    saved = nbhd_stats.table()[(3, 4)][8]["points"]
+    try:
+        nbhd_stats.table()[(3, 4)][8]["points"] = others
+        mults, _ = nb.stat_multipliers(4, 4, N, [8])
+        assert min(_value_at(W, g, (0,)) for _, g in mults) < 0
+    finally:
+        nbhd_stats.table()[(3, 4)][8]["points"] = saved

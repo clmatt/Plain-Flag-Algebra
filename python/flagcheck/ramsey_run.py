@@ -68,7 +68,7 @@ def red_minus(c: Fraction):
     return Add((Lit(red_flag()), Scale(-c, one_flag())))
 
 
-EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "lpsd")
+EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "lpsd")
 
 
 def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False,
@@ -79,6 +79,8 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
       tcodeg the same at red/blue triangles of roots (only bounds no pair implies);
       edges  red edge counts inside red / blue neighbourhoods (edge_tables);
       pedges red edge counts inside common neighbourhoods of pairs (hull lines in |S|);
+      nstats edges / induced paths / triangles of each neighbourhood lie in the convex hull
+             of all listed (a,b)-graphs of that order, at each degree (nbhd_stats);
       lpsd   also a localising PSD block for every codeg / edges / pedges multiplier.
     Linear localised constraints use rooted flags F with |g| + |F| - s <= loc_size
     (default n - 1)."""
@@ -143,6 +145,15 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
                 spec = nb.localizing_specs(g, n)
                 if spec:
                     localizing.append(spec)
+        if "nstats" in extras:
+            # These can be wider than loc_size: each still gets [[g]] >= 0 if it fits in n.
+            m, facts = nb.stat_multipliers(k, l, N, range(lo, hi + 1))
+            assumptions += facts
+            for _, g in m:
+                size = nb.expr_size(g)
+                if size <= n:
+                    ineqs += [(Scale(Fraction(-1), e), Fraction(0))
+                              for e in nb.localized(g, max(loc_size, size), zeros)]
     name = (f"R{k}{l}_N{N}_n{n}_{degrees}" + ("_e" if empty_type else "")
             + ("_x-" + "-".join(extras) if extras else "")
             + (f"_L{loc_size}" if extras and loc_size != n - 1 else ""))
