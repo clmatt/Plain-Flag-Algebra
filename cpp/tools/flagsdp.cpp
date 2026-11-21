@@ -19,6 +19,7 @@
 //                              exact rationals with denominator 1 for localizing blocks)
 //   end
 #include <chrono>
+#include <cstdio>
 #include <fstream>
 #include <map>
 #include <tuple>
@@ -97,9 +98,6 @@ int main(int argc, char** argv) {
 
         std::vector<std::pair<int, mpq_class>> objective;
         if (spec.objective) objective = toVector(T, evaluate(T, *spec.objective), n, gi, "objective");
-        std::vector<std::vector<std::pair<int, mpq_class>>> cons;
-        for (const auto& c : spec.constraints) cons.push_back(toVector(T, evaluate(T, *c.expr), n, gi, "constraint"));
-        std::cerr << "objective and " << cons.size() << " constraints (" << seconds(t0) << "s)\n";
 
         auto blocks = makeBlocks(T, n, spec.emptyType);
         std::cerr << "blocks: " << blocks.size() << " (" << seconds(t0) << "s)\n";
@@ -163,21 +161,15 @@ int main(int argc, char** argv) {
         }
         out << "objective " << objective.size() << "\n";
         for (auto& [g, v] : objective) out << g << " " << v.get_str() << "\n";
-        for (std::size_t c = 0; c < cons.size(); ++c) {
-            const auto& C = spec.constraints[c];
-            out << "constraint " << (C.kind == Constraint::Eq ? "eq" : "le") << " " << C.rhs.get_str() << " "
-                << cons[c].size() << "\n";
-            for (auto& [g, v] : cons[c]) out << g << " " << v.get_str() << "\n";
-        }
 
-        // Optional CSDP input, in exactly the layout of python/flagcheck/sdp.py write_sdpa:
+        // Optional CSDP input, in the layout of python/flagcheck/sdp.py write_sdpa (same
+        // entries; the order of entry lines differs, which the SDPA format allows):
         // LP block = lambda_G (m), d+, d-, (y+_j, y-_j) per equality, u_i per inequality, [nu].
         std::ofstream sdpa;
         const std::size_t m = graphs.size();
-        std::vector<std::size_t> eqIdx, leIdx;
-        for (std::size_t c = 0; c < cons.size(); ++c)
-            (spec.constraints[c].kind == Constraint::Eq ? eqIdx : leIdx).push_back(c);
-        const std::size_t lpSize = m + 2 + 2 * eqIdx.size() + leIdx.size() + (normalize ? 1 : 0);
+        std::size_t numEq = 0, numLe = 0;
+        for (const auto& C : spec.constraints) ++(C.kind == Constraint::Eq ? numEq : numLe);
+        const std::size_t lpSize = m + 2 + 2 * numEq + numLe + (normalize ? 1 : 0);
         const std::size_t lpBlock = blocks.size() + locBlocks.size() + 1;
         auto blockDim = [&](std::size_t b) {
             return b < blocks.size() ? blocks[b].flags.size() : locBlocks[b - blocks.size()].flags.size();
@@ -195,28 +187,51 @@ int main(int argc, char** argv) {
             sdpa << "\n";
             sdpa << "0 " << lpBlock << " " << m + 1 << " " << m + 1 << " 1.0\n";
             sdpa << "0 " << lpBlock << " " << m + 2 << " " << m + 2 << " -1.0\n";
-            // LP part of each graph row.
-            std::vector<std::vector<mpq_class>> dense(cons.size(), std::vector<mpq_class>(m));
-            for (std::size_t c = 0; c < cons.size(); ++c)
-                for (auto& [g, v] : cons[c]) dense[c][g] = v;
             for (std::size_t g = 0; g < m; ++g) {
                 const std::size_t row = g + 1;
                 sdpa << row << " " << lpBlock << " " << g + 1 << " " << g + 1 << " 1.0\n";
                 sdpa << row << " " << lpBlock << " " << m + 1 << " " << m + 1 << " 1.0\n";
                 sdpa << row << " " << lpBlock << " " << m + 2 << " " << m + 2 << " -1.0\n";
-                for (std::size_t j = 0; j < eqIdx.size(); ++j) {
-                    const double c = mpq_class(dense[eqIdx[j]][g] - spec.constraints[eqIdx[j]].rhs).get_d();
-                    if (c != 0) {
-                        sdpa << row << " " << lpBlock << " " << m + 3 + 2 * j << " " << m + 3 + 2 * j << " " << c << "\n";
-                        sdpa << row << " " << lpBlock << " " << m + 4 + 2 * j << " " << m + 4 + 2 * j << " " << -c << "\n";
+            }
+        }
+
+        // Constraints, one at a time: each is lifted to n vertices, written to both files and
+        // dropped, so memory does not grow with the number of constraints.
+        std::size_t eqSeen = 0, leSeen = 0, lpEntries = 0;
+        for (std::size_t c = 0; c < spec.constraints.size(); ++c) {
+            const auto& C = spec.constraints[c];
+            const bool eq = C.kind == Constraint::Eq;
+            const auto vec = toVector(T, evaluate(T, *C.expr), n, gi, "constraint");
+            out << "constraint " << (eq ? "eq" : "le") << " " << C.rhs.get_str() << " " << vec.size() << "\n";
+            for (auto& [g, v] : vec) out << g << " " << v.get_str() << "\n";
+            if (sdpa.is_open()) {
+                // coefficient of graph g in this LP column: value - rhs (eq) or rhs - value (le)
+                const std::size_t idx = eq ? m + 3 + 2 * eqSeen : m + 3 + 2 * numEq + leSeen;
+                auto emit = [&](std::size_t g, const mpq_class& value) {
+                    const double x = mpq_class(eq ? value - C.rhs : C.rhs - value).get_d();
+                    if (x == 0) return;
+                    sdpa << g + 1 << " " << lpBlock << " " << idx << " " << idx << " " << x << "\n";
+                    if (eq) sdpa << g + 1 << " " << lpBlock << " " << idx + 1 << " " << idx + 1 << " " << -x << "\n";
+                    lpEntries += eq ? 2 : 1;
+                };
+                if (C.rhs == 0) {
+                    for (auto& [g, v] : vec) emit(g, v);
+                } else {  // every graph has a nonzero coefficient unless its value equals rhs
+                    const mpq_class zero(0);
+                    std::size_t p = 0;
+                    for (std::size_t g = 0; g < m; ++g) {
+                        if (p < vec.size() && static_cast<std::size_t>(vec[p].first) == g) emit(g, vec[p++].second);
+                        else emit(g, zero);
                     }
                 }
-                for (std::size_t i = 0; i < leIdx.size(); ++i) {
-                    const double c = mpq_class(spec.constraints[leIdx[i]].rhs - dense[leIdx[i]][g]).get_d();
-                    const std::size_t idx = m + 3 + 2 * eqIdx.size() + i;
-                    if (c != 0) sdpa << row << " " << lpBlock << " " << idx << " " << idx << " " << c << "\n";
-                }
             }
+            ++(eq ? eqSeen : leSeen);
+            if ((c + 1) % 1000 == 0 || c + 1 == spec.constraints.size())
+                std::cerr << "constraints: " << c + 1 << "/" << spec.constraints.size() << ", LP entries "
+                          << lpEntries << " (" << seconds(t0) << "s)\n";
+        }
+
+        if (sdpa.is_open()) {
             if (normalize) {
                 const std::size_t row = m + 1;
                 for (std::size_t b = 0; b + 1 < lpBlock; ++b)
@@ -226,8 +241,11 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Y, computed in parallel chunks and written in graph order.
-        std::ostringstream yBody;
+        // Y, computed in parallel chunks and written in graph order. The body goes to a
+        // temporary file (its length is only known at the end) instead of memory.
+        const std::string yPath = std::string(argv[2]) + ".ybody";
+        std::ofstream yBody(yPath);
+        if (!yBody) throw std::runtime_error("cannot write " + yPath);
         std::size_t numEntries = 0;
         const std::size_t chunk = 256;
         for (std::size_t start = 0; start < graphs.size(); start += chunk) {
@@ -264,7 +282,15 @@ int main(int argc, char** argv) {
                          << std::get<2>(key) + 1 << " " << v.get_d() << "\n";
             }
         if (sdpa.is_open() && !sdpa) throw std::runtime_error("SDPA write failed");
-        out << "Y " << numEntries << "\n" << yBody.str() << "end\n";
+        yBody.close();
+        if (!yBody) throw std::runtime_error("write of " + yPath + " failed");
+        out << "Y " << numEntries << "\n";
+        if (numEntries > 0) {
+            std::ifstream yIn(yPath);
+            out << yIn.rdbuf();
+        }
+        std::remove(yPath.c_str());
+        out << "end\n";
         if (!out) throw std::runtime_error("write failed");
         std::cerr << "done (" << seconds(t0) << "s)\n";
         return 0;
