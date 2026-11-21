@@ -260,3 +260,20 @@ was not run (per the stopping rule). `verify` re-checked R45_N28 (R(4,5) <= 28):
 
 The n = 8 run of plain R(4,5) at N = 28 was stopped after about 3 h 45 m, at the user's
 request: it was using about 2 GB of WSL memory and Windows was down to 337 MB free.
+
+## 2026-11-20: option 2 (triple codegrees, larger localisation) at n = 7
+
+New family `tcodeg`: |S| <= R(k-a, l-b) - 1 at red/blue triangles of roots, keeping only
+the bounds no pair implies. For R(4,6), N = 40 there are 7, e.g. the common blue
+neighbourhood of a blue triangle is a (4,3)-graph, so it has at most 8 vertices.
+
+| problem (n = 7)  | degrees | extras                        | loc_size | margin   | proved |
+|------------------|---------|-------------------------------|----------|----------|--------|
+| R(4,6) N = 40    | local   | green,codeg,tcodeg,edges      | 6        | -1.0e-8  | no     |
+| R(4,6) N = 40    | local   | green,codeg,edges             | 7        | -4.9e-9  | no     |
+| R(4,6) N = 40    | local   | green,codeg,tcodeg,edges      | 7        | -9.5e-9  | no     |
+| R(4,5) N = 27    | all     | green,codeg,tcodeg,edges      | 6        | -1.0e-8  | no     |
+
+Nothing moves, so n = 7 looks exhausted for these constraint families. Next: an
+overnight n = 8 run of R(4,6) N = 40 (local + green,codeg,edges, loc_size 6), with CSDP's
+log streamed to ~/runs/night_n8/csdp.log and a memory guard.
