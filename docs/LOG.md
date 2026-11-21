@@ -190,3 +190,24 @@ degree information has to be pointwise: the identity uses sum_v d_v^2.
 `python -m flagcheck.verify` re-checked the certificate from scratch (margin 1.623e-3).
 Convention reminder: infeasible at N means R(k,l) <= N. N = 40 matches the best known
 bound (R(4,6) <= 40, DS1.18); N = 39 would be new.
+
+R(4,6) with localised degrees + green, codeg, edges (n = 7): N = 40 margin -7.1e-9 and
+N = 39 margin -4.0e-9, not proved. So this level reaches R(4,6) <= 41 (Mackey's bound),
+but not the best known 40.
+
+Second level (`--extras pedges`): at a red or blue pair of roots, the common
+neighbourhood S with a fixed colour pattern is a (k-a, l-b)-graph. Its red edge count
+lies in the edge-table range for |S|. In densities, D = |S|/N is a 3-vertex 2-flag and
+T = 2 e(S)/N^2 is a 4-vertex 2-flag. |S| ranges over 0..R(k-a,l-b)-1, so the constraints
+are the lower/upper convex-hull lines T >= a D + b (each re-checked exactly against every
+table point). Tests:
+- on Paley(17), D and T at concrete pairs equal |S|/N and 2e(S)/N^2 computed from the
+  graph;
+- every multiplier is >= 0 at every pair;
+- C++ matches the reference;
+- no option refutes C13 or Paley(17).
+
+Test-helper fix: pointwise checks now only use root placements that induce the
+multiplier's type. Elsewhere every value is trivially 0, which could make a "tight
+somewhere" assertion pass vacuously. The earlier tightness results (Paley(17) red-pair
+codegree bound, red-neighbourhood maximum) still hold with the stricter helper.

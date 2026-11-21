@@ -139,8 +139,17 @@ def test_direct_evaluator_matches_reference():
 # ---------------------------------------------------------------------------
 
 def _pointwise_values(W, g, s):
+    """Values of g at every root placement whose roots induce g's type (elsewhere every
+    flag of that type, hence g, is trivially 0)."""
+    from flagcheck.algebra import identity_flag
+
+    sigma = nb.sigma_of(g)
+    assert sigma.k == s
+    ident = {identity_flag(sigma): Fraction(1)}
     gc = evaluate(g, 3, ())
-    return [W.evaluate(gc, parts) for parts, _ in W.root_placements(s)]
+    vals = [W.evaluate(gc, parts) for parts, _ in W.root_placements(s) if W.evaluate(ident, parts) == 1]
+    assert vals, "no root placement of this type"
+    return vals
 
 
 CASES = [((3, 3), circulant(5, [1])), ((3, 4), circulant(8, [1, 4])), ((3, 5), circulant(13, [1, 5])),
@@ -159,7 +168,8 @@ def test_multipliers_hold_pointwise(kl, G):
         assert all(v == 0 for v in _pointwise_values(W, g, nb.sigma_of(g).k))
     codeg, _ = nb.codegree_multipliers(k, l, N, ramsey_upper)
     edges, _ = nb.edge_multipliers(k, l, N, range(lo, hi + 1), 4)
-    for name, g in codeg + edges:
+    pedges, _ = nb.pair_edge_multipliers(k, l, N, ramsey_upper)
+    for name, g in codeg + edges + pedges:
         vals = _pointwise_values(W, g, nb.sigma_of(g).k)
         assert min(vals) >= 0, name
 
@@ -199,6 +209,32 @@ def test_lagrange_interpolant_is_exact_on_the_window():
     assert min(vals["blue-nbhd-max-exact"]) == 0
 
 
+def test_pair_edge_multipliers_shape_and_tightness():
+    """R(4,6): the five non-trivial pair families, with the right Ramsey classes. On
+    Paley(17), the flags D and T at concrete pairs equal |S|/N and 2 e(S)/N^2 computed
+    directly from the graph, and every pair multiplier is >= 0 at every pair."""
+    mults, facts = nb.pair_edge_multipliers(4, 6, 40, ramsey_upper)
+    tags = {name.split("]")[0] + "]" for name, _ in mults}
+    assert tags == {"pair-edges[r:rb]", "pair-edges[r:bb]", "pair-edges[b:rr]", "pair-edges[b:rb]",
+                    "pair-edges[b:bb]"}
+    for fact in ("R(3,5) <= 14", "R(4,5) <= 25", "R(3,6) <= 18", "R(4,4) <= 18", "e(3,5,13) in [26,26]"):
+        assert fact in facts
+    G = paley(17)
+    N = G.k
+    W = StepGraphon.blowup(G)
+    for u, v, sigma in ((0, 1, nb.RED_PAIR), (0, 3, nb.BLUE_PAIR)):      # 1 is a square mod 17, 3 is not
+        assert G.color(u, v) == sigma.color(0, 1)
+        for pattern in ((RED, RED), (RED, BLUE), (BLUE, RED), (BLUE, BLUE)):
+            S = [x for x in range(N) if x not in (u, v) and (G.color(x, u), G.color(x, v)) == pattern]
+            e = sum(1 for i in S for j in S if i < j and G.color(i, j) == RED)
+            assert W.flag_density(nb.extension(sigma, pattern), (u, v)) == Fraction(len(S), N)
+            assert W.flag_density(nb.pair_extension(sigma, pattern, RED), (u, v)) == Fraction(2 * e, N * N)
+    pm, _ = nb.pair_edge_multipliers(4, 4, 17, ramsey_upper)
+    assert pm
+    for name, g in pm:
+        assert min(_pointwise_values(W, g, 2)) >= 0, name
+
+
 def test_codegree_bounds():
     # R(4,6): pairs joined in red; S red to both is a (2,6)-graph, etc.
     cb = nb.codegree_bound
@@ -219,7 +255,7 @@ def test_every_extra_constraint_holds_on_a_critical_graph(kl, n):
     k, l = kl
     G = KNOWN_RAMSEY_GRAPHS[kl]()
     W = StepGraphon.blowup(G)
-    p = build_problem(k, l, G.k, n, "none", extras=("green", "codeg", "edges", "lpsd"))
+    p = build_problem(k, l, G.k, n, "none", extras=("green", "codeg", "edges", "pedges", "lpsd"))
     assert p.ineqs and p.assumptions
     for expr, rhs in p.eqs:
         assert W.evaluate(evaluate(expr, 3, p.zeros)) == rhs

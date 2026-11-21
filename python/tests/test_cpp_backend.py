@@ -69,6 +69,7 @@ PROBLEMS = [
     localizing_problem(8, 5),
     # neighbourhood constraints: 2-rooted multipliers, linear and localising
     build_problem(3, 4, 8, 5, "none", extras=("green", "codeg", "edges", "lpsd")),
+    build_problem(4, 4, 17, 5, "none", extras=("pedges", "lpsd")),     # 4-vertex 2-rooted multipliers
     build_problem(3, 4, 5, 5, "none", extras=("edges", "lpsd")),        # cubic interpolant
 ]
 

@@ -68,7 +68,7 @@ def red_minus(c: Fraction):
     return Add((Lit(red_flag()), Scale(-c, one_flag())))
 
 
-EXTRAS = ("green", "codeg", "edges", "lpsd")
+EXTRAS = ("green", "codeg", "edges", "pedges", "lpsd")
 
 
 def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False,
@@ -77,7 +77,8 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
       green  every clone class has measure exactly 1/N, at 1- and 2-vertex roots;
       codeg  common-neighbourhood bounds |S| <= R(k-a, l-b) - 1 at red and blue pairs;
       edges  red edge counts inside red / blue neighbourhoods (edge_tables);
-      lpsd   also a localising PSD block for every codeg / edges multiplier.
+      pedges red edge counts inside common neighbourhoods of pairs (hull lines in |S|);
+      lpsd   also a localising PSD block for every codeg / edges / pedges multiplier.
     Linear localised constraints use rooted flags F with |g| + |F| - s <= loc_size
     (default n - 1)."""
     extras = tuple(sorted(set(extras)))
@@ -125,6 +126,10 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
             assumptions += facts
         if "edges" in extras:
             m, facts = nb.edge_multipliers(k, l, N, range(lo, hi + 1), n)
+            mults += m
+            assumptions += facts
+        if "pedges" in extras:
+            m, facts = nb.pair_edge_multipliers(k, l, N, ramsey_upper)
             mults += m
             assumptions += facts
         for _, g in mults:                       # g >= 0 pointwise  =>  -[[g F]] <= 0

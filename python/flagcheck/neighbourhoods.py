@@ -205,6 +205,47 @@ def edge_multipliers(k: int, l: int, N: int, window: Sequence[int], n: int):
     return out, facts
 
 
+def pair_extension(sigma: Flag, to_roots: Sequence[int], between: int) -> Flag:
+    """2-flag: the pair type plus x, y, each with colours to_roots to the roots, xy in `between`."""
+    rc = sigma.color(0, 1)
+    edges = [(0, 1, rc), (2, 3, between)]
+    for x in (2, 3):
+        edges += [(0, x, to_roots[0]), (1, x, to_roots[1])]
+    return from_edges(4, edges, s=2)
+
+
+def pair_edge_multipliers(k: int, l: int, N: int, ramsey_upper):
+    """Second level: at a pair of roots, S = vertices with a fixed colour pattern to the
+    pair induces an (a', b')-graph (codegree_family), so with s = |S| the red edge count
+    e(S) lies in [min, max] of edge_bounds(a', b', s). In densities,
+        D = p(x has the pattern) = s/N,  T = p(x, y have the pattern, xy red) = 2 e(S)/N^2.
+    s ranges over 0..R(a',b')-1 (too wide for an interpolant), so the constraints are the
+    lower / upper convex-hull lines of the points (s/N, 2 e/N^2): T - (a D + b) >= 0 (or <=).
+    Families with a' <= 2 or b' <= 2 are skipped (S has no red edge, or is a red clique;
+    both are already forced by the forbidden cliques)."""
+    out, facts = [], []
+    for sigma in (RED_PAIR, BLUE_PAIR):
+        rc = sigma.color(0, 1)
+        for pattern in ((RED, RED), (RED, BLUE), (BLUE, BLUE)):
+            a2, b2 = codegree_family(k, l, rc, pattern)
+            if a2 <= 2 or b2 <= 2:
+                continue
+            top = ramsey_upper(a2, b2) - 1
+            bounds = {s: edge_bounds(a2, b2, s) for s in range(0, top + 1)}
+            facts.append(f"R({a2},{b2}) <= {top + 1}")
+            facts += [f"e({a2},{b2},{s}) in [{lo},{hi}]" for s, (lo, hi) in bounds.items() if s]
+            D = Lit(extension(sigma, pattern))
+            T = Lit(pair_extension(sigma, pattern, RED))
+            tag = f"{COLOR_NAME[rc]}:{COLOR_NAME[pattern[0]]}{COLOR_NAME[pattern[1]]}"
+            for side, idx in (("min", 0), ("max", 1)):
+                sign = 1 if side == "min" else -1
+                pts = [(Fraction(s, N), Fraction(2 * bounds[s][idx], N * N)) for s in bounds]
+                for i, (sl, ic) in enumerate(_hull_lines(pts, lower=(side == "min"))):
+                    line = Add((Scale(sl, D), Scale(ic, one(sigma))))
+                    out.append((f"pair-edges[{tag}]-{side}-line{i}", Add((Scale(sign, T), Scale(-sign, line)))))
+    return out, facts
+
+
 # ---------------------------------------------------------------------------
 # Turning multipliers into constraints
 # ---------------------------------------------------------------------------
