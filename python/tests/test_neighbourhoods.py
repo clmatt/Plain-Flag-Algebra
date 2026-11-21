@@ -476,3 +476,39 @@ def test_stat_multiplier_detects_a_wrong_point():
         assert min(_value_at(W, g, (0,)) for _, g in mults) < 0
     finally:
         nbhd_stats.table()[(3, 4)][8]["points"] = saved
+
+
+# ---------------------------------------------------------------------------
+# eint: integrality of neighbourhood edge counts
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("kl,G", CASES[1:4] + [((4, 4), paley(17))], ids=lambda x: str(x) if isinstance(x, tuple) else str(x.k))
+def test_edge_integrality_counts_and_cuts(kl, G):
+    """X = (N^2/2) T at each root is exactly the number of red edges inside the root's red
+    (blue) neighbourhood, and every cut g_a >= 0 holds at every root."""
+    from itertools import combinations as _c
+
+    from flagcheck.ramsey import one_flag
+
+    k, l = kl
+    N = G.k
+    W = StepGraphon.blowup(G)
+    lo, hi = degree_window(k, l, N)
+    mults, facts = nb.edge_integrality_multipliers(k, l, N, range(lo, hi + 1))
+    assert mults and facts
+    half = Fraction(N * N, 2)
+    for v in range(N):
+        for color, T in ((RED, nb.double_extension(RED, RED)), (BLUE, nb.double_extension(BLUE, RED))):
+            nbhd = [u for u in range(N) if u != v and G.color(u, v) == color]
+            count = sum(G.color(x, y) == RED for x, y in _c(nbhd, 2))
+            assert half * W.flag_density(T, (v,)) == count
+        for name, g in mults:
+            assert _value_at(W, g, (v,)) >= 0, (name, v)
+    # a cut at a half-integer offset is not valid: it fails at some vertex
+    T = nb.double_extension(RED, RED)
+    X = Scale(half, Lit(T))
+    xs = {half * W.flag_density(T, (v,)) for v in range(N)}
+    c = min(xs)
+    bad = Mul((Add((X, Scale(-(c - Fraction(1, 2)), one_flag()))),
+               Add((X, Scale(-(c + Fraction(1, 2)), one_flag())))))
+    assert min(_value_at(W, bad, (v,)) for v in range(N)) < 0

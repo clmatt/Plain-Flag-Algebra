@@ -47,7 +47,7 @@ def test_driver_end_to_end_small(degrees):
     assert res8.bound <= 0
 
 
-ALL_EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "lpsd")
+ALL_EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "eint", "lpsd")
 
 
 @pytest.mark.skipif(not cppbackend.available() or shutil.which("csdp") is None, reason="needs flagsdp + CSDP")

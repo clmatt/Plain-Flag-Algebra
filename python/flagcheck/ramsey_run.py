@@ -68,7 +68,7 @@ def red_minus(c: Fraction):
     return Add((Lit(red_flag()), Scale(-c, one_flag())))
 
 
-EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "lpsd")
+EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "eint", "lpsd")
 
 
 def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False,
@@ -81,7 +81,9 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
       pedges red edge counts inside common neighbourhoods of pairs (hull lines in |S|);
       nstats edges / induced paths / triangles of each neighbourhood lie in the convex hull
              of all listed (a,b)-graphs of that order, at each degree (nbhd_stats);
-      lpsd   also a localising PSD block for every codeg / edges / pedges multiplier.
+      eint   (X - a)(X - a - 1) >= 0 at every vertex, X = red edges inside its red / blue
+             neighbourhood (a whole number), a over the range of the edge tables.
+      lpsd   also a localising PSD block for every codeg / edges / pedges / eint multiplier.
     Linear localised constraints use rooted flags F with |g| + |F| - s <= loc_size
     (default n - 1). blowup=True eliminates the clone variables (flagcheck.blowup): the SDP is
     then over the green-free graphs on n vertices only, with every constraint unchanged in value.
@@ -136,6 +138,10 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
             assumptions += facts
         if "edges" in extras:
             m, facts = nb.edge_multipliers(k, l, N, range(lo, hi + 1), n)
+            mults += m
+            assumptions += facts
+        if "eint" in extras:
+            m, facts = nb.edge_integrality_multipliers(k, l, N, range(lo, hi + 1))
             mults += m
             assumptions += facts
         if "pedges" in extras:

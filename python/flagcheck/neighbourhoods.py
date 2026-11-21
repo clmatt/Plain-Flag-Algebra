@@ -380,6 +380,32 @@ def pair_edge_multipliers(k: int, l: int, N: int, ramsey_upper):
 # Turning multipliers into constraints
 # ---------------------------------------------------------------------------
 
+def edge_integrality_multipliers(k: int, l: int, N: int, window: Sequence[int]):
+    """The number X of red edges inside the red (blue) neighbourhood of a vertex is a whole
+    number, so g_a = (X - a)(X - a - 1) >= 0 at every root, for every integer a. In the
+    blow-up X = (N^2 / 2) T, T the rooted flag "two neighbours joined by a red edge" (its
+    two non-roots are distinct vertices of H exactly when they are red to each other). a
+    runs over the range allowed by the edge tables, where the cut can bind."""
+    from .ramsey import one_flag
+
+    out, facts = [], []
+    window = list(window)
+    half = Fraction(N * N, 2)
+    for label, T, (a, b), size in (
+        ("red-nbhd", double_extension(RED, RED), (k - 1, l), lambda d: d),
+        ("blue-nbhd", double_extension(BLUE, RED), (k, l - 1), lambda d: N - 1 - d),
+    ):
+        bounds = {d: edge_bounds(a, b, size(d)) for d in window}
+        facts += [f"e({a},{b},{size(d)}) in [{lo},{hi}]" for d, (lo, hi) in bounds.items()]
+        lo = min(x for x, _ in bounds.values())
+        hi = max(y for _, y in bounds.values())
+        X = Scale(half, Lit(T))
+        for c in range(lo, hi):
+            g = Mul((Add((X, Scale(Fraction(-c), one_flag()))), Add((X, Scale(Fraction(-c - 1), one_flag())))))
+            out.append((f"{label}-int{c}", g))
+    return out, facts
+
+
 def sigma_of(g) -> Flag:
     e = g
     while not isinstance(e, (Lit, dict)):

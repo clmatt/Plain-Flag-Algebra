@@ -130,7 +130,7 @@ def feasibility(k, l, N, n, degrees, extras, loc_size, blowup, cuts, threads=Non
 
 
 def propagate(k, l, N, n, degrees, extras, loc_size, blowup, stats, threads=None, chain_dir=None, rounds=5,
-              log=print):
+              log=lambda s: print(s, flush=True)):
     """Repeat: bound every statistic on the current region, round the bounds to whole
     counts, add the rounded bounds as constraints. Stops when no bound improves or a
     statistic has no whole count left (then no (k,l)-graph on N vertices exists, given the
