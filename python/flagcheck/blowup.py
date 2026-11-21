@@ -147,3 +147,75 @@ def column(Q: Flag, graphs, N: int) -> Dict[int, Fraction]:
         if c:
             out[g] = lam * Fraction(c, comb(n, Qr.k))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Levels: one variable per green-free graph on 1..n vertices (keeps Y sparse)
+# ---------------------------------------------------------------------------
+#
+# y_G = lambda(G) w(Q_r(G)) with w(Q) = p_inj(Q) for green-free Q on any number of vertices,
+# so each G feeds exactly one variable. The levels are tied by
+#   w(Q') = sum_{|Q| = |Q'| + 1} d(Q', Q) w(Q),
+# and each level sums to 1, so v = w / n is a probability vector over all levels and
+# y_G = n lambda(G) v(Q_r(G)). Same feasible set as reduce_sdp, without the fill-in.
+
+def level_lists(n: int, zeros) -> Dict[int, list]:
+    zeros = tuple(zeros)
+    return {r: [G for G in generate(r, 3, zeros) if is_green_free(G)] for r in range(1, n + 1)}
+
+
+def level_equations(n: int, zeros):
+    """[{Q': 1, Q: -d(Q', Q), ...}] for every green-free Q' on r = n-1, ..., 1 vertices."""
+    lists = level_lists(n, zeros)
+    eqs = []
+    for r in range(n - 1, 0, -1):
+        dels: Dict[Flag, Dict[Flag, int]] = {}
+        for Q in lists[r + 1]:
+            for x in range(r + 1):
+                Qp = canonical(restrict(Q, [v for v in range(r + 1) if v != x], 0))
+                dels.setdefault(Qp, {})
+                dels[Qp][Q] = dels[Qp].get(Q, 0) + 1
+        for Qp in lists[r]:
+            e = {Qp: Fraction(1)}
+            for Q, c in dels.get(Qp, {}).items():
+                e[Q] = -Fraction(c, r + 1)
+            eqs.append(e)
+    return eqs
+
+
+def reduce_sdp_levels(sdp, N: int, zeros):
+    """Reference for flagsdp's `blowup N levels`: rows are the green-free graphs on n, n-1,
+    ..., 1 vertices; row Q' collects n lambda(G) times the data of every G with Q_r(G) = Q';
+    the level equations follow the problem's own equalities."""
+    from .sdp import FlagSDP
+
+    n = sdp.n
+    lists = level_lists(n, zeros)
+    rows = [Q for r in range(n, 0, -1) for Q in lists[r]]
+    ri = {Q: i for i, Q in enumerate(rows)}
+    target = {}
+    for g, G in enumerate(sdp.graphs):
+        lam, Qr = coefficient(G, N)
+        target[g] = (ri[Qr], n * lam)
+
+    def vec(v):
+        out = [Fraction(0)] * len(rows)
+        for g, (q, c) in target.items():
+            out[q] += c * v[g]
+        return out
+
+    Y = [[{} for _ in sdp.blocks] for _ in rows]
+    for g, (q, c) in target.items():
+        for b, entries in enumerate(sdp.Y[g]):
+            for key, val in entries.items():
+                Y[q][b][key] = Y[q][b].get(key, Fraction(0)) + c * val
+    Y = [[{k: v for k, v in d.items() if v != 0} for d in row] for row in Y]
+    level_eqs = []
+    for e in level_equations(n, zeros):
+        v = [Fraction(0)] * len(rows)
+        for Q, c in e.items():
+            v[ri[Q]] = c
+        level_eqs.append((v, Fraction(0)))
+    return FlagSDP(n=n, colors=sdp.colors, graphs=rows, blocks=sdp.blocks, Y=Y, f=vec(sdp.f),
+                   eqs=[(vec(v), r) for v, r in sdp.eqs] + level_eqs, ineqs=[(vec(v), r) for v, r in sdp.ineqs],
+                   block_kinds=sdp.block_kinds)

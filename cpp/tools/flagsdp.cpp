@@ -100,7 +100,15 @@ int main(int argc, char** argv) {
         // green-free graphs Q, with D M integral for D = N^n n!:
         //   D M[G][Q] = n!/aut(G) (N)_r aut(Q_r) (n-r)! c(Q_r, Q),
         // c(Q_r, Q) = number of r-subsets of Q inducing the quotient Q_r of G.
+        // Levels mode keeps Y sparse: y_G = lambda_G w(Q_r) with w(Q) the injective density of
+        // the green-free Q on |Q| <= n vertices, so each G feeds one variable. The variable
+        // vector is v = w / n (each level sums to 1, so v is a probability vector), with
+        //   D n lambda_G = n * n!/aut(G) (N)_r aut(Q_r) n!/r!,
+        // and the levels are tied by w(Q') = sum_Q d(Q', Q) w(Q), |Q| = |Q'| + 1 (written as
+        // equality constraints after the spec's own).
         const bool reduced = spec.blowup > 0;
+        const bool levels = reduced && spec.blowupLevels;
+        std::vector<std::vector<std::pair<int, mpq_class>>> levelEqs;
         std::vector<Flag> reducedGraphs;
         std::vector<int> toReduced(graphs.size(), -1);
         std::vector<std::vector<std::pair<int, mpz_class>>> rowsM(reduced ? graphs.size() : 0), colsM;
@@ -108,6 +116,8 @@ int main(int argc, char** argv) {
         if (reduced) {
             const int N = spec.blowup;
             if (spec.colors != 3) throw std::invalid_argument("blowup needs 3 colours (0 = clone)");
+            // levels: rows 0..g_n-1 are the green-free n-vertex graphs (graph order), then n-1, ..., 1
+            std::vector<std::unordered_map<Flag, int, FlagHash>> levelIndex(n + 1);
             for (std::size_t g = 0; g < graphs.size(); ++g) {
                 bool free = true;
                 for (int i = 0; i < n && free; ++i)
@@ -118,9 +128,23 @@ int main(int argc, char** argv) {
                         }
                 if (free) {
                     toReduced[g] = static_cast<int>(reducedGraphs.size());
+                    if (levels) levelIndex[n].emplace(graphs[g], toReduced[g]);
                     reducedGraphs.push_back(graphs[g]);
                 }
             }
+            for (int r = n - 1; levels && r >= 1; --r)
+                for (const Flag& Q : T.graphs(r)) {
+                    bool free = true;
+                    for (int i = 0; i < r && free; ++i)
+                        for (int j = i + 1; j < r; ++j)
+                            if (Q.color(i, j) == 0) {
+                                free = false;
+                                break;
+                            }
+                    if (!free) continue;
+                    levelIndex[r].emplace(Q, static_cast<int>(reducedGraphs.size()));
+                    reducedGraphs.push_back(Q);
+                }
             mpz_class nFact = 1;
             for (int i = 2; i <= n; ++i) nFact *= i;
             mpz_pow_ui(D.get_mpz_t(), mpz_class(N).get_mpz_t(), n);
@@ -150,6 +174,14 @@ int main(int argc, char** argv) {
                 A /= autG;
                 for (int i = 0; i < r; ++i) A *= (N - i);
                 A *= static_cast<unsigned long>(automorphismCount(Qr, 3));
+                if (levels) {      // A = n!/aut(G) (N)_r aut(Q_r); times n * n!/r!
+                    for (int i = r + 1; i <= n; ++i) A *= i;
+                    A *= n;
+                    auto it = levelIndex[r].find(Qr);
+                    if (it == levelIndex[r].end()) throw std::logic_error("blowup: quotient not in its level");
+                    rowsM[g].emplace_back(it->second, A);
+                    continue;
+                }
                 for (int i = 2; i <= n - r; ++i) A *= i;
                 const long subsets = static_cast<long>(binom(n, r));
                 for (const auto& [H, d] : T.lift(Combo{{Qr, 1}}, n)) {
@@ -162,11 +194,34 @@ int main(int argc, char** argv) {
                     rowsM[g].emplace_back(toReduced[it->second], A * cnt.get_num());
                 }
             }
+            // w(Q') - sum_Q d(Q', Q) w(Q) = 0, d(Q', Q) = (vertex deletions of Q giving Q') / |Q|
+            for (int r = n - 1; levels && r >= 1; --r) {
+                std::map<int, std::map<int, long>> del;    // row(Q') -> row(Q) -> count
+                for (const auto& [Q, q] : levelIndex[r + 1])
+                    for (int x = 0; x <= r; ++x) {
+                        std::vector<int> keep;
+                        for (int v = 0; v <= r; ++v)
+                            if (v != x) keep.push_back(v);
+                        auto it = levelIndex[r].find(T.canon(restrict(Q, keep, 0)));
+                        if (it == levelIndex[r].end()) throw std::logic_error("blowup: deletion not in its level");
+                        ++del[it->second][q];
+                    }
+                std::vector<int> rows;
+                for (const auto& [Qp, row] : levelIndex[r]) rows.push_back(row);
+                std::sort(rows.begin(), rows.end());
+                for (int row : rows) {
+                    std::vector<std::pair<int, mpq_class>> vec{{row, mpq_class(1)}};
+                    for (const auto& [q, c] : del[row]) vec.emplace_back(q, mpq_class(-c, r + 1));
+                    std::sort(vec.begin(), vec.end(), [](auto& a, auto& b) { return a.first < b.first; });
+                    for (auto& e : vec) e.second.canonicalize();
+                    levelEqs.push_back(std::move(vec));
+                }
+            }
             colsM.resize(reducedGraphs.size());
             for (std::size_t g = 0; g < graphs.size(); ++g)
                 for (const auto& [q, c] : rowsM[g]) colsM[q].emplace_back(static_cast<int>(g), c);
-            std::cerr << "blowup N=" << N << ": " << reducedGraphs.size() << " green-free graphs (" << seconds(t0)
-                      << "s)\n";
+            std::cerr << "blowup N=" << N << (levels ? " (levels)" : "") << ": " << reducedGraphs.size()
+                      << " rows, " << levelEqs.size() << " level equations (" << seconds(t0) << "s)\n";
         }
         // c . y = (c M) . z, with M = (D M) / D
         auto reduceVec = [&](const std::vector<std::pair<int, mpq_class>>& vec) {
@@ -274,6 +329,7 @@ int main(int argc, char** argv) {
         const std::size_t m = outGraphs.size();
         std::size_t numEq = 0, numLe = 0;
         for (const auto& C : spec.constraints) ++(C.kind == Constraint::Eq ? numEq : numLe);
+        numEq += levelEqs.size();
         const std::size_t lpSize = m + 2 + 2 * numEq + numLe + (normalize ? 1 : 0);
         const std::size_t lpBlock = blocks.size() + locBlocks.size() + 1;
         auto blockDim = [&](std::size_t b) {
@@ -303,11 +359,19 @@ int main(int argc, char** argv) {
         // Constraints, one at a time: each is lifted to n vertices, written to both files and
         // dropped, so memory does not grow with the number of constraints.
         std::size_t eqSeen = 0, leSeen = 0, lpEntries = 0;
-        for (std::size_t c = 0; c < spec.constraints.size(); ++c) {
-            const auto& C = spec.constraints[c];
+        const std::size_t numConstraints = spec.constraints.size() + levelEqs.size();
+        const Constraint levelEq{Constraint::Eq, mpq_class(0), nullptr};
+        for (std::size_t c = 0; c < numConstraints; ++c) {
+            const bool isLevel = c >= spec.constraints.size();
+            const auto& C = isLevel ? levelEq : spec.constraints[c];
             const bool eq = C.kind == Constraint::Eq;
-            auto vec = toVector(T, evaluate(T, *C.expr), n, gi, "constraint");
-            if (reduced) vec = reduceVec(vec);
+            std::vector<std::pair<int, mpq_class>> vec;
+            if (isLevel) {
+                vec = std::move(levelEqs[c - spec.constraints.size()]);
+            } else {
+                vec = toVector(T, evaluate(T, *C.expr), n, gi, "constraint");
+                if (reduced) vec = reduceVec(vec);
+            }
             out << "constraint " << (eq ? "eq" : "le") << " " << C.rhs.get_str() << " " << vec.size() << "\n";
             for (auto& [g, v] : vec) out << g << " " << v.get_str() << "\n";
             if (sdpa.is_open()) {
@@ -332,8 +396,8 @@ int main(int argc, char** argv) {
                 }
             }
             ++(eq ? eqSeen : leSeen);
-            if ((c + 1) % 1000 == 0 || c + 1 == spec.constraints.size())
-                std::cerr << "constraints: " << c + 1 << "/" << spec.constraints.size() << ", LP entries "
+            if ((c + 1) % 1000 == 0 || c + 1 == numConstraints)
+                std::cerr << "constraints: " << c + 1 << "/" << numConstraints << ", LP entries "
                           << lpEntries << " (" << seconds(t0) << "s)\n";
         }
 
@@ -354,8 +418,8 @@ int main(int argc, char** argv) {
         if (!yBody) throw std::runtime_error("cannot write " + yPath);
         std::size_t numEntries = 0;
         const std::size_t chunk = 256;
-        std::vector<std::vector<YEntry>> allY(reduced ? graphs.size() : 0);   // reduced: kept for the sums
-        for (std::size_t start = 0; start < graphs.size(); start += chunk) {
+        std::vector<std::vector<YEntry>> allY(reduced && !levels ? graphs.size() : 0);  // full mode: kept
+        for (std::size_t start = 0; start < (levels ? 0 : graphs.size()); start += chunk) {
             const std::size_t end = std::min(graphs.size(), start + chunk);
             std::vector<std::vector<YEntry>> results(end - start);
             std::string error;
@@ -395,12 +459,15 @@ int main(int argc, char** argv) {
 #pragma omp parallel for schedule(dynamic, 1)
                 for (std::size_t q = start; q < end; ++q) {
                     std::unordered_map<std::uint64_t, mpz_class> acc;
-                    for (const auto& [g, c] : colsM[q])
-                        for (const auto& e : allY[g]) {
+                    for (const auto& [g, c] : colsM[q]) {
+                        // levels: each G is in exactly one column, so computing Y_G here costs nothing extra
+                        const std::vector<YEntry> own = levels ? computeY(T, blocks, graphs[g]) : std::vector<YEntry>();
+                        for (const auto& e : levels ? own : allY[g]) {
                             const std::uint64_t key = (static_cast<std::uint64_t>(e.block) << 40) |
                                                       (static_cast<std::uint64_t>(e.i) << 20) | e.j;
                             mpz_addmul_ui(acc[key].get_mpz_t(), c.get_mpz_t(), static_cast<unsigned long>(e.count));
                         }
+                    }
                     auto& v = sums[q - start];
                     v.assign(acc.begin(), acc.end());
                     std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.first < b.first; });

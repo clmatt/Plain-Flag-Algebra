@@ -106,8 +106,12 @@ Spec parseSpec(const std::string& text) {
             } else if (key == "n") {
                 spec.n = std::stoi(rest);
             } else if (key == "blowup") {
-                spec.blowup = std::stoi(rest);
+                std::istringstream ls(rest);
+                std::string mode;
+                ls >> spec.blowup >> mode;
                 if (spec.blowup < 1) throw std::invalid_argument("blowup N must be positive");
+                if (mode == "levels") spec.blowupLevels = true;
+                else if (!mode.empty()) throw std::invalid_argument("unknown blowup mode " + mode);
             } else if (key == "empty_type") {
                 spec.emptyType = std::stoi(rest) != 0;
             } else if (key == "zero") {

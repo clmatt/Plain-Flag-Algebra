@@ -144,3 +144,73 @@ def test_reduced_never_refutes_a_real_graph(kln):
     k, l, N, n = kln
     _, sol, res, _ = run(k, l, N, n, "all", extras=ALL, blowup=True)
     assert res.bound <= 0, sol.primal_objective
+
+
+# ---------------------------------------------------------------------------
+# levels form
+# ---------------------------------------------------------------------------
+
+from flagcheck.blowup import level_equations, level_lists, reduce_sdp_levels
+
+
+@pytest.mark.parametrize("N,n,seed", [(6, 4, 1), (7, 5, 2), (8, 5, 4)])
+def test_levels_are_exact_on_random_blowups(N, n, seed):
+    """y_G = n lambda(G) v(Q_r(G)) with v = p_inj / n, and the level equations hold."""
+    rng = random.Random(seed)
+    zeros = blowup_zeros()
+    for _ in range(2):
+        H = random_graph(rng, N)
+        y = StepGraphon.blowup(H, clone_color=GREEN).graph_distribution(n)
+        w = {}
+        for r in range(1, n + 1):
+            w.update(injective_densities(H, r))
+        for G in generate(n, 3, zeros):
+            lam, Qr = coefficient(G, N)
+            assert y.get(G, Fraction(0)) == lam * w.get(Qr, 0)
+        for e in level_equations(n, zeros):
+            assert sum(c * w.get(Q, 0) for Q, c in e.items()) == 0
+        assert all(sum(w.get(Q, 0) for Q in level_lists(n, zeros)[r]) == 1 for r in range(1, n + 1))
+
+
+LEVEL_PROBLEMS = [
+    build_problem(3, 4, 9, 5, "all", blowup="levels"),
+    build_problem(3, 4, 8, 5, "none", extras=ALL, blowup="levels"),
+    build_problem(4, 4, 17, 5, "local", extras=("codeg", "edges", "pedges", "lpsd"), blowup="levels"),
+]
+
+
+def _row_dict(v, graphs):
+    return {canonical(G): x for G, x in zip(graphs, v) if x}
+
+
+@pytest.mark.skipif(not cppbackend.available(), reason="flagsdp not built")
+@pytest.mark.parametrize("problem", LEVEL_PROBLEMS, ids=lambda p: p.name)
+def test_cpp_levels_equal_reference(problem):
+    full = cppbackend.build_cpp_sdp(dataclasses.replace(problem, blowup=0, blowup_levels=False))
+    full = FlagSDP(**{**full.__dict__, "graphs": [canonical(G) for G in full.graphs]})
+    ref = reduce_sdp_levels(full, problem.blowup, problem.zeros)
+    cpp = cppbackend.build_cpp_sdp(problem)
+    canon = [canonical(G) for G in cpp.graphs]
+    assert sorted(canon, key=repr) == sorted(ref.graphs, key=repr) and len(set(canon)) == len(canon)
+    to_ref = [ref.graphs.index(G) for G in canon]
+    assert [f for _, f in cpp.blocks] == [f for _, f in ref.blocks] and cpp.block_kinds == ref.block_kinds
+    for q, r in enumerate(to_ref):
+        assert cpp.f[q] == ref.f[r]
+        assert cpp.Y[q] == ref.Y[r], (problem.name, q)
+    assert len(cpp.eqs) == len(ref.eqs) and len(cpp.ineqs) == len(ref.ineqs)
+    k = len(full.eqs)
+    for (cv, cr), (rv, rr) in zip(cpp.eqs[:k] + cpp.ineqs, ref.eqs[:k] + ref.ineqs):
+        assert cr == rr and all(cv[q] == rv[r] for q, r in enumerate(to_ref))
+    cpp_level = sorted((frozenset(_row_dict(v, cpp.graphs).items()) for v, _ in cpp.eqs[k:]), key=repr)
+    ref_level = sorted((frozenset(_row_dict(v, ref.graphs).items()) for v, _ in ref.eqs[k:]), key=repr)
+    assert cpp_level == ref_level and all(r == 0 for _, r in cpp.eqs[k:])
+
+
+@pytest.mark.skipif(not cppbackend.available() or shutil.which("csdp") is None, reason="needs flagsdp + CSDP")
+def test_levels_end_to_end():
+    _, _, res9, _ = run(3, 4, 9, 5, "all", extras=ALL, blowup="levels")
+    _, _, res8, _ = run(3, 4, 8, 5, "all", extras=ALL, blowup="levels")
+    assert res9.bound > 0 and res8.bound <= 0
+    for k, l, N, n in [(3, 5, 13, 6), (4, 4, 17, 6)]:
+        _, sol, res, _ = run(k, l, N, n, "all", extras=ALL, blowup="levels")
+        assert res.bound <= 0, (k, l, N, sol.primal_objective)

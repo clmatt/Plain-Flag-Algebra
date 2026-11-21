@@ -39,6 +39,7 @@ class Problem:
     # N > 0: eliminate the clone variables of an N-vertex blow-up (flagcheck.blowup); the
     # SDP is then over the green-free graphs only.
     blowup: int = 0
+    blowup_levels: bool = False      # with blowup: the sparse "levels" form (flagcheck.blowup)
 
 
 K3 = from_edges(3, [(0, 1, 1), (0, 2, 1), (1, 2, 1)])

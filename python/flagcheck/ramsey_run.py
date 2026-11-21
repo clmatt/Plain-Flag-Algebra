@@ -72,7 +72,7 @@ EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "lpsd")
 
 
 def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False,
-                  extras=(), loc_size=None, blowup: bool = False) -> Problem:
+                  extras=(), loc_size=None, blowup=False) -> Problem:
     """extras (see neighbourhoods.py):
       green  every clone class has measure exactly 1/N, at 1- and 2-vertex roots;
       codeg  common-neighbourhood bounds |S| <= R(k-a, l-b) - 1 at red and blue pairs;
@@ -84,7 +84,9 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
       lpsd   also a localising PSD block for every codeg / edges / pedges multiplier.
     Linear localised constraints use rooted flags F with |g| + |F| - s <= loc_size
     (default n - 1). blowup=True eliminates the clone variables (flagcheck.blowup): the SDP is
-    then over the green-free graphs on n vertices only, with every constraint unchanged in value."""
+    then over the green-free graphs on n vertices only, with every constraint unchanged in value.
+    blowup="levels" is the same relaxation with one variable per green-free graph on 1..n
+    vertices, tied by linear equations, so the SDP data stays as sparse as without blowup."""
     extras = tuple(sorted(set(extras)))
     if not set(extras) <= set(EXTRAS):
         raise ValueError(f"unknown extras {set(extras) - set(EXTRAS)}")
@@ -158,9 +160,10 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
     name = (f"R{k}{l}_N{N}_n{n}_{degrees}" + ("_e" if empty_type else "")
             + ("_x-" + "-".join(extras) if extras else "")
             + (f"_L{loc_size}" if extras and loc_size != n - 1 else "")
-            + ("_b" if blowup else ""))
+            + ({True: "_b", "levels": "_bl"}.get(blowup, "") if blowup else ""))
     return Problem(name, n, NUM_COLORS, zeros, {}, eqs=eqs, ineqs=ineqs, normalize=True, localizing=localizing,
-                   include_empty_type=empty_type, assumptions=sorted(set(assumptions)), blowup=N if blowup else 0)
+                   include_empty_type=empty_type, assumptions=sorted(set(assumptions)), blowup=N if blowup else 0,
+                   blowup_levels=blowup == "levels")
 
 
 def _frac(x) -> str:
@@ -244,7 +247,7 @@ def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, emp
         shutil.rmtree(workdir, ignore_errors=True)
     params = {"k": k, "l": l, "N": N, "n": n, "degrees": degrees, "empty_type": empty_type,
               "window": degree_window(k, l, N), "extras": sorted(set(extras)), "loc_size": loc_size,
-              "solver": solver, "blowup": bool(blowup)}
+              "solver": solver, "blowup": blowup if blowup == "levels" else bool(blowup)}
     if results_dir:
         save_result(os.path.join(results_dir, f"{problem.name}.json"), params, sol, cert, res, t,
                     problem.assumptions)
@@ -264,11 +267,13 @@ def main():
     ap.add_argument("--loc-size", type=int, default=None, help="max |g| + |F| - s for localised constraints")
     ap.add_argument("--solver", default="csdp", choices=["csdp", "sdpa"])
     ap.add_argument("--blowup", action="store_true", help="eliminate the clone variables (flagcheck.blowup)")
+    ap.add_argument("--blowup-levels", action="store_true", help="the same, in the sparse levels form")
     ap.add_argument("--results", default=os.path.join(os.path.dirname(__file__), "..", "..", "results"))
     a = ap.parse_args()
     extras = [x for x in a.extras.split(",") if x]
     sdp, sol, res, t = run(a.k, a.l, a.N, a.n, a.degrees, a.threads, a.results, empty_type=a.empty_type,
-                           extras=extras, loc_size=a.loc_size, solver=a.solver, blowup=a.blowup)
+                           extras=extras, loc_size=a.loc_size, solver=a.solver,
+                           blowup="levels" if a.blowup_levels else a.blowup)
     print(f"R({a.k},{a.l})<={a.N} n={a.n} degrees={a.degrees} extras={a.extras or '-'} window={degree_window(a.k, a.l, a.N)}: "
           f"graphs={len(sdp.graphs)} blocks={len(sdp.blocks)} csdp={sol.primal_objective:.3e} "
           f"exact={float(res.bound):.3e} PROVED={res.bound > 0} "

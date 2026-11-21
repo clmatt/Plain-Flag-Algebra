@@ -16,7 +16,10 @@ Only the problem parameters and the certificate are read from the file. Then:
      definitions and compared exactly.
    For a clone-eliminated result (params "blowup"), the graph list must be the green-free
    admissible graphs, and each sampled entry for Q is recomputed as sum_G M[G][Q] times the
-   value at G, with the column M[.][Q] counted directly (flagcheck.blowup.column).
+   value at G, with the column M[.][Q] counted directly (flagcheck.blowup.column). In the
+   levels form the rows are the green-free graphs on 1..n vertices, a sampled row Q sums
+   n lambda(G) times the value at G over the G with quotient Q, and every level equation is
+   recomputed and compared.
 3. The certificate is re-checked in exact arithmetic, and the proven bound must equal
    the stored one and be positive.
 """
@@ -43,7 +46,11 @@ def load_certificate(data) -> Certificate:
 def check_structure(sdp, problem) -> None:
     """Graph list and plain flag lists against the independent reference."""
     ref_graphs = set(generate(problem.n, problem.colors, problem.zeros))
-    if problem.blowup:
+    if problem.blowup and problem.blowup_levels:
+        from .blowup import level_lists
+
+        ref_graphs = {Q for lst in level_lists(problem.n, problem.zeros).values() for Q in lst}
+    elif problem.blowup:
         from .blowup import is_green_free
 
         ref_graphs = {G for G in ref_graphs if is_green_free(G)}
@@ -76,11 +83,23 @@ def spot_check(sdp, problem, sample) -> int:
     from .direct import GraphEvaluator
 
     kinds = sdp.block_kinds or ["plain"] * len(sdp.blocks)
+    levels = bool(problem.blowup and problem.blowup_levels)
+    sdp_eqs = sdp.eqs
+    if levels:      # the problem's equalities, then the level equations (all checked here)
+        from .blowup import level_equations
+
+        k = len(problem.eqs)
+        sdp_eqs = sdp.eqs[:k]
+        want = sorted((frozenset(e.items()) for e in level_equations(problem.n, problem.zeros)), key=repr)
+        got = sorted((frozenset((canonical(G), x) for G, x in zip(sdp.graphs, v) if x) for v, _ in sdp.eqs[k:]),
+                     key=repr)
+        if want != got or any(r != 0 for _, r in sdp.eqs[k:]):
+            raise AssertionError("level equations differ from the reference")
     exprs = [problem.objective] + [e for e, _ in problem.eqs + problem.ineqs]
-    vectors = [sdp.f] + [v for v, _ in sdp.eqs + sdp.ineqs]
-    if len(sdp.eqs) != len(problem.eqs) or len(sdp.ineqs) != len(problem.ineqs):
+    vectors = [sdp.f] + [v for v, _ in sdp_eqs + sdp.ineqs]
+    if len(sdp_eqs) != len(problem.eqs) or len(sdp.ineqs) != len(problem.ineqs):
         raise AssertionError("number of constraints differs from the problem")
-    for j, ((_, r), (_, r2)) in enumerate(zip(sdp.eqs + sdp.ineqs, problem.eqs + problem.ineqs)):
+    for j, ((_, r), (_, r2)) in enumerate(zip(sdp_eqs + sdp.ineqs, problem.eqs + problem.ineqs)):
         if Fraction(r) != Fraction(r2):
             raise AssertionError(f"constraint {j}: right-hand side differs")
     loc_specs = list(problem.localizing)
@@ -107,12 +126,26 @@ def spot_check(sdp, problem, sample) -> int:
         return Ys, coeffs
 
     if problem.blowup:
-        from .blowup import column
+        from .blowup import coefficient, column, quotient
 
         all_graphs = list(generate(problem.n, problem.colors, problem.zeros))
         cache = {}
+    if levels:
+        by_quotient = {}
+        for h, G in enumerate(all_graphs):
+            by_quotient.setdefault(quotient(G)[1], []).append(h)
     for g in sample:
-        if problem.blowup:      # values at Q = sum_G M[G][Q] * values at G
+        if levels:              # values at row Q = sum over G with quotient Q of n lambda(G) * values at G
+            Ys, coeffs = {b: {} for b in range(len(sdp.blocks))}, [Fraction(0)] * len(exprs)
+            for h in by_quotient.get(canonical(sdp.graphs[g]), []):
+                m = problem.n * coefficient(all_graphs[h], problem.blowup)[0]
+                hY, hc = values(all_graphs[h])
+                for b, d in hY.items():
+                    for key, v in d.items():
+                        Ys[b][key] = Ys[b].get(key, Fraction(0)) + m * v
+                coeffs = [c + m * v for c, v in zip(coeffs, hc)]
+            Ys = {b: {k: v for k, v in d.items() if v} for b, d in Ys.items()}
+        elif problem.blowup:    # values at Q = sum_G M[G][Q] * values at G
             Ys, coeffs = {b: {} for b in range(len(sdp.blocks))}, [Fraction(0)] * len(exprs)
             for h, m in column(canonical(sdp.graphs[g]), all_graphs, problem.blowup).items():
                 if h not in cache:
@@ -162,9 +195,9 @@ def _verify(a):
 
         sdp = build_from_problem(problem)
         if problem.blowup:
-            from .blowup import reduce_sdp
+            from .blowup import reduce_sdp, reduce_sdp_levels
 
-            sdp = reduce_sdp(sdp, problem.blowup, problem.zeros)
+            sdp = (reduce_sdp_levels if problem.blowup_levels else reduce_sdp)(sdp, problem.blowup, problem.zeros)
         print("rebuilt entirely with the Python reference")
         res = check_certificate(sdp, load_certificate(data))
     else:

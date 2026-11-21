@@ -92,3 +92,26 @@ def test_reduced_tampering_is_rejected(reduced_result_file, change, tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text(json.dumps(data))
     assert verify_main([str(bad), "--spot-check", "0"]) == 1
+
+
+@pytest.fixture(scope="module")
+def levels_result_file():
+    d = tempfile.mkdtemp()
+    run(3, 4, 9, 5, "none", results_dir=d, extras=("green", "codeg", "edges", "nstats", "lpsd"), blowup="levels")
+    yield os.path.join(d, "R34_N9_n5_none_x-codeg-edges-green-lpsd-nstats_bl.json")
+    shutil.rmtree(d, ignore_errors=True)
+
+
+def test_verify_levels(levels_result_file):
+    assert json.load(open(levels_result_file))["params"]["blowup"] == "levels"
+    assert verify_main([levels_result_file, "--spot-check", "12"]) == 0
+    assert verify_main([levels_result_file, "--reference"]) == 0
+
+
+@pytest.mark.parametrize("change", [("blowup", True), ("blowup", False), ("N", 8)])
+def test_levels_tampering_is_rejected(levels_result_file, change, tmp_path):
+    data = json.load(open(levels_result_file))
+    data["params"][change[0]] = change[1]
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(data))
+    assert verify_main([str(bad), "--spot-check", "0"]) == 1
