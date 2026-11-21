@@ -8,6 +8,7 @@ green pairs) every rooted density below is an exact function of H:
   codeg    p(x has colours (c0, c1) to roots)  = |S| / N          (S = vertices of H with
                                                                    those colours, outside
                                                                    the two root classes)
+  tcodeg   the same with three roots
   edges    p(x, y red to root, xy red)         = 2 e(N_r(v)) / N^2
            p(x, y blue to root, xy red)        = 2 e_red(N_b(v)) / N^2
 
@@ -24,7 +25,7 @@ Hypotheses used (all recorded in Problem.assumptions):
 """
 
 from fractions import Fraction
-from itertools import product
+from itertools import combinations, permutations, product
 from typing import List, Sequence, Tuple
 
 from .algebra import identity_flag
@@ -117,6 +118,59 @@ def codegree_multipliers(k: int, l: int, N: int, ramsey_upper):
             g = Add((Scale(Fraction(c, N), one(sigma)), Scale(Fraction(-1), Lit(extension(sigma, pattern)))))
             out.append((name, g))
             ka, lb = codegree_family(k, l, rc, pattern)
+            facts.append(f"R({ka},{lb}) <= {c + 1}")
+    return out, facts
+
+
+def triple_type(reds: int) -> Flag:
+    """3-vertex type with `reds` red edges (first) and the rest blue."""
+    cols = [RED] * reds + [BLUE] * (3 - reds)
+    return from_edges(3, [(0, 1, cols[0]), (0, 2, cols[1]), (1, 2, cols[2])])
+
+
+def _max_clique(sigma: Flag, verts: Sequence[int], color: int) -> int:
+    return max(r for r in range(len(verts) + 1) for sub in combinations(verts, r)
+               if all(sigma.color(i, j) == color for i, j in combinations(sub, 2)))
+
+
+def root_family(k: int, l: int, sigma: Flag, to_roots: Sequence[int]) -> Tuple[int, int]:
+    """(k - a, l - b) for any root type: a (b) is the largest red (blue) clique of sigma
+    among the roots joined to S in red (blue). Agrees with codegree_family on pairs."""
+    reds = [i for i, c in enumerate(to_roots) if c == RED]
+    blues = [i for i, c in enumerate(to_roots) if c == BLUE]
+    return k - _max_clique(sigma, reds, RED), l - _max_clique(sigma, blues, BLUE)
+
+
+def triple_codegree_multipliers(k: int, l: int, N: int, ramsey_upper):
+    """g = c/N - p(x has colours P to the three roots) >= 0, c = R(root_family) - 1, for
+    every admissible red/blue triangle type and pattern P up to automorphisms of the type.
+    Skipped when trivially true (c >= N - 3), when the extension is itself forbidden
+    (c = 0), or when implied by a pair bound (c >= the bound for some two of the roots:
+    S here is a subset of that pair's S)."""
+    out, facts = [], []
+    for reds in range(4):
+        sigma = triple_type(reds)
+        if _max_clique(sigma, range(3), RED) >= k or _max_clique(sigma, range(3), BLUE) >= l:
+            continue
+        auts = [p for p in permutations(range(3))
+                if all(sigma.color(p[i], p[j]) == sigma.color(i, j) for i, j in combinations(range(3), 2))]
+        seen = set()
+        for pattern in product((RED, BLUE), repeat=3):
+            key = min(tuple(pattern[p[i]] for i in range(3)) for p in auts)
+            if key in seen:
+                continue
+            seen.add(key)
+            ka, lb = root_family(k, l, sigma, pattern)
+            c = ramsey_upper(ka, lb) - 1
+            pair_c = min(ramsey_upper(*root_family(k, l, from_edges(2, [(0, 1, sigma.color(i, j))]),
+                                                   (pattern[i], pattern[j]))) - 1
+                         for i, j in combinations(range(3), 2))
+            if c == 0 or c >= N - 3 or c >= pair_c:
+                continue
+            tag = "".join(COLOR_NAME[sigma.color(i, j)] for i, j in ((0, 1), (0, 2), (1, 2)))
+            name = f"tcodeg[{tag}:{''.join(COLOR_NAME[x] for x in pattern)}<={c}]"
+            g = Add((Scale(Fraction(c, N), one(sigma)), Scale(Fraction(-1), Lit(extension(sigma, pattern)))))
+            out.append((name, g))
             facts.append(f"R({ka},{lb}) <= {c + 1}")
     return out, facts
 

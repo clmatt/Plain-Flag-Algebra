@@ -68,7 +68,7 @@ def red_minus(c: Fraction):
     return Add((Lit(red_flag()), Scale(-c, one_flag())))
 
 
-EXTRAS = ("green", "codeg", "edges", "pedges", "lpsd")
+EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "lpsd")
 
 
 def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False,
@@ -76,6 +76,7 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
     """extras (see neighbourhoods.py):
       green  every clone class has measure exactly 1/N, at 1- and 2-vertex roots;
       codeg  common-neighbourhood bounds |S| <= R(k-a, l-b) - 1 at red and blue pairs;
+      tcodeg the same at red/blue triangles of roots (only bounds no pair implies);
       edges  red edge counts inside red / blue neighbourhoods (edge_tables);
       pedges red edge counts inside common neighbourhoods of pairs (hull lines in |S|);
       lpsd   also a localising PSD block for every codeg / edges / pedges multiplier.
@@ -124,6 +125,10 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
             m, facts = nb.codegree_multipliers(k, l, N, ramsey_upper)
             mults += m
             assumptions += facts
+        if "tcodeg" in extras:
+            m, facts = nb.triple_codegree_multipliers(k, l, N, ramsey_upper)
+            mults += m
+            assumptions += facts
         if "edges" in extras:
             m, facts = nb.edge_multipliers(k, l, N, range(lo, hi + 1), n)
             mults += m
@@ -139,7 +144,8 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
                 if spec:
                     localizing.append(spec)
     name = (f"R{k}{l}_N{N}_n{n}_{degrees}" + ("_e" if empty_type else "")
-            + ("_x-" + "-".join(extras) if extras else ""))
+            + ("_x-" + "-".join(extras) if extras else "")
+            + (f"_L{loc_size}" if extras and loc_size != n - 1 else ""))
     return Problem(name, n, NUM_COLORS, zeros, {}, eqs=eqs, ineqs=ineqs, normalize=True, localizing=localizing,
                    include_empty_type=empty_type, assumptions=sorted(set(assumptions)))
 

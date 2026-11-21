@@ -255,7 +255,7 @@ def test_every_extra_constraint_holds_on_a_critical_graph(kl, n):
     k, l = kl
     G = KNOWN_RAMSEY_GRAPHS[kl]()
     W = StepGraphon.blowup(G)
-    p = build_problem(k, l, G.k, n, "none", extras=("green", "codeg", "edges", "pedges", "lpsd"))
+    p = build_problem(k, l, G.k, n, "none", extras=("green", "codeg", "tcodeg", "edges", "pedges", "lpsd"))
     assert p.ineqs and p.assumptions
     for expr, rhs in p.eqs:
         assert W.evaluate(evaluate(expr, 3, p.zeros)) == rhs
@@ -264,3 +264,63 @@ def test_every_extra_constraint_holds_on_a_critical_graph(kl, n):
     for m, g in p.localizing:
         s = nb.sigma_of(g).k
         assert min(_pointwise_values(W, g, s)) >= 0
+
+
+# ---------------------------------------------------------------------------
+# Three roots
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("kl,G", CASES, ids=lambda x: str(x) if isinstance(x, tuple) else str(x.k))
+def test_triple_codegree_holds_pointwise(kl, G):
+    k, l = kl
+    W = StepGraphon.blowup(G)
+    mults, _ = nb.triple_codegree_multipliers(k, l, G.k, ramsey_upper)
+    checked = 0
+    for name, g in mults:
+        try:
+            vals = _pointwise_values(W, g, 3)
+        except AssertionError:          # G has no root triple of this type (C5: no blue triangle)
+            continue
+        assert min(vals) >= 0, name
+        checked += 1
+    assert checked or not mults         # (3,3), N = 5: every triple bound is trivial
+
+
+def test_triple_codegree_semantics_and_tightness_on_paley17():
+    """At concrete root triangles of Paley(17) the extension density is |S|/N computed from
+    the graph, |S| never exceeds the bound, and some bound is attained."""
+    from itertools import combinations as combs
+
+    G = paley(17)
+    N = G.k
+    W = StepGraphon.blowup(G)
+    mults, facts = nb.triple_codegree_multipliers(4, 4, N, ramsey_upper)
+    assert "R(2,3) <= 3" in facts
+    attained = False
+    for name, g in mults:
+        sigma = nb.sigma_of(g)
+        tag, rest = name[len("tcodeg["):].split(":")
+        pattern = tuple(RED if ch == "r" else BLUE for ch in rest[:3])
+        c = int(rest.split("<=")[1].rstrip("]"))
+        for roots in combs(range(N), 3):
+            for perm in ((0, 1, 2), (0, 2, 1), (1, 0, 2), (1, 2, 0), (2, 0, 1), (2, 1, 0)):
+                r = tuple(roots[p] for p in perm)
+                if any(G.color(r[i], r[j]) != sigma.color(i, j) for i, j in combs(range(3), 2)):
+                    continue
+                S = [x for x in range(N) if x not in r and all(G.color(x, r[i]) == pattern[i] for i in range(3))]
+                assert W.flag_density(nb.extension(sigma, pattern), r) == Fraction(len(S), N)
+                assert len(S) <= c, name
+                attained |= len(S) == c
+    assert attained
+
+
+def test_triple_codegree_families():
+    m, facts = nb.triple_codegree_multipliers(4, 6, 40, ramsey_upper)
+    names = {nm for nm, _ in m}
+    # common blue neighbourhood of a blue triangle is a (4,3)-graph: at most 8 vertices
+    assert "tcodeg[bbb:bbb<=8]" in names
+    # x red to a red edge and blue to a third root: (2,5)-graph, beats the pair bound 5
+    assert "tcodeg[rrr:rrb<=4]" in names
+    # implied by pairs, hence absent: x blue to all of a red triangle ((4,5), 24 = pair bound)
+    assert not any(nm.startswith("tcodeg[rrr:bbb") for nm in names)
+    assert "R(3,4) <= 9" in facts and "R(2,5) <= 5" in facts
