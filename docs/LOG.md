@@ -314,3 +314,17 @@ Indexed unrooted lift (theory.cpp): p(F, H) read from an index of all k-subsets 
 n-vertex graphs instead of scanning every n-vertex graph per F. Byte-identical flagsdp
 output on 9 problems; unit test against density() (mutation-checked); 42 s -> 16 s for
 R(4,6) N = 40 n = 7.
+
+## 2026-11-21: nstats (neighbourhood structure from complete lists) at n = 7
+
+| problem (n = 7) | degrees | extras                        | nstats rows | margin   | proved |
+|-----------------|---------|-------------------------------|-------------|----------|--------|
+| R(4,5) N = 27   | all     | green,codeg,edges,nstats      | 23          | -1.9e-8  | no     |
+| R(4,6) N = 40   | local   | green,codeg,edges,nstats      | 96          | -1.2e-8  | no     |
+
+For R(4,5) N = 27 both neighbourhoods are fully listed at every degree, so the 3-vertex
+statistics are used at full strength (16 more rows need 8 vertices). No effect: the
+relaxation's slack is not in 3-vertex neighbourhood statistics.
+
+Green-free 8-vertex graphs (for eliminating the clone variables): R(4,5) 5588 of 10681,
+R(4,6) 6343 of 11667.
