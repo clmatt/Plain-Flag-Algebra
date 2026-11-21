@@ -372,3 +372,35 @@ and RSS was 1.9 GB before CSDP had started. The host C: drive (which holds the W
 had fallen to 4.5 GB free, so the run was stopped and its files deleted. At n = 7 the
 reduction gave 1.5-1.9x faster solves (R(4,6): 395 s -> 272 s; R(4,5): 454 s -> 241 s),
 not the 3-6x the row count suggested; the density eats most of the gain.
+
+## 2026-11-21: clone elimination, levels form
+
+The full reduction fills in Y. The levels form avoids that: y_G = lambda(G) w(Q_r(G)),
+with one variable w(Q) per green-free graph Q on 1..n vertices (injective density of Q
+in H), tied by w(Q') = sum_Q d(Q', Q) w(Q) for |Q| = |Q'| + 1. The feasible set is the
+same as the full reduction's, each G feeds one row, so the SDP data is as sparse as the
+unreduced problem. R(4,6): 6343 + 678 + 165 = 7186 rows at n = 8 (unreduced 11667),
+plus 843 level equations. flagsdp `blowup N levels`, ramsey_run --blowup-levels, verify.
+Checks: exact on random blow-ups; C++ equals the reference reduction exactly; dropping
+the factor n is caught; verify recomputes sampled rows and all level equations.
+
+Green-root types are not redundant: a type with two clone roots is equivalent to the
+type with one root fewer and flags one vertex smaller, i.e. blocks of the other parity,
+which the SDP does not otherwise contain. Not pursued.
+
+## 2026-11-21: range yardstick and integrality propagation (flagcheck.ranges)
+
+When N is not proved, the phase-1 margin is ~0 for any feasible relaxation, so it cannot
+rank constraint families; the earlier "no effect" verdicts (tcodeg, nstats, L7) only say
+"still feasible". New yardstick: certified bounds lo <= S <= hi on a statistic S over the
+feasible region (objective S and -S, no normalisation row, exact certificates).
+
+Integrality: for a (k,l)-graph H on N vertices, scale * S is a whole number: subgraph
+counts (j! c(F)/N^j in the blow-up), numbers of vertices of each red degree (exact
+Lagrange polynomial in the root's red degree, since every degree is in the window), half
+the number of odd-degree vertices. So ceil(lo*scale) <= scale*S <= floor(hi*scale) are
+valid constraints; --propagate adds them and repeats (each certificate valid given the
+cuts before it; the chain is saved), ending with a phase-1 check. A single linear
+statistic gains nothing from case splits (its range over a convex region is an interval);
+the leverage is coarse lattices (degree counts, spacing 1/N) and the interaction of
+several rounded statistics.
