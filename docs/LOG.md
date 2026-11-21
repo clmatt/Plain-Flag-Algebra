@@ -363,3 +363,12 @@ Reduced runs at n = 7 (graphs = number of green-free graph rows):
 
 The tighter relaxation does not close the n = 7 gap (margins are solver-level zeros).
 The n = 8 reduced run (6343 rows instead of 11667) was started 2026-11-21 11:00.
+
+n = 8 reduced run stopped by hand at 11:53 (still building). The reduction makes Y much
+denser: Y_Q sums the Y_G of every G whose quotient embeds in Q, so each reduced row has
+the union of their supports. After 53 min the files were 1.1 GB (exact) + 1.0 GB (Y body)
++ 3.35 GB (SDPA) and growing, against 1.4 GB in total for the unreduced n = 8 problem,
+and RSS was 1.9 GB before CSDP had started. The host C: drive (which holds the WSL disk)
+had fallen to 4.5 GB free, so the run was stopped and its files deleted. At n = 7 the
+reduction gave 1.5-1.9x faster solves (R(4,6): 395 s -> 272 s; R(4,5): 454 s -> 241 s),
+not the 3-6x the row count suggested; the density eats most of the gain.
