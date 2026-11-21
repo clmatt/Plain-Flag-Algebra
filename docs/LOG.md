@@ -287,3 +287,17 @@ plain R(4,5) at n = 8 builds in 126 MB, so the cost is in the localised constrai
 to n = 8 (each is held as an exact vector over every 8-vertex graph). Options: stream
 those constraints out of flagsdp instead of holding them, run plain/local n = 8 here
 (fits), or a bigger machine.
+
+## 2026-11-21: streaming flagsdp; n = 8 with extras now builds in 166 MB
+
+The OOM was flagsdp's dense (constraints x graphs) table of GMP rationals for the SDPA
+LP rows, plus holding every lifted constraint and the Y body in memory. flagsdp now lifts
+each constraint, writes it to both files and drops it; Y goes through a temporary file.
+Exact output is byte-identical to the old binary on 9 problems (every extras family, up to
+R(4,6) N = 40 n = 7); the SDPA files hold the same entries in a different order; all
+pipeline/solver tests pass.
+
+Probe, R(4,6) N = 40, n = 8, local + green,codeg,edges, loc_size 6 (under ulimit -v 2.5 GB):
+11667 graphs, 293 blocks, 961 eq + 2096 le constraints, 18.8M LP entries, peak RSS 166 MB,
+38 min (almost all of it lifting constraints to 8 vertices). Files: 1.4 GB.
+The solve was started 2026-11-21 08:17 (~/jobs/night_n8.log, CSDP log in ~/runs/night_n8).
