@@ -328,3 +328,38 @@ relaxation's slack is not in 3-vertex neighbourhood statistics.
 
 Green-free 8-vertex graphs (for eliminating the clone variables): R(4,5) 5588 of 10681,
 R(4,6) 6343 of 11667.
+
+## 2026-11-21: clone elimination (--blowup)
+
+For the balanced blow-up W of a red/blue graph H on N >= n vertices, the n-vertex
+densities satisfy y_G = sum_Q M[G][Q] z_Q exactly, where z_Q is the probability that n
+distinct uniform vertices of H induce the green-free graph Q, and
+M[G][Q] = n!/aut(G) (N)_r/N^n aut(Q_r)/r! d(Q_r, Q) (r = number of green classes of G,
+Q_r its quotient). z lies in the simplex over the green-free admissible graphs, so the SDP
+over z (vectors c -> c M, Y_Q = sum_G M[G][Q] Y_G) is a valid relaxation, with fewer
+graph rows. It is also at least as strong: y is confined to the image M(simplex) instead
+of the whole simplex.
+
+Implementation: flagcheck/blowup.py (reference), flagsdp spec directive `blowup <N>`
+(integer counts over den_b N^n n!, so the file format and exact checker are unchanged),
+ramsey_run --blowup, verify (graph list = green-free admissible graphs; sampled entries
+recomputed from columns of M counted without lift()).
+
+Checks: y = M z exactly on random blow-ups (N = 5..8, n = 3..5) and Paley17; columns of M
+sum to 1; nauty automorphism counts equal brute force; C++ reduced output equals the
+reference reduction exactly (4 problems, incl. all extras and localising blocks); reduced
+runs prove R(3,4) <= 9 and never <= 8, never refute C13 / Paley17 at n = 6; verify and
+--reference pass, tampering (blowup flag, N) is rejected. Dropping the aut(Q_r) factor in
+flagsdp is caught by all of these (it produced false "proofs" for C13 / Paley17).
+Unreduced flagsdp output is byte-identical to before (18 comparisons).
+
+Reduced runs at n = 7 (graphs = number of green-free graph rows):
+
+| problem (n = 7) | degrees | extras                   | graphs | margin (exact) | proved |
+|-----------------|---------|--------------------------|--------|----------------|--------|
+| R(4,5) N = 27   | all     | green,codeg,edges        | 627    | -6.9e-9        | no     |
+| R(4,6) N = 40   | local   | green,codeg,edges        | 678    | -3.6e-9        | no     |
+| R(4,6) N = 40   | local   | green,codeg,edges,nstats | 678    | -6.9e-9        | no     |
+
+The tighter relaxation does not close the n = 7 gap (margins are solver-level zeros).
+The n = 8 reduced run (6343 rows instead of 11667) was started 2026-11-21 11:00.
