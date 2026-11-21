@@ -277,3 +277,13 @@ neighbourhood of a blue triangle is a (4,3)-graph, so it has at most 8 vertices.
 Nothing moves, so n = 7 looks exhausted for these constraint families. Next: an
 overnight n = 8 run of R(4,6) N = 40 (local + green,codeg,edges, loc_size 6), with CSDP's
 log streamed to ~/runs/night_n8/csdp.log and a memory guard.
+
+## 2026-11-20 (late): n = 8 with extras does not fit this machine
+
+The size probe for R(4,6) N = 40, n = 8, local + green,codeg,edges (loc_size 6) never
+finished building: the kernel OOM-killed `flagsdp` at 3.3 GB resident (WSL's whole cap)
+while it was generating the problem. So the night run was not started. For comparison,
+plain R(4,5) at n = 8 builds in 126 MB, so the cost is in the localised constraints lifted
+to n = 8 (each is held as an exact vector over every 8-vertex graph). Options: stream
+those constraints out of flagsdp instead of holding them, run plain/local n = 8 here
+(fits), or a bigger machine.
