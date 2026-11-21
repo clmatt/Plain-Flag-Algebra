@@ -230,3 +230,18 @@ Benchmark on the same file, same background load, 2 threads each:
 
 No speed-up, so CSDP stays the default. SDPA remains as an independently implemented
 second solver. Both certificates go through the same exact checker anyway.
+
+## 2026-11-20: R(4,5) calibration with extras; N = 40 with pedges
+
+R(4,5) = 25, n = 7, degrees=all + green,codeg,edges:
+
+| N  | margin    | proved |
+|----|-----------|--------|
+| 28 | +4.317e-4 | yes: R(4,5) <= 28 (plain n = 7 reached 29) |
+| 27 | -1.6e-8   | no     |
+| 26 | -1.6e-8   | no     |
+| 25 | -5.1e-9   | no     |
+| 24 | -4.2e-9   | no, as it must be (352366 graphs exist): soundness check passed |
+
+`verify` re-checked R46_N41 (R(4,6) <= 41): passes.
+R(4,6) N = 40, local + green,codeg,edges,pedges: -5.4e-9, not proved.
