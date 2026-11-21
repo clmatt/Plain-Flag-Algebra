@@ -211,3 +211,22 @@ Test-helper fix: pointwise checks now only use root placements that induce the
 multiplier's type. Elsewhere every value is trivially 0, which could make a "tight
 somewhere" assertion pass vacuously. The earlier tightness results (Paley(17) red-pair
 codegree bound, red-neighbourhood maximum) still hold with the stricter helper.
+
+## 2026-11-20: SDPA vs CSDP
+
+`--solver sdpa` runs SDPA 7.3.20 (Ubuntu package) on the same input file. SDPA's
+standard form is CSDP's with primal and dual swapped: xVec = y (densities),
+yMat = X (certificate), objValDual = CSDP's primal objective. param.sdpa is written to
+print 17 significant digits (the default %+8.3e would ruin exact rounding) and
+tolerances of 1e-8. On small problems the two solvers give the same exact-checker
+verdicts and objectives within 1e-6 (tests/test_ramsey_run.py).
+
+Benchmark on the same file, same background load, 2 threads each:
+
+| problem (n = 7)                                | SDPA  | CSDP  | margin SDPA / CSDP  |
+|------------------------------------------------|-------|-------|---------------------|
+| R(4,6) N=41, local + green,codeg,edges (LP 5280) | 567 s | 508 s | +6.979e-7 / +6.998e-7 |
+| R(4,6) N=42, plain (LP 1441)                   | 237 s | 169 s | -3.8e-9 / -4.1e-9   |
+
+No speed-up, so CSDP stays the default. SDPA remains as an independently implemented
+second solver. Both certificates go through the same exact checker anyway.

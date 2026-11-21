@@ -59,6 +59,21 @@ def test_driver_with_extras_small(extras):
     assert res8.bound <= 0
 
 
+@pytest.mark.skipif(not cppbackend.available() or shutil.which("csdp") is None or shutil.which("sdpa") is None,
+                    reason="needs flagsdp + CSDP + SDPA")
+@pytest.mark.parametrize("args", [(3, 4, 9, 5, "all", ()), (3, 4, 8, 5, "all", ()),
+                                  (3, 4, 9, 5, "none", ALL_EXTRAS), (4, 4, 17, 6, "none", ())])
+def test_sdpa_agrees_with_csdp(args):
+    """Same input file, same verdict from the exact checker, and objectives that agree to
+    solver accuracy (SDPA's standard form is CSDP's with primal and dual swapped)."""
+    k, l, N, n, deg, extras = args
+    _, sc, rc, _ = run(k, l, N, n, deg, extras=extras, solver="csdp")
+    _, ss, rs, _ = run(k, l, N, n, deg, extras=extras, solver="sdpa")
+    assert (rc.bound > 0) == (rs.bound > 0)
+    assert abs(sc.primal_objective - ss.primal_objective) < 1e-6
+    assert len(ss.densities) == len(sc.densities)
+
+
 @pytest.mark.skipif(not cppbackend.available() or shutil.which("csdp") is None, reason="needs flagsdp + CSDP")
 @pytest.mark.parametrize("kln", [(3, 5, 13, 5), (4, 4, 17, 5), (4, 4, 17, 6)])
 def test_extras_never_refute_a_real_graph(kln):

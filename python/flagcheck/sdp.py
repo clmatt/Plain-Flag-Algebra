@@ -269,6 +269,66 @@ def solve_csdp(sdp: FlagSDP, workdir: Optional[str] = None, params: Optional[dic
             os.rmdir(workdir)
 
 
+SDPA_PARAMS = {"maxIteration": "200", "epsilonStar": "1.0E-8", "lambdaStar": "1.0E2", "omegaStar": "2.0",
+               "lowerBound": "-1.0E5", "upperBound": "1.0E5", "betaStar": "0.1", "betaBar": "0.2",
+               "gammaStar": "0.9", "epsilonDash": "1.0E-8"}
+
+
+def run_sdpa(prob: str, block_sizes: List[int], layout: LPLayout, workdir: str,
+             params: Optional[dict] = None, threads: Optional[int] = None) -> NumericSolution:
+    """Run SDPA (double precision) on the same SDPA file as run_csdp.
+
+    SDPA's standard form is CSDP's with primal and dual swapped: SDPA's xVec is CSDP's y
+    (the densities), SDPA's yMat is CSDP's X (the certificate matrices), and objValDual
+    (max F_0 . Y) is CSDP's primal objective. Solutions are printed with 17 significant
+    digits (SDPA's default is 4, too coarse for exact rounding)."""
+    import re
+
+    import numpy as np
+
+    p = dict(SDPA_PARAMS, **(params or {}))
+    keys = ["maxIteration", "epsilonStar", "lambdaStar", "omegaStar", "lowerBound", "upperBound",
+            "betaStar", "betaBar", "gammaStar", "epsilonDash"]
+    with open(os.path.join(workdir, "param.sdpa"), "w") as fh:
+        for k in keys:
+            fh.write(f"{p[k]}\t{k}\n")
+        for k in ("xPrint", "XPrint", "YPrint", "infPrint"):
+            fh.write(f"%+.17e\t{k}\n")
+    out = os.path.join(workdir, "problem.out")
+    cmd = ["sdpa", prob, out] + (["-numThreads", str(threads)] if threads else [])
+    proc = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True)
+    log = proc.stdout + proc.stderr
+    if not os.path.exists(out):
+        raise RuntimeError(f"SDPA produced no output (exit {proc.returncode}):\n{log}")
+    text = open(out).read()
+    if "param  is ./param.sdpa" not in text and "param  is param.sdpa" not in text:
+        raise RuntimeError("SDPA did not read our param.sdpa (precision would be too low)")
+
+    def scalar(name):
+        m = re.search(rf"^{name}\s*=\s*(\S+)", text, re.M)
+        return m.group(1) if m else None
+
+    phase = scalar("phase.value")
+    pobj = float(scalar("objValDual") or "nan")        # CSDP primal
+    dobj = float(scalar("objValPrimal") or "nan")      # CSDP dual
+    num = r"[-+]?\d+\.\d+e[-+]\d+"
+    xvec = text.split("xVec =", 1)[1].split("xMat =", 1)[0]
+    y = [float(t) for t in re.findall(num, xvec)]
+    ymat = text.split("yMat =", 1)[1].split("main loop time", 1)[0]
+    vals = [float(t) for t in re.findall(num, ymat)]
+    expected = sum(d * d for d in block_sizes) + layout.size
+    if len(vals) != expected:
+        raise RuntimeError(f"SDPA yMat has {len(vals)} numbers, expected {expected}")
+    blocks, pos = [], 0
+    for d in block_sizes:
+        M = np.array(vals[pos:pos + d * d]).reshape(d, d)
+        blocks.append((M + M.T) / 2)
+        pos += d * d
+    lp = vals[pos:pos + layout.size]
+    status = 0 if phase == "pdOPT" else 1
+    return NumericSolution(status, pobj, dobj, blocks, lp, y, layout, log + f"\nSDPA phase: {phase}\n")
+
+
 def run_csdp(prob: str, block_sizes: List[int], layout: LPLayout, workdir: str,
              params: Optional[dict] = None) -> NumericSolution:
     """Run CSDP on an existing SDPA file (written by write_sdpa or by `flagsdp --sdpa`)."""

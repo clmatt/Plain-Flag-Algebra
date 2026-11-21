@@ -188,7 +188,7 @@ def save_result(path, params, sol, cert, res, timings, assumptions=()):
 
 
 def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, empty_type=False, workdir=None,
-        extras=(), loc_size=None):
+        extras=(), loc_size=None, solver="csdp"):
     """Large-problem path: C++ writes both the exact problem and the CSDP input; the
     certificate is checked by streaming the exact problem file (tests/test_large_pipeline.py
     shows both steps agree with the in-memory path)."""
@@ -197,7 +197,7 @@ def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, emp
 
     from .certificate import check_flagsdp_file
     from .cppbackend import read_shape, run_flagsdp
-    from .sdp import LPLayout, run_csdp
+    from .sdp import LPLayout, run_csdp, run_sdpa
 
     t = {}
     own = workdir is None
@@ -208,7 +208,13 @@ def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, emp
     m, sizes, neq, nle = read_shape(out)
     t["build"] = time.time() - t0
     t0 = time.time()
-    sol = run_csdp(dat, sizes, LPLayout(m, neq, nle, True), workdir)
+    layout = LPLayout(m, neq, nle, True)
+    if solver == "csdp":
+        sol = run_csdp(dat, sizes, layout, workdir)
+    elif solver == "sdpa":
+        sol = run_sdpa(dat, sizes, layout, workdir, threads=threads)
+    else:
+        raise ValueError(f"unknown solver {solver!r}")
     t["solve"] = time.time() - t0
     t0 = time.time()
     cert = round_solution(sol, bits=bits)
@@ -218,7 +224,8 @@ def run(k, l, N, n, degrees="none", threads=None, results_dir=None, bits=50, emp
     if own:
         shutil.rmtree(workdir, ignore_errors=True)
     params = {"k": k, "l": l, "N": N, "n": n, "degrees": degrees, "empty_type": empty_type,
-              "window": degree_window(k, l, N), "extras": sorted(set(extras)), "loc_size": loc_size}
+              "window": degree_window(k, l, N), "extras": sorted(set(extras)), "loc_size": loc_size,
+              "solver": solver}
     if results_dir:
         save_result(os.path.join(results_dir, f"{problem.name}.json"), params, sol, cert, res, t,
                     problem.assumptions)
@@ -236,11 +243,12 @@ def main():
     ap.add_argument("--empty-type", action="store_true", help="include the empty type (even n only)")
     ap.add_argument("--extras", default="", help="comma-separated subset of " + ",".join(EXTRAS))
     ap.add_argument("--loc-size", type=int, default=None, help="max |g| + |F| - s for localised constraints")
+    ap.add_argument("--solver", default="csdp", choices=["csdp", "sdpa"])
     ap.add_argument("--results", default=os.path.join(os.path.dirname(__file__), "..", "..", "results"))
     a = ap.parse_args()
     extras = [x for x in a.extras.split(",") if x]
     sdp, sol, res, t = run(a.k, a.l, a.N, a.n, a.degrees, a.threads, a.results, empty_type=a.empty_type,
-                           extras=extras, loc_size=a.loc_size)
+                           extras=extras, loc_size=a.loc_size, solver=a.solver)
     print(f"R({a.k},{a.l})<={a.N} n={a.n} degrees={a.degrees} extras={a.extras or '-'} window={degree_window(a.k, a.l, a.N)}: "
           f"graphs={len(sdp.graphs)} blocks={len(sdp.blocks)} csdp={sol.primal_objective:.3e} "
           f"exact={float(res.bound):.3e} PROVED={res.bound > 0} "
