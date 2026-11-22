@@ -438,7 +438,7 @@ sparse constraint matrices, whose nonzeros the levels form does not reduce.
 Result (2026-11-22): CSDP converged after 58 iterations (~14.8 h), "Partial Success, reduced
 accuracy, stuck at edge of primal feasibility": Pobj -3.995e-08, Dobj 3.04e-08, relative
 primal infeasibility 8.5e-08. The margin converges to 0 from both sides -- the same feasible
-pattern as every n = 7 run -- so R(4,6) <= 39 is NOT proved at n = 8 with local +
+pattern as every n = 7 run -- so R(4,6) <= 40 is NOT reproduced at n = 8 with local +
 green,codeg,edges. The exact check never ran: on loading the solution the Python
 post-processing went from 0.8 GB to 3.47 GB in 90 s and the memory guard killed it at
 05:51 (it would only have confirmed a non-positive bound). Before any further n = 8 run the
