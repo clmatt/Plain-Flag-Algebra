@@ -193,21 +193,36 @@ def check_flagsdp_file(path: str, cert: Certificate) -> CheckResult:
         for _ in range(int(parts[1])):
             g, v = nxt()
             f[int(g)] = Fraction(v)
-        eqs, ineqs = [], []
+        # The constraint rows are folded into the slacks as they are read instead of being
+        # stored: at n = 8 they hold ~10^8 entries, far too many to keep as Fractions.
+        #   r_g = f_g - ysum_g - sum_j y_j (a_j[g] - alpha_j) - sum_i u_i (beta_i - b_i[g])
+        ys = [Fraction(y) for y in cert.y]
+        us = [Fraction(u) for u in cert.u]
+        if any(u < 0 for u in us):
+            raise ValueError("inequality multipliers must be non-negative")
+        corr = [Fraction(0)] * m      # -sum_j y_j a_j[g] + sum_i u_i b_i[g]
+        const = Fraction(0)           # sum_j y_j alpha_j - sum_i u_i beta_i
+        neq = nle = 0
         parts = nxt()
         while parts[0] == "constraint":
-            vec = {}
+            if parts[1] == "eq":
+                if neq >= len(ys):
+                    raise ValueError("certificate does not match the problem shape")
+                c, neq = -ys[neq], neq + 1
+            else:
+                if nle >= len(us):
+                    raise ValueError("certificate does not match the problem shape")
+                c, nle = us[nle], nle + 1
+            const -= c * Fraction(parts[2])
             for _ in range(int(parts[3])):
                 g, v = nxt()
-                vec[int(g)] = Fraction(v)
-            (eqs if parts[1] == "eq" else ineqs).append((vec, Fraction(parts[2])))
+                if c:
+                    corr[int(g)] += c * Fraction(v)
             parts = nxt()
         if parts[0] != "Y":
             raise ValueError("expected Y section")
-        if len(cert.blocks) != nb or len(cert.y) != len(eqs) or len(cert.u) != len(ineqs):
+        if len(cert.blocks) != nb or len(ys) != neq or len(us) != nle:
             raise ValueError("certificate does not match the problem shape")
-        if any(Fraction(u) < 0 for u in cert.u):
-            raise ValueError("inequality multipliers must be non-negative")
         grams = []
         for (rows, weights), d in zip(cert.blocks, sizes):
             if any(Fraction(w) < 0 for w in weights):
@@ -249,15 +264,6 @@ def check_flagsdp_file(path: str, cert: Certificate) -> CheckResult:
         if fh.readline().strip() != "end":
             raise ValueError("missing end marker")
 
-    slacks = []
-    for g in range(m):
-        r = f[g] - ysum[g]
-        for (vec, alpha), y in zip(eqs, cert.y):
-            if y:
-                r -= Fraction(y) * (vec.get(g, Fraction(0)) - alpha)
-        for (vec, beta), u in zip(ineqs, cert.u):
-            if u:
-                r -= Fraction(u) * (beta - vec.get(g, Fraction(0)))
-        slacks.append(r)
+    slacks = [f[g] - ysum[g] + corr[g] + const for g in range(m)]
     bound = min(slacks)
     return CheckResult(bound, slacks, [g for g, r in enumerate(slacks) if r == bound])
