@@ -476,3 +476,22 @@ compare: at (23, e = 101) it gives t >= 85, the true minimum is 96.
 
 n = 7, R(4,6) N = 40, local: + green,codeg,edges,mrtri exact -5.9e-9; + nstats,mrtri
 -2.2e-8; not proved.
+
+Ranges with mrtri (n = 7, local + green,codeg,edges,mrtri): red3 [0.0463684, 0.0511322]
+(base [0.0462500, 0.0511320]: width -2.4%), blue3 [0.1799192, 0.1942385] (base
+[0.1799580, 0.1942860]). The blue3 lower bound is BELOW the base one although the region is
+smaller, so one of the two CSDP solves stopped ~4e-5 short of its optimum: both bounds are
+valid, but CSDP's accuracy on these problems is limited.
+
+Is CSDP hiding a tiny positive margin? In exact arithmetic the phase-1 margin is >= 0 (the
+zero certificate with the normalisation slack attains 0), = 0 iff the SDP is feasible, > 0
+iff infeasible. So every "-1e-8" result means "0 or something positive below CSDP's
+resolution", and with margins 1.6e-3 (N = 42) and 7e-7 (N = 41) a margin ~1e-10 at N = 40
+is not excluded. CSDP on R(4,6) N = 40 n = 7 (local + green,codeg,edges):
+  default (tol 1e-8, perturbobj): pobj -1.5e-9 (exact -2.5e-9)
+  tol 1e-10, perturbobj=0: "Lack of progress", primal infeasibility 1.8e-2 (useless)
+  tol 1e-12, perturbobj=0: same behaviour, stopped
+  tol 1e-10, perturbobj=1: "Stuck at edge of primal feasibility" at pobj -9.6e-8,
+    dobj 1.3e-8 -- worse than the default.
+Double precision cannot go below ~1e-8 here; deciding 0 vs tiny-positive needs an
+extended-precision solver (SDPA-GMP / SDPA-DD). Building SDPA-GMP 7.1.3 needs the user's OK.
