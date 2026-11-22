@@ -189,10 +189,12 @@ contradicts the count of red edges in blue neighbourhoods, which is at least 42*
 degree information has to be pointwise: the identity uses sum_v d_v^2.
 `python -m flagcheck.verify` re-checked the certificate from scratch (margin 1.623e-3).
 Convention reminder: infeasible at N means R(k,l) <= N. N = 40 matches the best known
-bound (R(4,6) <= 40, DS1.18); N = 39 would be new.
+bound (R(4,6) <= 40, DS1.18 Table Ib: Angeltveit--McKay 2019, unpublished, personal
+communication [AnM2]; the best published bound is 41 [MR5], McKay--Radziszowski 1997,
+subgraph counting identities); N = 39 would be new.
 
 R(4,6) with localised degrees + green, codeg, edges (n = 7): N = 40 margin -7.1e-9 and
-N = 39 margin -4.0e-9, not proved. So this level reaches R(4,6) <= 41 (Mackey's bound),
+N = 39 margin -4.0e-9, not proved. So this level reaches R(4,6) <= 41 (the published bound [MR5]),
 but not the best known 40.
 
 Second level (`--extras pedges`): at a red or blue pair of roots, the common
