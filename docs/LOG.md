@@ -446,3 +446,33 @@ post-processing went from 0.8 GB to 3.47 GB in 90 s and the memory guard killed 
 05:51 (it would only have confirmed a non-positive bound). Before any further n = 8 run the
 post-processing must be made to stream / skip the exact rounding when the CSDP margin is
 not positive.
+
+## 2026-11-22: post-processing memory; MR5 (McKay-Radziszowski 1997)
+
+Bound attribution (DS1.18): R(4,6) <= 41 is [MR5] (McKay-Radziszowski, JCTB 69 (1997)
+193-209), the best published bound; R(4,6) <= 40 is Angeltveit-McKay 2019, unpublished
+(Table Ib, "personal communication"). So the N = 40 runs aim at the first published
+(checkable) proof of <= 40, and our verified n = 7 certificate for N = 41 matches [MR5].
+
+Memory: the overnight n = 8 check was killed because check_flagsdp_file stored every
+constraint row (~10^8 Fractions at n = 8). It now folds each row into the slacks while
+reading (cb57dbe): identical exact slacks on R(4,6) N = 40 n = 7, peak 232 -> 47 MB.
+
+What [MR5] uses for R(4,6) <= 41: an LP over n_i (vertices of degree i), g_ij / h_ij
+(vertices whose red / blue neighbourhood has i vertices and j edges), with the counting
+identities (I2) = Goodman and (I3) (sum_v 3 t(G-_v) = sum_v g3(G+_v)), and bounds
+e(3,6,i), e(4,5,i), and Table IV: triangle bounds t'(e) <= t <= t''(e) of (4,5,23,e)- and
+(4,5,24,e)-graphs (from LP(4,5,23), LP(4,5,24)). The flag SDP has all of this (identities
+are automatic; local degrees + edges give the joint distribution) except Table IV at 23
+vertices (nstats covers 24 exactly). They note LP(4,6,40) is feasible and that <= 40 would
+follow from e(4,5,22) >= 93, e(4,5,23) >= 105, e(4,5,24) >= 113. McKay's data give the
+exact minima 88, 101, 116, so that route is closed.
+
+New extra mrtri (94b9f6d): (E,T) hull lines of the triangle-vs-edges bounds of
+(4,5)-neighbourhoods, exact where McKay lists all graphs with that edge count (r45_24; the
+extreme counts of r45extreme on 22, 23), Table IV otherwise. The transcription is checked
+against every listed graph on 22-24 vertices (no violation). Table IV is loose where we can
+compare: at (23, e = 101) it gives t >= 85, the true minimum is 96.
+
+n = 7, R(4,6) N = 40, local: + green,codeg,edges,mrtri exact -5.9e-9; + nstats,mrtri
+-2.2e-8; not proved.
