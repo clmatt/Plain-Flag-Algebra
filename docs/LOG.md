@@ -434,3 +434,13 @@ R(4,6) N = 40, n = 8, local + green,codeg,edges, blowup levels: started 15:00. B
 memory is no longer the constraint; but iteration 3 took ~25 min, about the same as the
 unreduced problem. CSDP's time here is dominated by forming the Schur complement from the
 sparse constraint matrices, whose nonzeros the levels form does not reduce.
+
+Result (2026-11-22): CSDP converged after 58 iterations (~14.8 h), "Partial Success, reduced
+accuracy, stuck at edge of primal feasibility": Pobj -3.995e-08, Dobj 3.04e-08, relative
+primal infeasibility 8.5e-08. The margin converges to 0 from both sides -- the same feasible
+pattern as every n = 7 run -- so R(4,6) <= 39 is NOT proved at n = 8 with local +
+green,codeg,edges. The exact check never ran: on loading the solution the Python
+post-processing went from 0.8 GB to 3.47 GB in 90 s and the memory guard killed it at
+05:51 (it would only have confirmed a non-positive bound). Before any further n = 8 run the
+post-processing must be made to stream / skip the exact rounding when the CSDP margin is
+not positive.
