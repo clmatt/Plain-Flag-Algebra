@@ -422,3 +422,15 @@ distribution is essentially unconstrained at n = 7, so integrality propagation o
 counts has nothing to bite on; stopped after round 0 (chain in results/chain_R46_N40_n7_deg).
 eint (neighbourhood edge-count integrality) at n = 7: R(4,6) N = 40 margin -7.1e-9,
 R(4,5) N = 27 margin -7.3e-9: not proved.
+
+Range comparison (continued): tcodeg leaves both ranges unchanged; nstats narrows them a
+little (blue triangles: lower bound 1919.5 -> 1921.0 as a count, width -0.9%; red -0.3%).
+loc_size 7 and no-extras configs not run (stopped to give n = 8 the machine).
+
+## 2026-11-21: n = 8, levels form
+
+R(4,6) N = 40, n = 8, local + green,codeg,edges, blowup levels: started 15:00. Build 27 min
+(1.4 GB SDPA + 0.86 GB exact file). CSDP RSS 1.18 GB (unreduced: ~2.25 GB WSL total), so
+memory is no longer the constraint; but iteration 3 took ~25 min, about the same as the
+unreduced problem. CSDP's time here is dominated by forming the Schur complement from the
+sparse constraint matrices, whose nonzeros the levels form does not reduce.
