@@ -479,6 +479,107 @@ def test_stat_multiplier_detects_a_wrong_point():
 
 
 # ---------------------------------------------------------------------------
+# mrtri: triangles against edges in (4,5)-neighbourhoods
+# ---------------------------------------------------------------------------
+
+def _extreme_45(orders):
+    """{s: [graph6 lines]} of r45extreme.tar.gz for the given orders (all graphs with the
+    file's (s, e))."""
+    import tarfile
+
+    out = {}
+    with tarfile.open(os.path.join(DATA, "r45extreme.tar.gz")) as tar:
+        for m in tar.getmembers():
+            if m.isfile():
+                for line in tar.extractfile(m).read().splitlines():
+                    if line.strip() and line.strip()[0] - 63 in orders:
+                        out.setdefault(line.strip()[0] - 63, []).append(line)
+    return out
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "r45extreme.tar.gz")), reason="McKay's lists absent")
+def test_triangle_tables_against_every_listed_graph():
+    """EXTREME_TRIANGLES is exactly what the archive gives, and no listed (4,5)-graph on 22-24
+    vertices violates MR5 Table IV (a check of the transcription)."""
+    seen = {}
+    for s, lines in _extreme_45((22, 23)).items():
+        for line in lines:
+            e, _, t = nbhd_stats.triple_stats(*nbhd_stats.adjacency(line))
+            a, b = seen.setdefault(s, {}).get(e, (t, t))
+            seen[s][e] = (min(a, t), max(b, t))
+    assert seen == nbhd_stats.EXTREME_TRIANGLES
+    for s, table in nbhd_stats.MR5_TRIANGLES.items():
+        pts = nbhd_stats.triple_points(4, 5, s) or set()
+        pts |= {(e, None, t) for e, rng in seen.get(s, {}).items() for t in rng}
+        assert pts
+        for e, _, t in pts:
+            assert table[e][0] <= t <= table[e][1], (s, e, t)
+    for s in (22, 23, 24):
+        bounds = nbhd_stats.triangle_bounds(s)
+        assert set(bounds) <= set(range(edge_bounds(4, 5, s)[0], edge_bounds(4, 5, s)[1] + 1))
+        for e, rng in seen.get(s, {}).items():
+            assert bounds[e] == rng
+
+
+def _rooted(H, N, red_extra):
+    """A graph on N vertices whose root 0 is blue to a copy of H (red edges of H kept) and
+    red to the other N-1-|H| vertices; red_extra decides colours among the rest."""
+    s = H.k
+    edges = []
+    for x in range(1, N):
+        edges.append((0, x, BLUE if x <= s else RED))
+    for x, y in _combs(range(1, N), 2):
+        if y <= s:
+            edges.append((x, y, H.color(x - 1, y - 1)))
+        else:
+            edges.append((x, y, RED if red_extra(x, y) else BLUE))
+    return from_edges(N, edges)
+
+
+def _sample_45(s):
+    if s == 24:
+        with open(os.path.join(DATA, "r45_24.g6"), "rb") as fh:
+            lines = [ln for i, ln in enumerate(fh) if i in (0, 1000, 176183, 352365)]
+    else:
+        lines = _extreme_45((s,))[s]
+        lines = lines[:2] + lines[-2:]
+    return [_graph_from_g6(ln) for ln in lines]
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "r45_24.g6")), reason="McKay's lists absent")
+@pytest.mark.parametrize("s", [22, 23, 24])
+def test_triangle_multipliers_hold_at_real_neighbourhoods(s):
+    """R(4,6), N = 40: a root of red degree 39 - s whose blue neighbourhood is a real
+    (4,5)-graph on s vertices satisfies every mrtri multiplier."""
+    N = 40
+    lo, hi = degree_window(4, 6, N)
+    mults, facts = nb.triangle_multipliers(4, 6, N, range(lo, hi + 1))
+    assert facts and all("blue" in name for name, _ in mults)
+    for H in _sample_45(s):
+        W = StepGraphon.blowup(_rooted(H, N, lambda x, y: (x + y) % 3 == 0))
+        vals = [_value_at(W, g, (0,)) for _, g in mults]
+        assert min(vals) >= 0
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "r45_24.g6")), reason="McKay's lists absent")
+def test_triangle_multiplier_detects_too_few_triangles():
+    """Raising the lower bound above a real graph's triangle count must make a multiplier
+    negative at its root: the constraints really use the table."""
+    N = 40
+    lo, hi = degree_window(4, 6, N)
+    H = _sample_45(23)[0]
+    e, _, t = _stats(H, range(23))
+    saved = dict(nbhd_stats.EXTREME_TRIANGLES[23])
+    try:
+        nbhd_stats.EXTREME_TRIANGLES[23][e] = (t + 1, t + 1)
+        mults, _ = nb.triangle_multipliers(4, 6, N, range(lo, hi + 1))
+        W = StepGraphon.blowup(_rooted(H, N, lambda x, y: (x + y) % 3 == 0))
+        assert min(_value_at(W, g, (0,)) for _, g in mults) < 0
+    finally:
+        nbhd_stats.EXTREME_TRIANGLES[23] = saved
+
+
+# ---------------------------------------------------------------------------
 # eint: integrality of neighbourhood edge counts
 # ---------------------------------------------------------------------------
 

@@ -112,6 +112,61 @@ def compute(data_dir: str) -> Dict:
     return out
 
 
+# Published bounds t_lo <= t <= t_hi on the number of triangles of a (4,5)-graph on s
+# vertices with e edges: B.D. McKay, S.P. Radziszowski, "Subgraph Counting Identities and
+# Ramsey Numbers", J. Combin. Theory Ser. B 69 (1997) 193-209, Table IV (from their linear
+# programs LP(4,5,23) and LP(4,5,24)). MR5_TRIANGLES[s][e] = (t_lo, t_hi). A hypothesis
+# (published table); the tests check it against every listed (4,5)-graph we have.
+# fmt: off
+MR5_TRIANGLES = {
+    23: {98: (90, 98), 99: (88, 104), 100: (87, 109), 101: (85, 113), 102: (83, 117),
+         103: (82, 121), 104: (82, 125), 105: (84, 128), 106: (85, 131), 107: (87, 134),
+         108: (89, 137), 109: (91, 141), 110: (92, 142), 111: (94, 144), 112: (97, 146),
+         113: (100, 149), 114: (103, 151), 115: (106, 153), 116: (109, 154), 117: (113, 156),
+         118: (116, 157), 119: (119, 158), 120: (122, 160), 121: (126, 161), 122: (129, 162),
+         123: (133, 164), 124: (138, 165), 125: (142, 166), 126: (147, 168), 127: (153, 169),
+         128: (159, 170), 129: (166, 172), 130: (172, 173)},
+    24: {109: (112, 112), 110: (111, 117), 111: (110, 121), 112: (110, 125), 113: (109, 128),
+         114: (108, 131), 115: (108, 135), 116: (107, 138), 117: (107, 142), 118: (109, 145),
+         119: (112, 148), 120: (114, 151), 121: (117, 154), 122: (119, 156), 123: (122, 159),
+         124: (125, 162), 125: (127, 165), 126: (130, 168), 127: (133, 169), 128: (135, 170),
+         129: (138, 172), 130: (142, 173), 131: (146, 174), 132: (176, 176)},
+}
+# Exact triangle ranges of the (4,5)-graphs with the extreme edge counts: r45extreme.tar.gz
+# holds ALL (4,5)-graphs with s vertices and e edges in r45<s>.<e>.g6, for the few smallest
+# and largest e (McKay's page, as in edge_tables). Recomputed in the tests from the archive.
+EXTREME_TRIANGLES = {
+    22: {88: (66, 77), 89: (68, 79), 113: (130, 145), 114: (135, 148)},
+    23: {101: (96, 96), 102: (95, 101), 103: (94, 105), 104: (94, 109),
+         119: (136, 151), 120: (141, 152), 121: (146, 156), 122: (154, 154)},
+}
+# fmt: on
+
+
+def triangle_bounds(s: int) -> Dict[int, Tuple[int, int]]:
+    """{e: (t_lo, t_hi)} for every edge count e of a (4,5)-graph on s vertices: the exact
+    range where all graphs with that e are listed (complete list at s = 24, extreme edge
+    counts below), else MR5 Table IV, else the trivial [0, C(s,3)]."""
+    from .edge_tables import edge_bounds
+
+    lo_e, hi_e = edge_bounds(4, 5, s)
+    exact: Dict[int, Tuple[int, int]] = dict(EXTREME_TRIANGLES.get(s, {}))
+    pts = triple_points(4, 5, s)
+    if pts:
+        for e, _, t in pts:
+            a, b = exact.get(e, (t, t))
+            exact[e] = (min(a, t), max(b, t))
+    out = {}
+    for e in range(lo_e, hi_e + 1):
+        if e in exact:
+            out[e] = exact[e]
+        elif pts:
+            continue                      # complete list: no graph with this many edges
+        else:
+            out[e] = MR5_TRIANGLES.get(s, {}).get(e, (0, comb(s, 3)))
+    return out
+
+
 _TABLE = None
 
 

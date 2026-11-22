@@ -68,7 +68,7 @@ def red_minus(c: Fraction):
     return Add((Lit(red_flag()), Scale(-c, one_flag())))
 
 
-EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "eint", "lpsd")
+EXTRAS = ("green", "codeg", "tcodeg", "edges", "pedges", "nstats", "mrtri", "eint", "lpsd")
 
 
 def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_type: bool = False,
@@ -81,6 +81,8 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
       pedges red edge counts inside common neighbourhoods of pairs (hull lines in |S|);
       nstats edges / induced paths / triangles of each neighbourhood lie in the convex hull
              of all listed (a,b)-graphs of that order, at each degree (nbhd_stats);
+      mrtri  triangles against edges in (4,5)-neighbourhoods: exact where McKay lists all
+             graphs with that edge count, McKay-Radziszowski 1997 Table IV otherwise;
       eint   (X - a)(X - a - 1) >= 0 at every vertex, X = red edges inside its red / blue
              neighbourhood (a whole number), a over the range of the edge tables.
       lpsd   also a localising PSD block for every codeg / edges / pedges / eint multiplier.
@@ -154,9 +156,11 @@ def build_problem(k: int, l: int, N: int, n: int, degrees: str = "none", empty_t
                 spec = nb.localizing_specs(g, n)
                 if spec:
                     localizing.append(spec)
-        if "nstats" in extras:
+        for extra, maker in (("nstats", nb.stat_multipliers), ("mrtri", nb.triangle_multipliers)):
+            if extra not in extras:
+                continue
             # These can be wider than loc_size: each still gets [[g]] >= 0 if it fits in n.
-            m, facts = nb.stat_multipliers(k, l, N, range(lo, hi + 1))
+            m, facts = maker(k, l, N, range(lo, hi + 1))
             assumptions += facts
             for _, g in m:
                 size = nb.expr_size(g)

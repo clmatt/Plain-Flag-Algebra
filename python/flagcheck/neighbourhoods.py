@@ -269,6 +269,52 @@ def triple_extension(to_root: int, reds: int) -> Flag:
     return from_edges(4, edges, s=1)
 
 
+def triangle_multipliers(k: int, l: int, N: int, window: Sequence[int]):
+    """Triangles against edges in the neighbourhoods that are (4,5)-graphs (nbhd_stats.
+    triangle_bounds: exact data where all graphs are listed, McKay-Radziszowski 1997 Table IV
+    for s = 23, 24 otherwise). At a root of degree d whose red (blue) neighbourhood is a
+    (4,5)-graph on s vertices, (E, T) = (2e/N^2, 6t/N^3) lies above the lower and below the
+    upper convex hull of the points (e, t_lo(e)) and (e, t_hi(e)); the hull lines are
+    interpolated in R over the window as in stat_multipliers."""
+    from .nbhd_stats import triangle_bounds
+    from .ramsey import one_flag
+
+    out, facts = [], []
+    window = list(window)
+    for label, rc, fam, size in (("red", RED, (k - 1, l), lambda d: d),
+                                 ("blue", BLUE, (k, l - 1), lambda d: N - 1 - d)):
+        if fam != (4, 5):
+            continue
+        tabled = {}
+        for d in window:
+            try:
+                tabled[d] = triangle_bounds(size(d))
+            except KeyError:
+                pass
+        if not tabled:
+            continue
+        facts += [f"triangles of {size(d)}-vertex (4,5)-graphs against edges (McKay's lists; "
+                  f"McKay-Radziszowski 1997 Table IV)" for d in tabled]
+        X, Y = Lit(double_extension(rc, RED)), Lit(triple_extension(rc, 3))
+        for side in ("min", "max"):
+            lower = side == "min"
+            sign = 1 if lower else -1
+            lines = {}
+            for d in window:
+                if d in tabled:
+                    pts = {(Fraction(2 * e, N * N), Fraction(6 * (lo if lower else hi), N ** 3))
+                           for e, (lo, hi) in tabled[d].items()}
+                    lines[d] = _plane_lines(pts, lower)
+                else:
+                    lines[d] = [(Fraction(0), Fraction(0) if lower else Fraction(6 * comb(size(d), 3), N ** 3))]
+            for i in range(max(len(v) for v in lines.values())):
+                A = _lagrange({d: v[i % len(v)][0] for d, v in lines.items()}, window, N)
+                B = _lagrange({d: v[i % len(v)][1] for d, v in lines.items()}, window, N)
+                g = Add((Scale(sign, Y), Scale(-sign, Mul((A, X))), Scale(-sign, B)))
+                out.append((f"mrtri[{label}]-{side}-{i}", g))
+    return out, facts
+
+
 def _plane_lines(plane, lower: bool):
     """Valid lines y >= a x + b (lower) or y <= a x + b (upper) through the hull of the points;
     a single x value gives the horizontal line through the extreme y."""
