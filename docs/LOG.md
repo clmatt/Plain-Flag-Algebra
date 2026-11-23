@@ -495,3 +495,14 @@ is not excluded. CSDP on R(4,6) N = 40 n = 7 (local + green,codeg,edges):
     dobj 1.3e-8 -- worse than the default.
 Double precision cannot go below ~1e-8 here; deciding 0 vs tiny-positive needs an
 extended-precision solver (SDPA-GMP / SDPA-DD). Building SDPA-GMP 7.1.3 needs the user's OK.
+
+SDPA-GMP 7.1.3 built in WSL (~/src/sdpagmp; the bundled SPOOLES needs CC="gcc -std=gnu99
+-fpermissive -w" with GCC 15). Parameters that converge on our files: epsilonStar =
+epsilonDash = 1e-25, lambdaStar 1e2, betaBar 0.2, 128-bit precision (the package default
+lambdaStar 1e4 / betaBar 0.3 stopped at pFEAS on R(3,4) N = 9 n = 5).
+  R(3,4) N = 9 n = 5 (infeasible): margin 1.5950443607122e-4 at 128/256/512 bits
+    (CSDP 1.5950394e-4: off in the 6th digit).
+  Calibration, true margin 0 (a Ramsey graph exists): R(3,4) N = 8 n = 5, 6: 8.1e-20,
+    1.1e-19; R(4,4) N = 17 n = 6: 7.0e-20; R(3,5) N = 13 n = 6 local+green,codeg,edges:
+    4.7e-19. So a zero margin shows as ~1e-19, anything well above that is real.
+R(4,6) N = 40 n = 7 local + green,codeg,edges started 16:44 (single-threaded, 380 MB).
