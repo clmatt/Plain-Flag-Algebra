@@ -506,3 +506,8 @@ lambdaStar 1e4 / betaBar 0.3 stopped at pFEAS on R(3,4) N = 9 n = 5).
     1.1e-19; R(4,4) N = 17 n = 6: 7.0e-20; R(3,5) N = 13 n = 6 local+green,codeg,edges:
     4.7e-19. So a zero margin shows as ~1e-19, anything well above that is real.
 R(4,6) N = 40 n = 7 local + green,codeg,edges started 16:44 (single-threaded, 380 MB).
+Result: SDPA-GMP converged in 50 iterations (3.3 h CPU): objValPrimal (upper bound on
+the margin) 5.45e-20, objValDual -6.10e-20, dual infeasibility 7.9e-28 (phase pFEAS, i.e.
+stopped on epsilon, not pdOPT). The margin is <= 5e-20, the calibration's zero level: the
+n = 7 SDP for R(4,6) N = 40 (local + green,codeg,edges) is genuinely feasible. CSDP was not
+hiding a tiny positive margin here; the relaxation itself is too weak.
