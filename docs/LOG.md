@@ -511,3 +511,20 @@ the margin) 5.45e-20, objValDual -6.10e-20, dual infeasibility 7.9e-28 (phase pF
 stopped on epsilon, not pdOPT). The margin is <= 5e-20, the calibration's zero level: the
 n = 7 SDP for R(4,6) N = 40 (local + green,codeg,edges) is genuinely feasible. CSDP was not
 hiding a tiny positive margin here; the relaxation itself is too weak.
+
+## 2026-11-22: what the n = 7 fake needs (diagnostics with FALSE hypotheses, no certificates kept)
+
+R(4,6) N = 40 n = 7, local + green,codeg,edges, with one assumption changed:
+| assumption (not true!)                 | exact margin | verdict    |
+|----------------------------------------|--------------|------------|
+| e(4,5,22) >= 93 and e(4,5,23) >= 105   | +1.681e-6    | infeasible |
+| e(4,5,22) >= 93 only                   | -3.9e-9      | feasible   |
+| e(4,5,23) >= 105 only                  | -4.6e-9      | feasible   |
+| every red degree = 15                  | +1.176e-3    | infeasible |
+| every red degree = 16                  | -3.9e-9      | feasible   |
+| every red degree = 17                  | +2.058e-6    | infeasible |
+So the fake lives on degree-16 (and 17) vertices whose blue neighbourhoods are sparse
+(4,5,23)- and (4,5,22)-graphs, MR5's obstruction exactly. For a 16-regular graph, (I2)
+gives avg e(blue nbhd) = 64 + avg e(red nbhd) <= 104 since (3,6,16)-graphs have <= 40
+edges; with e(4,5,23) >= 101 the blue neighbourhoods average 101..104 edges -- precisely
+the edge counts for which r45extreme lists ALL (4,5,23,e)-graphs.
