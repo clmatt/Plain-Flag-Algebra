@@ -528,3 +528,8 @@ So the fake lives on degree-16 (and 17) vertices whose blue neighbourhoods are s
 gives avg e(blue nbhd) = 64 + avg e(red nbhd) <= 104 since (3,6,16)-graphs have <= 40
 edges; with e(4,5,23) >= 101 the blue neighbourhoods average 101..104 edges -- precisely
 the edge counts for which r45extreme lists ALL (4,5,23,e)-graphs.
+Same with both sizes capped (false): exact data at 22 (e <= 89, 29 points) and 23
+(e <= 104, 277 points), window [15,17]: exact +4.189e-9 (CSDP +1.7e-8), infeasible but only
+barely; with 22 alone feasible (-7.3e-9). So even this over-strong version of "the sparse
+neighbourhoods are the listed ones" only just kills the n = 7 fake; an honest version
+(bootstrapped bounds for the unlisted middle edge counts) will be weaker.
