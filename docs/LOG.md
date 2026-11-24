@@ -533,3 +533,9 @@ Same with both sizes capped (false): exact data at 22 (e <= 89, 29 points) and 2
 barely; with 22 alone feasible (-7.3e-9). So even this over-strong version of "the sparse
 neighbourhoods are the listed ones" only just kills the n = 7 fake; an honest version
 (bootstrapped bounds for the unlisted middle edge counts) will be weaker.
+Bootstrap probe: certified min of t over (4,5,23)-graphs with 105 <= e <= 118 at n = 7
+(R(4,5) N = 23, degrees all + green,codeg,edges,nstats, e-range as cuts): t >= 82.29,
+no better than MR5 Table IV (84 at e = 105) and far below the listed graphs (94 at e = 104).
+Conclusion: 3-vertex statistics of the 22/23-vertex blue neighbourhoods cannot prove
+N = 40 at n = 7 -- even the false "no unlisted sparse neighbourhood" version is only
+barely infeasible, and honest bounds for the unlisted ones are weak.
