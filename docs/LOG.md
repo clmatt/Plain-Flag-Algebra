@@ -539,3 +539,40 @@ no better than MR5 Table IV (84 at e = 105) and far below the listed graphs (94 
 Conclusion: 3-vertex statistics of the 22/23-vertex blue neighbourhoods cannot prove
 N = 40 at n = 7 -- even the false "no unlisted sparse neighbourhood" version is only
 barely infeasible, and honest bounds for the unlisted ones are weak.
+
+## 4-vertex neighbourhood statistics ("quad" cuts)
+
+Counts c in Z^11 of induced 4-vertex subgraphs of every listed graph: (3,6) on 15/16/17
+(1823 / 312 / 7 distinct vectors) and (4,5) on 24 (231402 distinct). At a root of red degree
+d, Q[rc,h] (root rc-joined to 4 vertices inducing class h) has density 24 c_h / N^4, so a
+direction a with b_d = min over the complete list (or the trivial C(s,4) min a_h) gives the
+valid cut sum_h a_h Q[rc,h] >= B(R), B(d/N) = 24 b_d / N^4 (flagcheck.nbhd_quads,
+neighbourhoods.quad_multipliers, extra "quad"; tests/test_quads.py).
+
+Cut directions come from a separation loop (scratch): solve the n = 7 SDP (local + green,
+codeg, edges) with no objective, take the solution's pseudo-average count vector at each
+degree, separate it from the listed vectors by an LP.
+
+FALSE ALARM, caught: the first loop reported phase-1 +2.56e-5 after one round. Its own
+flag builder dropped the edge (3,0) of the C4 representative (pairs were tested as i < j),
+so "C4" was encoded as P4 and the cuts were invalid. Rebuilt through the driver with the
+library encoding: exact -1.942e-8, feasible. Regression test added (the 11 quad flags must
+be distinct and have the right leaf graphs). The loop is being rerun with the library flags.
+
+Rerun with the library flags, global cuts (one direction, B(R) interpolated over the window):
+8 rounds, 32 cuts, phase 1 stays ~ -5e-9 and the separation margins never shrink -- a global
+cut only constrains the degree-weighted average of a.c(v) - b_d, so the solution trades
+violations between degrees.
+
+Degree-localised cuts: L_d(R) is 1 at roots of degree d and 0 at the other window degrees,
+so [[L_d(R)(a.Q - 24 b_d / N^4)]] >= 0 is valid and has size 5 + 2 = 7 = n. These cut off the
+separated conditional vector itself. 12 rounds, 50 cuts (red d = 15, 16, 17 and blue d = 15:
+the orders with complete lists): margins fell from 110 / 543 / 25 / 58 to 0.003 / 0.99 / 0 /
+0.56, i.e. the solution's conditional 4-vertex count vectors now lie (essentially) in the
+hulls of the listed graphs, and phase 1 is still -5.6e-9 (round 11). Converged, feasible.
+
+Conclusion: at n = 7, every 4-vertex statistic of the neighbourhoods that has a complete list
+(red at 15-17, blue at 15) is already satisfiable by the fake; what remains free is the blue
+neighbourhood at degrees 16 and 17 ((4,5)-graphs on 23 and 22 vertices, no complete lists).
+The 50 cuts are stored in flagcheck/data/quad_cuts.json (valid, offsets rechecked from the
+lists by `python -m flagcheck.nbhd_quads check`), extra "quad" in ramsey_run.

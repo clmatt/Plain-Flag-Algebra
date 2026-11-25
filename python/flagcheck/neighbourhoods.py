@@ -315,6 +315,74 @@ def triangle_multipliers(k: int, l: int, N: int, window: Sequence[int]):
     return out, facts
 
 
+def quad_flag(rc: int, h: int) -> Flag:
+    """Root joined in colour rc to 4 vertices inducing class h of nbhd_quads (red edges,
+    blue non-edges). At a root of a blow-up of an N-vertex graph its density is
+    24 c_h / N^4, c_h = number of 4-subsets of the rc-neighbourhood inducing class h
+    (ordered 4-tuples of distinct original vertices; a clone pair would be green)."""
+    from .nbhd_quads import PAIRS, REPS
+
+    E = set(REPS[h])
+    edges = [(0, i, rc) for i in range(1, 5)]
+    edges += [(i + 1, j + 1, RED if (i, j) in E else BLUE) for i, j in PAIRS]
+    return from_edges(5, edges, s=1)
+
+
+def quad_multipliers(k: int, l: int, N: int, window: Sequence[int]):
+    """The stored quad cuts for (k, l, N) (nbhd_quads): at a root of red degree d,
+    sum_h a_h c_h >= b_d, i.e. g = sum_h a_h Q[rc,h] - B(R) >= 0 with B(d/N) = 24 b_d / N^4."""
+    from .nbhd_quads import LIST_COUNTS, family, load_cuts, trivial_offset
+
+    out, facts = [], []
+    window = list(window)
+    for i, c in enumerate(load_cuts()):
+        if (c["k"], c["l"], c["N"]) != (k, l, N):
+            continue
+        g, f = quad_cut_expr(k, l, N, window, c, i)
+        out.append((f"quad[{c['colour']}]-{i}", g))
+        facts += f
+    return out, facts
+
+
+def quad_cut_expr(k: int, l: int, N: int, window: Sequence[int], c: dict, i=0):
+    """(g, facts) for one quad cut (nbhd_quads format, Fraction values). Without "degree":
+    g = sum_h a_h Q[rc,h] - B(R), offsets at every window degree. With "degree": d, the cut is
+    localised at that degree, g = L_d(R) (sum_h a_h Q[rc,h] - 24 b_d / N^4), L_d the Lagrange
+    basis polynomial of the window (1 at d, 0 at the other window degrees, so L_d(R) is 0 or 1
+    at every root of a real graph): |g| = 5 + |window| - 1."""
+    from .nbhd_quads import LIST_COUNTS, family, trivial_offset
+    from .ramsey import one_flag
+
+    window = list(window)
+    facts = []
+    if "degree" in c:
+        if sorted(c["offsets"]) != [c["degree"]] or c["degree"] not in window:
+            raise ValueError(f"quad cut {i}: a localised cut needs its one offset in the window")
+    elif sorted(c["offsets"]) != window:
+        raise ValueError(f"quad cut {i}: offsets for {sorted(c['offsets'])}, window {window}")
+    rc = RED if c["colour"] == "red" else BLUE
+    for d, (b, source) in c["offsets"].items():
+        fam, s = family(k, l, N, c["colour"], d)
+        if source == "trivial":
+            if b != trivial_offset(c["a"], fam, s):
+                raise ValueError(f"quad cut {i}: wrong trivial offset at d = {d}")
+        elif (*fam, s) in LIST_COUNTS:
+            facts.append(f"4-vertex induced subgraph counts of all {LIST_COUNTS[(*fam, s)]} "
+                         f"({fam[0]},{fam[1]})-graphs on {s} vertices (McKay's list)")
+        else:
+            raise ValueError(f"quad cut {i}: no complete list for ({fam[0]},{fam[1]},{s})")
+    terms = tuple(Scale(a, Lit(quad_flag(rc, h))) for h, a in enumerate(c["a"]) if a)
+    if "degree" in c:
+        d = c["degree"]
+        b = c["offsets"][d][0]
+        L = _lagrange({e: Fraction(int(e == d)) for e in window}, window, N)
+        g = Mul((L, Add(terms + (Scale(-Fraction(24) * b / N ** 4, one_flag()),))))
+    else:
+        B = _lagrange({d: Fraction(24) * b / N ** 4 for d, (b, _) in c["offsets"].items()}, window, N)
+        g = Add(terms + (Scale(Fraction(-1), B),))
+    return g, facts
+
+
 def _plane_lines(plane, lower: bool):
     """Valid lines y >= a x + b (lower) or y <= a x + b (upper) through the hull of the points;
     a single x value gives the horizontal line through the extreme y."""
